@@ -48,6 +48,8 @@ the **operator** watches all three through the queue.
 <repo>/
 └── .status-pipe/
     ├── launch.json              # committed — how to launch this repo's orchestrator
+    ├── config.json              # committed — repo conventions: epic dir, inventory,
+    │                            #   ticketing source, trust mode, attribution
     ├── orchestrator.json        # ignored — pass metadata: passCount, timestamps,
     │                            #   staleWorkerMinutes, parked
     ├── tickets/                 # ignored — one file per tracked ticket
@@ -57,17 +59,18 @@ the **operator** watches all three through the queue.
         └── 853/ack-7f3a9c2e.json
 ```
 
-Recommended ignore rules (everything runtime, only the launcher committed):
+Recommended ignore rules (everything runtime; only launcher + config committed):
 
 ```gitignore
 .status-pipe/*
 !.status-pipe/launch.json
+!.status-pipe/config.json
 ```
 
 JSON Schemas are **not** copied per-repo: they ship once in this repository
 under `schemas/` (`ticket.schema.json`, `ack.schema.json`, `launch.schema.json`,
-`orchestrator.schema.json`) and are referenced by `$id`; the extension and the
-plugin both vendor them.
+`orchestrator.schema.json`, `config.schema.json`) and are referenced by `$id`;
+the extension and the plugin both vendor them.
 
 ## Renames from the prototype convention
 

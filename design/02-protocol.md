@@ -17,6 +17,9 @@ migrating those repos is in [10-naming.md](10-naming.md).
 └── .status-pipe/
     ├── launch.json              # committed: how to launch this repo's orchestrator
     │                            #   (schema + semantics in 09-launch-and-supervision.md)
+    ├── config.json              # committed: repo conventions — epic dir, inventory
+    │                            #   label, ticketing source, trust mode, attribution
+    │                            #   (schema + semantics in 07-claude-plugin.md)
     ├── orchestrator.json        # gitignored: orchestrator pass metadata
     ├── tickets/                 # gitignored: one file per tracked ticket (worker-owned)
     │   ├── 853.json
@@ -29,6 +32,7 @@ migrating those repos is in [10-naming.md](10-naming.md).
 ```gitignore
 .status-pipe/*
 !.status-pipe/launch.json
+!.status-pipe/config.json
 ```
 
 A repo "participates" if `.status-pipe/` exists under a workspace folder root.
@@ -54,6 +58,7 @@ extension interprets them:
 | `waitingOn` | null or `{kind, ref, pr, since, detail}` | `kind ∈ {build, review, comment, owner, merge}`. owner/review/merge/comment ⇒ NEEDS YOU; build ⇒ WAITING. `ref` should deep-link the exact comment/run. `since` renders as a live duration. |
 | `prs[]` | `{number, url, head, base, draft, state, ci, part}` | One PR row each; `head`/`base` drive the stack indicators (below). `ci ∈ {unknown, pending, passing, failing}` is the worker's cached view — superseded by live forge checks when enrichment succeeds. |
 | `blockers[]` | string[] | Red text, verbatim; non-empty forces NEEDS YOU regardless of `health`. |
+| `subTickets[]` | optional `{key, url, topic, status}` | Discussion channels carved out of an epic's tracking ticket ([07-claude-plugin.md](07-claude-plugin.md)); listed in the expanded card. Not work items — the epic stays one card. |
 | `history[]` | `{at, phase, note, runId}` | Append-only log; the expanded card's timeline. `runId` is a deliberately generic run reference (CI run, workflow run). Ack consumption/supersession is recorded here. |
 | `worker` | `{status: idle\|running\|error, taskId, startedAt, heartbeatAt}` | Worker liveness. `running` with `heartbeatAt` older than `staleWorkerMinutes` ⇒ stale-worker escalation (NEEDS YOU, top priority). |
 | `updatedAt` | ISO-8601 | Relative timestamp; fair-scheduling sort key within lanes. |
