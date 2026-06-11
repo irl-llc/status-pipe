@@ -1,0 +1,297 @@
+#!/usr/bin/env node
+/**
+ * post-comment — the status-pipe posting wrapper (design/07-claude-plugin.md).
+ *
+ * The ONLY sanctioned way the agent posts forge/ticket comments. It:
+ *   1. prepends the attribution marker (config.attribution.commentPrefix,
+ *      default "**CLAUDE COMMENT**"; with includeAgentId=true and --context,
+ *      the prefix becomes "<prefix> (<context>)");
+ *   2. posts via `gh api` (GitHub) or Bitbucket/Jira REST (env tokens
+ *      BITBUCKET_TOKEN / JIRA_EMAIL+JIRA_API_TOKEN);
+ *   3. records the created comment's API id into the ticket file's
+ *      agentCommentIds[] with an atomic read-modify-write (tmp + rename) —
+ *      the comment-ID ledger that lets the trust gateway exclude the agent's
+ *      own posts from operator-signal detection on shared accounts.
+ *
+ * Fail-closed: if the ticket file does not exist, the script refuses BEFORE
+ * posting — an unledgered agent comment could mint operator-grade authority
+ * on a shared account.
+ *
+ * Usage:
+ *   post-comment --repo-root <path> --ticket <KEY> --issue <N>  (--body <text> | --body-file <path>) [--context <text>]
+ *   post-comment --repo-root <path> --ticket <KEY> --pr <N>     (--body <text> | --body-file <path>) [--context <text>]
+ *   post-comment --repo-root <path> --ticket <KEY> --jira <KEY> (--body <text> | --body-file <path>) [--context <text>]
+ *
+ * Prints the created comment's id and url on stdout.
+ * No npm dependencies. Node >= 18 (global fetch).
+ */
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
+const { execFileSync } = require('child_process');
+
+const PROG = 'post-comment';
+
+function die(message, code = 1) {
+	process.stderr.write(`${PROG}: ${message}\n`);
+	process.exit(code);
+}
+
+function parseArgs(argv) {
+	const args = {
+		repoRoot: null,
+		ticket: null,
+		pr: null,
+		issue: null,
+		jira: null,
+		body: null,
+		bodyFile: null,
+		context: null,
+	};
+	for (let i = 0; i < argv.length; i++) {
+		const a = argv[i];
+		const next = () => {
+			i++;
+			if (i >= argv.length) die(`missing value for ${a}`, 2);
+			return argv[i];
+		};
+		if (a === '--repo-root') args.repoRoot = next();
+		else if (a === '--ticket') args.ticket = next();
+		else if (a === '--pr') args.pr = next();
+		else if (a === '--issue') args.issue = next();
+		else if (a === '--jira') args.jira = next();
+		else if (a === '--body') args.body = next();
+		else if (a === '--body-file') args.bodyFile = next();
+		else if (a === '--context') args.context = next();
+		else if (a === '--help' || a === '-h') {
+			process.stdout.write(
+				`usage: ${PROG} --repo-root <path> --ticket <KEY> ` +
+					`(--pr <N> | --issue <N> | --jira <KEY>) ` +
+					`(--body <text> | --body-file <path>) [--context <text>]\n`,
+			);
+			process.exit(0);
+		} else die(`unknown argument: ${a}`, 2);
+	}
+	if (!args.repoRoot) die('--repo-root is required', 2);
+	if (!args.ticket) die('--ticket is required (names the ticket file ledger)', 2);
+	const targets = [args.pr, args.issue, args.jira].filter((t) => t !== null);
+	if (targets.length !== 1) die('exactly one of --pr, --issue, --jira is required', 2);
+	if (args.pr && !/^\d+$/.test(args.pr)) die('--pr must be a number', 2);
+	if (args.issue && !/^\d+$/.test(args.issue)) die('--issue must be a number', 2);
+	if ((args.body === null) === (args.bodyFile === null)) {
+		die('exactly one of --body or --body-file is required', 2);
+	}
+	return args;
+}
+
+function readJson(file) {
+	return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+
+function tryExec(cmd, argv, cwd) {
+	try {
+		return execFileSync(cmd, argv, {
+			cwd,
+			encoding: 'utf8',
+			stdio: ['ignore', 'pipe', 'pipe'],
+		}).trim();
+	} catch {
+		return null;
+	}
+}
+
+/** Protocol dir anchored at the primary checkout (git common dir). */
+function protocolDir(repoRoot) {
+	const common = tryExec('git', ['rev-parse', '--git-common-dir'], repoRoot);
+	if (common) {
+		const abs = path.isAbsolute(common) ? common : path.join(repoRoot, common);
+		return path.join(abs, '..', '.status-pipe');
+	}
+	return path.join(repoRoot, '.status-pipe');
+}
+
+function detectForge(repoRoot) {
+	const url = tryExec('git', ['remote', 'get-url', 'origin'], repoRoot) || '';
+	if (url.includes('bitbucket.org')) {
+		const m = url.match(/bitbucket\.org[:/]([^/]+)\/([^/.]+)/);
+		return { kind: 'bitbucket', workspace: m ? m[1] : null, slug: m ? m[2] : null };
+	}
+	return { kind: 'github' };
+}
+
+function ghApiPost(repoRoot, endpoint, body) {
+	let out;
+	try {
+		out = execFileSync(
+			'gh',
+			['api', '--method', 'POST', endpoint, '-f', `body=${body}`],
+			{ cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+		);
+	} catch (e) {
+		const detail = e.stderr ? String(e.stderr).trim().split('\n')[0] : e.message;
+		die(
+			`GitHub post failed (gh api ${endpoint}): ${detail}. ` +
+				'Is `gh` installed and authenticated? Nothing was posted.',
+		);
+	}
+	const created = JSON.parse(out);
+	return { id: String(created.id), url: created.html_url || null };
+}
+
+async function bitbucketPost(forge, pr, body) {
+	if (!process.env.BITBUCKET_TOKEN) {
+		die('BITBUCKET_TOKEN must be set to post Bitbucket PR comments. Nothing was posted.');
+	}
+	if (!forge.workspace || !forge.slug) {
+		die('could not parse the Bitbucket workspace/slug from the origin remote.');
+	}
+	let res;
+	try {
+		res = await fetch(
+			`https://api.bitbucket.org/2.0/repositories/${forge.workspace}/${forge.slug}/pullrequests/${pr}/comments`,
+			{
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${process.env.BITBUCKET_TOKEN}`,
+					'Content-Type': 'application/json',
+					Accept: 'application/json',
+				},
+				body: JSON.stringify({ content: { raw: body } }),
+			},
+		);
+	} catch (e) {
+		die(`Bitbucket API request failed (${e.message}). Nothing was posted.`);
+	}
+	if (!res.ok) {
+		die(`Bitbucket API returned ${res.status}. Check BITBUCKET_TOKEN. Nothing was posted.`);
+	}
+	const created = await res.json();
+	return {
+		id: String(created.id),
+		url: created.links && created.links.html ? created.links.html.href : null,
+	};
+}
+
+async function jiraPost(config, key, body) {
+	const jira = (config.tickets && config.tickets.jira) || {};
+	if (!jira.siteUrl) {
+		die('config.tickets.jira.siteUrl is required to post Jira comments.');
+	}
+	const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+	if (process.env.JIRA_EMAIL && process.env.JIRA_API_TOKEN) {
+		headers.Authorization =
+			'Basic ' +
+			Buffer.from(`${process.env.JIRA_EMAIL}:${process.env.JIRA_API_TOKEN}`).toString(
+				'base64',
+			);
+	} else if (process.env.JIRA_API_TOKEN) {
+		headers.Authorization = `Bearer ${process.env.JIRA_API_TOKEN}`;
+	} else {
+		die('JIRA_API_TOKEN (and usually JIRA_EMAIL) must be set to post Jira comments. Nothing was posted.');
+	}
+	const base = jira.siteUrl.replace(/\/$/, '');
+	let res;
+	try {
+		res = await fetch(`${base}/rest/api/2/issue/${encodeURIComponent(key)}/comment`, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({ body }),
+		});
+	} catch (e) {
+		die(`Jira API request failed (${e.message}). Nothing was posted.`);
+	}
+	if (!res.ok) {
+		die(`Jira API returned ${res.status} for ${key}. Check JIRA_API_TOKEN / JIRA_EMAIL. Nothing was posted.`);
+	}
+	const created = await res.json();
+	return {
+		id: String(created.id),
+		url: `${base}/browse/${key}?focusedCommentId=${created.id}`,
+	};
+}
+
+/** Atomic read-modify-write of the ticket file: write tmp, then rename(2). */
+function recordAgentCommentId(ticketFile, commentId) {
+	const ticket = readJson(ticketFile);
+	if (!Array.isArray(ticket.agentCommentIds)) ticket.agentCommentIds = [];
+	if (!ticket.agentCommentIds.includes(commentId)) {
+		ticket.agentCommentIds.push(commentId);
+	}
+	const tmp = path.join(
+		path.dirname(ticketFile),
+		`.${path.basename(ticketFile)}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`,
+	);
+	fs.writeFileSync(tmp, `${JSON.stringify(ticket, null, '\t')}\n`);
+	fs.renameSync(tmp, ticketFile);
+}
+
+async function main() {
+	const args = parseArgs(process.argv.slice(2));
+	const repoRoot = path.resolve(args.repoRoot);
+	if (!fs.existsSync(repoRoot)) die(`repo root does not exist: ${repoRoot}`, 2);
+
+	// Attribution config: LOCAL WORKING TREE only.
+	const configPath = path.join(repoRoot, '.status-pipe', 'config.json');
+	let config = {};
+	if (fs.existsSync(configPath)) {
+		try {
+			config = readJson(configPath);
+		} catch (e) {
+			die(`could not parse ${configPath}: ${e.message}`);
+		}
+	}
+
+	// The ledger must exist before anything is posted (fail closed).
+	const ticketFile = path.join(protocolDir(repoRoot), 'tickets', `${args.ticket}.json`);
+	if (!fs.existsSync(ticketFile)) {
+		die(
+			`ticket file not found: ${ticketFile} — refusing to post. Write the ` +
+				'ticket state file first so the comment id can be recorded in ' +
+				'agentCommentIds[] (an unledgered agent comment could be mistaken ' +
+				'for an operator signal on a shared account).',
+		);
+	}
+	try {
+		readJson(ticketFile);
+	} catch (e) {
+		die(`ticket file is not valid JSON (${e.message}) — refusing to post: ${ticketFile}`);
+	}
+
+	let rawBody;
+	if (args.bodyFile !== null) {
+		try {
+			rawBody = fs.readFileSync(args.bodyFile, 'utf8');
+		} catch (e) {
+			die(`could not read --body-file: ${e.message}`, 2);
+		}
+	} else {
+		rawBody = args.body;
+	}
+	if (!rawBody || !rawBody.trim()) die('comment body is empty', 2);
+
+	const attribution = config.attribution || {};
+	let prefix = attribution.commentPrefix || '**CLAUDE COMMENT**';
+	if (attribution.includeAgentId === true && args.context) {
+		prefix = `${prefix} (${args.context})`;
+	}
+	const body = `${prefix}\n\n${rawBody.trim()}\n`;
+
+	const forge = detectForge(repoRoot);
+	let created;
+	if (args.jira) {
+		created = await jiraPost(config, args.jira, body);
+	} else if (args.pr && forge.kind === 'bitbucket') {
+		created = await bitbucketPost(forge, args.pr, body);
+	} else {
+		// GitHub: PR conversation comments are issue comments.
+		const n = args.pr || args.issue;
+		created = ghApiPost(repoRoot, `repos/{owner}/{repo}/issues/${n}/comments`, body);
+	}
+
+	recordAgentCommentId(ticketFile, created.id);
+	process.stdout.write(`comment id: ${created.id}\nurl: ${created.url || '(none)'}\n`);
+}
+
+main().catch((e) => die(e && e.message ? e.message : String(e)));
