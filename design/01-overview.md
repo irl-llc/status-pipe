@@ -19,7 +19,12 @@ command set that exists in `irl-llc` and `git-spice-code-extension` today.
 ## Goals
 
 1. **Single pane of glass** across N repos / M concurrent agent loops: side-tray
-   view for ambient awareness, full editor tab for triage sessions.
+   view for ambient awareness, full editor tab for triage sessions. Two
+   operating modes, same machinery: **single-repo** (one repo, the operator
+   drives the agent from a Claude Code pane; the extension monitors) and
+   **fleet** (multi-root workspace; the extension also launches and supervises
+   each repo's orchestrator via a committed `.status-pipe-launch` file). See
+   [09-launch-and-supervision.md](09-launch-and-supervision.md).
 2. **Queue, not dashboard**: ordering and grouping is by *what the operator
    should do next*, not by repo or recency. Blocked > review-ready > waiting >
    running > done.
@@ -29,7 +34,8 @@ command set that exists in `irl-llc` and `git-spice-code-extension` today.
    [02-state-schema.md](02-state-schema.md#feedback-signal)).
 4. **Forge-portable**: GitHub and Bitbucket Cloud both supported through an
    internal forge abstraction (modeled on git-spice's), selected by remote-URL
-   inference with a `statusPipe.forge.type` override.
+   inference with a `statusPipe.forge.type` override. Ticketing follows the
+   forge: GitHub issues on GitHub; **Jira Cloud** on Bitbucket Cloud.
 5. **Stack-aware, minimally**: PR rows show their upstream (base) branch above
    and downstream (dependent) branches below in small type. status-pipe is not
    a stack visualizer — git-spice's extension owns that — it just keeps the
@@ -41,8 +47,10 @@ command set that exists in `irl-llc` and `git-spice-code-extension` today.
 
 ## Non-goals
 
-- Driving agents (start/stop/launch). The orchestrator loop owns that. The only
-  write status-pipe performs is the feedback signal file.
+- Driving agent *work* (what to do next, retries, scheduling of work items).
+  The orchestrator loop owns that. status-pipe only launches/supervises the
+  orchestrator *process* (opt-in, fleet mode) and writes ack signal files —
+  it never writes agent state.
 - Replacing the forge's review UI. Reviewing happens on GitHub/Bitbucket;
   status-pipe deep-links there.
 - Git operations of any kind. status-pipe never runs git; everything it knows
@@ -71,3 +79,4 @@ command set that exists in `irl-llc` and `git-spice-code-extension` today.
 - [06-testing-and-release.md](06-testing-and-release.md) — test layers and release automation
 - [07-claude-plugin.md](07-claude-plugin.md) — the baseline Claude Code plugin (slash commands + workflow) that emits this contract
 - [08-workflow-simulation.md](08-workflow-simulation.md) — the step-by-step operator-day simulation that drove the queue semantics and feedback-signal design
+- [09-launch-and-supervision.md](09-launch-and-supervision.md) — single-repo vs fleet operating modes, the `.status-pipe-launch` contract, agent-process supervision and health

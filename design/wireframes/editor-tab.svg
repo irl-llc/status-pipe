@@ -1,146 +1,164 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="660" viewBox="0 0 1000 660" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-  <!-- status-pipe wireframe: editor-tab (expanded workspace), two-pane -->
-  <rect width="1000" height="660" fill="#1e1e1e"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="640" viewBox="0 0 1000 640" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <!-- status-pipe wireframe v2: editor-tab (expanded workspace), two-pane. Codicon glyphs, non-default-only indicators. -->
+  <defs>
+    <symbol id="i-person" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="5" r="2.6"/><path d="M3 13.5 a5 4.5 0 0 1 10 0"/></g></symbol>
+    <symbol id="i-eye" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.5 8 C4.5 3.8 11.5 3.8 14.5 8 C11.5 12.2 4.5 12.2 1.5 8 Z"/><circle cx="8" cy="8" r="1.8"/></g></symbol>
+    <symbol id="i-merge" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="4" cy="3.5" r="1.7"/><circle cx="4" cy="12.5" r="1.7"/><circle cx="12" cy="8" r="1.7"/><path d="M4 5.2 v5.6 M4 7 c0 2.5 3.5 1 6.3 1"/></g></symbol>
+    <symbol id="i-pulse" viewBox="0 0 16 16"><polyline points="1,9 4.5,9 6.5,4 9.5,12.5 11.5,9 15,9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="i-x" viewBox="0 0 16 16"><g stroke="currentColor" stroke-width="1.6"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></g></symbol>
+    <symbol id="i-clock" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="8" cy="8" r="6"/><path d="M8 4.5 V8 l2.5 2"/></g></symbol>
+    <symbol id="i-check" viewBox="0 0 16 16"><polyline points="3,8.5 6.5,12 13,4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-comment" viewBox="0 0 16 16"><path d="M2.5 3 h11 v8 h-6.5 l-2.5 2.5 v-2.5 h-2 z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3.5" width="12" height="9" rx="1"/><path d="M2.5 4.5 L8 9 L13.5 4.5"/></g></symbol>
+    <symbol id="i-sync" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13.5 8 a5.5 5.5 0 1 1 -2.2 -4.4"/><path d="M13.5 2.5 v3 h-3"/></g></symbol>
+    <symbol id="i-warn" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.3"><path d="M8 2 L15 13.5 H1 Z" stroke-linejoin="round"/><line x1="8" y1="6.5" x2="8" y2="10"/><circle cx="8" cy="11.8" r="0.4"/></g></symbol>
+  </defs>
 
-  <!-- editor tab chrome -->
+  <rect width="1000" height="640" fill="#1e1e1e"/>
+
+  <!-- editor tab chrome; far right of the header = reserved activity slot -->
   <rect x="0" y="0" width="1000" height="28" fill="#252526"/>
   <rect x="0" y="0" width="170" height="28" fill="#1e1e1e"/>
-  <text x="14" y="18" fill="#cccccc" font-size="10">⛗ Status Pipe — Queue</text>
+  <text x="14" y="18" fill="#cccccc" font-size="10">Status Pipe — Queue</text>
   <text x="158" y="18" fill="#6e6e6e" font-size="10">×</text>
+  <use href="#i-warn" x="976" y="7" width="13" height="13" color="#cca700"/>
+  <text x="968" y="18" fill="#5a5a5a" font-size="7" text-anchor="end" font-style="italic">reserved slot: idle=empty · refresh=spinner · degraded=warn (tooltip: cause, data age, retry) · click = force refresh</text>
 
   <!-- ===== left pane: dense queue ===== -->
-  <rect x="0" y="28" width="300" height="632" fill="#1e1e1e"/>
-  <rect x="300" y="28" width="1" height="632" fill="#3c3c3c"/>
-  <rect x="10" y="38" width="280" height="20" rx="3" fill="#3c3c3c"/>
-  <text x="18" y="52" fill="#6e6e6e" font-size="9">filter…</text>
+  <rect x="300" y="28" width="1" height="612" fill="#3c3c3c"/>
+  <!-- agents strip -->
+  <rect x="0" y="28" width="300" height="20" fill="#232324"/>
+  <use href="#i-pulse" x="10" y="32" width="11" height="11" color="#3794ff"/>
+  <text x="27" y="42" fill="#9a9a9a" font-size="9">agents: 1 running · 1 scheduled 3m · <tspan fill="#f48771">1 failed</tspan></text>
 
-  <text x="12" y="76" fill="#e0e0e0" font-size="9" font-weight="700">▾ NEEDS YOU (4)</text>
-  <!-- dense rows; selected = #155 -->
+  <text x="12" y="68" fill="#e0e0e0" font-size="9" font-weight="700">▾ NEEDS YOU (4)</text>
   <g font-size="9">
-    <rect x="6" y="84" width="288" height="30" rx="3" fill="#2d2d30"/>
-    <rect x="6" y="84" width="3" height="30" fill="#f48771"/>
-    <text x="16" y="97" fill="#cccccc">⚠ fleet-ui #95 i18n extraction</text>
-    <text x="16" y="109" fill="#6e6e6e" font-size="8">stale run · 47m</text>
+    <rect x="6" y="76" width="288" height="30" rx="3" fill="#2d2d30"/>
+    <rect x="6" y="76" width="3" height="30" fill="#f48771"/>
+    <text x="16" y="89" fill="#cccccc">fleet-ui #95 i18n extraction</text>
+    <text x="16" y="101" fill="#6e6e6e" font-size="8">stale run · 47m</text>
 
-    <rect x="6" y="118" width="288" height="30" rx="3" fill="#2d2d30"/>
-    <rect x="6" y="118" width="3" height="30" fill="#f48771"/>
-    <text x="16" y="131" fill="#cccccc">❓ fleet-api #142 Auth token rotation</text>
-    <text x="16" y="143" fill="#6e6e6e" font-size="8">owner question · 35m</text>
+    <rect x="6" y="110" width="288" height="30" rx="3" fill="#2d2d30"/>
+    <rect x="6" y="110" width="3" height="30" fill="#f48771"/>
+    <text x="16" y="123" fill="#cccccc">fleet-api #142 Auth token rotation</text>
+    <text x="16" y="135" fill="#6e6e6e" font-size="8">owner question · 35m</text>
 
-    <rect x="6" y="152" width="288" height="30" rx="3" fill="#04395e"/>
-    <rect x="6" y="152" width="3" height="30" fill="#cca700"/>
-    <text x="16" y="165" fill="#ffffff">👀 fleet-api #155 Rate limiter</text>
-    <text x="16" y="177" fill="#9cc3ee" font-size="8">review on #512 · 14h   ◀ selected</text>
+    <rect x="6" y="144" width="288" height="30" rx="3" fill="#04395e"/>
+    <rect x="6" y="144" width="3" height="30" fill="#cca700"/>
+    <text x="16" y="157" fill="#ffffff">fleet-api #155 Rate limiter</text>
+    <text x="16" y="169" fill="#9cc3ee" font-size="8">review on #512 · 14h — selected</text>
 
-    <rect x="6" y="186" width="288" height="30" rx="3" fill="#2d2d30"/>
-    <rect x="6" y="186" width="3" height="30" fill="#cca700"/>
-    <text x="16" y="199" fill="#cccccc">🔀 fleet-ui #91 Login redirect</text>
-    <text x="16" y="211" fill="#6e6e6e" font-size="8">awaiting merge · 2h</text>
+    <rect x="6" y="178" width="288" height="30" rx="3" fill="#2d2d30"/>
+    <rect x="6" y="178" width="3" height="30" fill="#cca700"/>
+    <text x="16" y="191" fill="#cccccc">fleet-ui #91 Login redirect</text>
+    <text x="16" y="203" fill="#6e6e6e" font-size="8">awaiting merge · 2h</text>
   </g>
-  <text x="12" y="236" fill="#e0e0e0" font-size="9" font-weight="700">▾ WAITING (2)</text>
+  <text x="12" y="228" fill="#e0e0e0" font-size="9" font-weight="700">▾ WAITING (2)</text>
   <g font-size="9">
-    <rect x="6" y="244" width="288" height="22" rx="3" fill="#2d2d30"/>
-    <rect x="6" y="244" width="3" height="22" fill="#3794ff"/>
-    <text x="16" y="258" fill="#9a9a9a">⟳ fleet-api #161 Audit log export</text>
-    <rect x="6" y="270" width="288" height="22" rx="3" fill="#2d2d30"/>
-    <rect x="6" y="270" width="3" height="22" fill="#3794ff"/>
-    <text x="16" y="284" fill="#9a9a9a">⟳ fleet-ui #88 Theme tokens</text>
+    <rect x="6" y="236" width="288" height="22" rx="3" fill="#2d2d30"/>
+    <rect x="6" y="236" width="3" height="22" fill="#3794ff"/>
+    <text x="16" y="250" fill="#9a9a9a">fleet-api #161 Audit log export</text>
+    <rect x="6" y="262" width="288" height="22" rx="3" fill="#2d2d30"/>
+    <rect x="6" y="262" width="3" height="22" fill="#3794ff"/>
+    <text x="16" y="276" fill="#9a9a9a">fleet-ui #88 Theme tokens</text>
   </g>
-  <text x="12" y="312" fill="#8a8a8a" font-size="9" font-weight="700">▸ QUIET (1)</text>
+  <text x="12" y="304" fill="#8a8a8a" font-size="9" font-weight="700">▸ QUIET (1)</text>
 
   <!-- ===== right pane: expanded issue ===== -->
-  <!-- header -->
-  <rect x="316" y="40" width="48" height="15" rx="7" fill="#1f3a5f"/>
-  <text x="340" y="51" fill="#9cc3ee" font-size="8" text-anchor="middle">fleet-api</text>
+  <rect x="316" y="40" width="46" height="14" rx="7" fill="#1f3a5f"/>
+  <text x="339" y="50" fill="#9cc3ee" font-size="8" text-anchor="middle">fleet-api</text>
   <text x="372" y="52" fill="#3794ff" font-size="13" font-weight="700">#155</text>
   <text x="412" y="52" fill="#e0e0e0" font-size="13" font-weight="700">Rate limiter</text>
-  <rect x="510" y="40" width="48" height="15" rx="7" fill="#3c3c3c"/>
-  <text x="534" y="51" fill="#aaaaaa" font-size="8" text-anchor="middle">review</text>
-  <text x="700" y="51" fill="#6e6e6e" font-size="9">open: tracking issue ↗ · epic file · state JSON</text>
-  <text x="316" y="70" fill="#9a9a9a" font-size="10">T1a+T1b implemented and green; stack ready for first review pass starting at #512.</text>
+  <text x="510" y="52" fill="#6e6e6e" font-size="9">review</text>
+  <text x="976" y="52" fill="#6e6e6e" font-size="9" text-anchor="end">open: ticket · epic file · state JSON</text>
+  <text x="316" y="72" fill="#9a9a9a" font-size="10">T1a+T1b implemented and green; stack ready for first review pass starting at #512.</text>
 
-  <!-- waiting banner + ack -->
-  <rect x="316" y="80" width="500" height="20" rx="3" fill="#3a3320"/>
-  <text x="324" y="94" fill="#cca700" font-size="10">👀 review · PR #512 awaits your review · waiting 14h · open ↗</text>
-  <rect x="826" y="80" width="150" height="20" rx="3" fill="#3c3c3c"/>
-  <text x="901" y="94" fill="#cccccc" font-size="9" text-anchor="middle">✋ Ready for another look</text>
+  <!-- waiting line + primary action -->
+  <use href="#i-eye" x="316" y="82" width="12" height="12" color="#cca700"/>
+  <text x="334" y="92" fill="#cca700" font-size="10">PR #512 awaits your review · 14h</text>
+  <rect x="836" y="80" width="140" height="18" rx="3" fill="#3c3c3c"/>
+  <text x="906" y="92.5" fill="#cccccc" font-size="9" text-anchor="middle">Ready for another look</text>
 
-  <!-- run liveness panel -->
-  <rect x="316" y="112" width="660" height="34" rx="4" fill="#252526" stroke="#3c3c3c"/>
-  <text x="328" y="126" fill="#8a8a8a" font-size="8">RUN</text>
-  <text x="328" y="139" fill="#cccccc" font-size="9">status: idle</text>
-  <text x="420" y="139" fill="#cccccc" font-size="9">last heartbeat: 14h ago</text>
-  <text x="580" y="139" fill="#cccccc" font-size="9">orchestrator pass #31 finished 12m ago</text>
-  <text x="850" y="139" fill="#cccccc" font-size="9">staleRunMinutes: 30</text>
+  <!-- run line (work-item liveness; supervisor state lives in the agents strip) -->
+  <text x="316" y="114" fill="#6e6e6e" font-size="9">run idle · last heartbeat 14h · orchestrator pass #31 finished 12m ago · staleRunMinutes 30</text>
 
   <!-- PR table -->
-  <text x="316" y="170" fill="#e0e0e0" font-size="10" font-weight="700">PULL REQUESTS (stack)</text>
-  <rect x="316" y="178" width="660" height="18" fill="#252526"/>
+  <text x="316" y="140" fill="#e0e0e0" font-size="10" font-weight="700">PULL REQUESTS (stack)</text>
+  <rect x="316" y="148" width="660" height="16" fill="#252526"/>
   <g fill="#8a8a8a" font-size="8">
-    <text x="324" y="190">PR</text><text x="370" y="190">PART</text><text x="410" y="190">BRANCH (base ↑)</text>
-    <text x="570" y="190">CHECKS</text><text x="700" y="190">COMMENTS</text><text x="790" y="190">TASKS</text><text x="840" y="190">REVIEW</text><text x="910" y="190">ISSUES</text>
+    <text x="324" y="159">PR</text><text x="366" y="159">PART</text><text x="402" y="159">BRANCH (base ↑)</text>
+    <text x="560" y="159">CHECKS</text><text x="694" y="159">COMMENTS</text><text x="776" y="159">TASKS</text><text x="822" y="159">REVIEW</text><text x="902" y="159">TICKET</text>
   </g>
   <g font-size="9">
-    <rect x="316" y="196" width="660" height="40" fill="#2d2d30"/>
-    <text x="324" y="212" fill="#3794ff" font-weight="600">#512</text>
-    <text x="370" y="212" fill="#9cc3ee">T1a</text>
-    <text x="410" y="212" fill="#cccccc">rate-limit-core</text>
-    <text x="410" y="226" fill="#6e6e6e" font-size="8">↑ main · ↓ T1b #513</text>
-    <text x="570" y="212" fill="#89d185">✓ build · ✓ lint · ✓ e2e</text>
-    <text x="700" y="212" fill="#cccccc">5 total · 2/3 unres.</text>
-    <text x="790" y="212" fill="#6e6e6e">—</text>
-    <text x="840" y="212" fill="#cca700">changes req.</text>
-    <text x="910" y="212" fill="#3794ff">→ #91</text>
+    <rect x="316" y="164" width="660" height="38" fill="#2d2d30"/>
+    <text x="324" y="180" fill="#3794ff" font-weight="600">#512</text>
+    <text x="366" y="180" fill="#9cc3ee">T1a</text>
+    <text x="402" y="180" fill="#cccccc">rate-limit-core</text>
+    <text x="402" y="194" fill="#6e6e6e" font-size="8">↑ main · ↓ T1b #513</text>
+    <use href="#i-check" x="560" y="171" width="10" height="10" color="#89d185"/>
+    <text x="574" y="180" fill="#9a9a9a">3/3</text>
+    <use href="#i-comment" x="694" y="171" width="10" height="10" color="#cca700"/>
+    <text x="708" y="180" fill="#cca700">2 of 3 unres.</text>
+    <text x="776" y="180" fill="#6e6e6e">—</text>
+    <text x="822" y="180" fill="#cca700">changes req.</text>
+    <text x="902" y="180" fill="#3794ff">#91</text>
 
-    <rect x="316" y="238" width="660" height="40" fill="#252526"/>
-    <text x="324" y="254" fill="#3794ff" font-weight="600">#513</text>
-    <text x="370" y="254" fill="#9cc3ee">T1b</text>
-    <text x="410" y="254" fill="#cccccc">rate-limit-redis  <tspan fill="#8a8a8a" font-size="8">(draft)</tspan></text>
-    <text x="410" y="268" fill="#6e6e6e" font-size="8">↑ T1a #512</text>
-    <text x="570" y="254" fill="#cca700">● build (22.x) running · ✓ lint</text>
-    <text x="700" y="254" fill="#cccccc">0</text>
-    <text x="790" y="254" fill="#6e6e6e">—</text>
-    <text x="840" y="254" fill="#6e6e6e">—</text>
-    <text x="910" y="254" fill="#6e6e6e">—</text>
+    <rect x="316" y="204" width="660" height="38" fill="#252526"/>
+    <text x="324" y="220" fill="#3794ff" font-weight="600">#513</text>
+    <text x="366" y="220" fill="#9cc3ee">T1b</text>
+    <text x="402" y="220" fill="#cccccc">rate-limit-redis <tspan fill="#6e6e6e" font-size="8">draft</tspan></text>
+    <text x="402" y="234" fill="#6e6e6e" font-size="8">↑ T1a #512</text>
+    <use href="#i-clock" x="560" y="211" width="10" height="10" color="#cca700"/>
+    <text x="574" y="220" fill="#cca700">build (22.x) · 1/2 done</text>
+    <text x="694" y="220" fill="#6e6e6e">—</text>
+    <text x="776" y="220" fill="#6e6e6e">—</text>
+    <text x="822" y="220" fill="#6e6e6e">—</text>
+    <text x="902" y="220" fill="#6e6e6e">—</text>
   </g>
-  <text x="324" y="296" fill="#6e6e6e" font-size="8" font-style="italic">Bitbucket repos additionally populate TASKS (☑ unresolved/total); column hidden when the forge lacks the capability.</text>
+  <text x="324" y="258" fill="#6e6e6e" font-size="8" font-style="italic">passing checks collapse to a count; failing/pending checks are named inline. TASKS column rendered only on forges with the capability (Bitbucket).</text>
+  <text x="324" y="270" fill="#6e6e6e" font-size="8" font-style="italic">TICKET: GitHub issue (#91) or Jira key (PROJ-91) per the repo's ticketing source.</text>
 
   <!-- history timeline -->
-  <text x="316" y="324" fill="#e0e0e0" font-size="10" font-weight="700">HISTORY</text>
-  <line x1="324" y1="334" x2="324" y2="544" stroke="#3c3c3c" stroke-width="2"/>
+  <text x="316" y="296" fill="#e0e0e0" font-size="10" font-weight="700">HISTORY</text>
+  <line x1="324" y1="306" x2="324" y2="506" stroke="#3c3c3c" stroke-width="2"/>
   <g font-size="9">
-    <circle cx="324" cy="344" r="4" fill="#cca700"/>
-    <text x="338" y="341" fill="#8a8a8a" font-size="8">today 02:10 · review</text>
-    <text x="338" y="353" fill="#cccccc">Submitted #512 (T1a) ready + #513 (T1b) draft; requested owner review.</text>
+    <circle cx="324" cy="316" r="4" fill="#cca700"/>
+    <text x="338" y="313" fill="#8a8a8a" font-size="8">today 02:10 · review</text>
+    <text x="338" y="325" fill="#cccccc">Submitted #512 (T1a) ready + #513 (T1b) draft; requested owner review.</text>
 
-    <circle cx="324" cy="374" r="4" fill="#3794ff"/>
-    <text x="338" y="371" fill="#8a8a8a" font-size="8">yesterday 22:48 · implementation · run 27281...</text>
-    <text x="338" y="383" fill="#cccccc">Redis token bucket behind feature flag; 18/18 unit + 6/6 integration green locally.</text>
+    <circle cx="324" cy="346" r="4" fill="#3794ff"/>
+    <text x="338" y="343" fill="#8a8a8a" font-size="8">yesterday 22:48 · implementation · run 27281…</text>
+    <text x="338" y="355" fill="#cccccc">Redis token bucket behind feature flag; 18/18 unit + 6/6 integration green locally.</text>
 
-    <circle cx="324" cy="404" r="4" fill="#89d185"/>
-    <text x="338" y="401" fill="#8a8a8a" font-size="8">yesterday 20:15 · implementation</text>
-    <text x="338" y="413" fill="#cccccc">owner ack 4c11a2 consumed: "plan approved, proceed with sliding window"</text>
+    <circle cx="324" cy="376" r="4" fill="#89d185"/>
+    <text x="338" y="373" fill="#8a8a8a" font-size="8">yesterday 20:15 · implementation</text>
+    <text x="338" y="385" fill="#cccccc">owner ack 4c11a2 consumed: "plan approved, proceed with sliding window"</text>
 
-    <circle cx="324" cy="434" r="4" fill="#6e6e6e"/>
-    <text x="338" y="431" fill="#8a8a8a" font-size="8">yesterday 19:02 · planning</text>
-    <text x="338" y="443" fill="#cccccc">ack 88f0e1 superseded (state advanced before pickup)</text>
+    <circle cx="324" cy="406" r="4" fill="#6e6e6e"/>
+    <text x="338" y="403" fill="#8a8a8a" font-size="8">yesterday 19:02 · planning</text>
+    <text x="338" y="415" fill="#cccccc">ack 88f0e1 superseded (state advanced before pickup)</text>
 
-    <circle cx="324" cy="464" r="4" fill="#3794ff"/>
-    <text x="338" y="461" fill="#8a8a8a" font-size="8">yesterday 18:40 · planning</text>
-    <text x="338" y="473" fill="#cccccc">Posted rate-limiter design (fixed vs sliding window) on tracking issue; parked for owner.</text>
+    <circle cx="324" cy="436" r="4" fill="#3794ff"/>
+    <text x="338" y="433" fill="#8a8a8a" font-size="8">yesterday 18:40 · planning</text>
+    <text x="338" y="445" fill="#cccccc">Posted rate-limiter design (fixed vs sliding window) on tracking issue; parked for owner.</text>
 
-    <circle cx="324" cy="494" r="4" fill="#3794ff"/>
-    <text x="338" y="491" fill="#8a8a8a" font-size="8">yesterday 18:05 · planning</text>
-    <text x="338" y="503" fill="#cccccc">orchestrator claimed (fanout pass #28)</text>
+    <circle cx="324" cy="466" r="4" fill="#3794ff"/>
+    <text x="338" y="463" fill="#8a8a8a" font-size="8">yesterday 18:05 · planning</text>
+    <text x="338" y="475" fill="#cccccc">orchestrator claimed (fanout pass #28)</text>
   </g>
-  <text x="338" y="534" fill="#6e6e6e" font-size="8" font-style="italic">every entry = history[] verbatim; runId links to the workflow run when present</text>
+  <text x="338" y="500" fill="#6e6e6e" font-size="8" font-style="italic">every entry = history[] verbatim; runId links to the workflow run when present</text>
 
   <!-- ack log -->
-  <text x="316" y="572" fill="#e0e0e0" font-size="10" font-weight="700">ACKS</text>
-  <rect x="316" y="580" width="660" height="22" rx="3" fill="#252526"/>
-  <text x="324" y="594" fill="#89d185" font-size="9">✓ 9b21d4ee pending — sent 14:02 "Replied to all 4 threads" · withdraw</text>
-  <rect x="316" y="606" width="660" height="22" rx="3" fill="#252526"/>
-  <text x="324" y="620" fill="#6e6e6e" font-size="9">4c11a2 consumed yesterday 20:15 · 88f0e1 superseded yesterday 19:02</text>
+  <text x="316" y="530" fill="#e0e0e0" font-size="10" font-weight="700">ACKS</text>
+  <use href="#i-mail" x="316" y="538" width="11" height="11" color="#89d185"/>
+  <text x="332" y="548" fill="#89d185" font-size="9">9b21d4ee pending — sent 14:02 "Replied to all 4 threads"</text>
+  <text x="332" y="562" fill="#6e6e6e" font-size="9">4c11a2 consumed yesterday 20:15 · 88f0e1 superseded yesterday 19:02</text>
 
-  <text x="316" y="648" fill="#6e6e6e" font-size="8">raw state: .autopilot/run/issue-155.json (updated 02:10) · schema v1 · repo irl-llc/fleet-api ✓ matches remote</text>
+  <text x="316" y="592" fill="#6e6e6e" font-size="8">raw state: .autopilot/run/issue-155.json (updated 02:10) · schema v1 · repo irl-llc/fleet-api matches remote</text>
+
+  <!-- status bar -->
+  <rect x="0" y="618" width="1000" height="22" fill="#007acc"/>
+  <use href="#i-sync" x="10" y="622" width="12" height="12" color="#ffffff"/>
+  <text x="28" y="633" fill="#ffffff" font-size="9">status-pipe: refreshing fleet-api</text>
+  <text x="988" y="633" fill="#cfe8ff" font-size="8" text-anchor="end">status-bar item mirrors the activity slot in editor mode</text>
 </svg>

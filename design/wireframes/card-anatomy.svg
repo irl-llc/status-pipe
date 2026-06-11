@@ -1,95 +1,118 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="760" height="470" viewBox="0 0 760 470" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
-  <!-- status-pipe wireframe: annotated card anatomy -->
-  <rect width="760" height="470" fill="#1e1e1e"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="560" viewBox="0 0 780 560" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <!-- status-pipe wireframe v2: annotated card anatomy (tray density).
+       Rules: codicon glyphs only · one indicator per fact · non-default status only · detail on hover. -->
+  <defs>
+    <symbol id="i-eye" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.5 8 C4.5 3.8 11.5 3.8 14.5 8 C11.5 12.2 4.5 12.2 1.5 8 Z"/><circle cx="8" cy="8" r="1.8"/></g></symbol>
+    <symbol id="i-comment" viewBox="0 0 16 16"><path d="M2.5 3 h11 v8 h-6.5 l-2.5 2.5 v-2.5 h-2 z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+    <symbol id="i-checklist" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.3"><rect x="2" y="2.5" width="12" height="11" rx="1.5"/><polyline points="4.5,8 7,10.5 11.5,5.5"/></g></symbol>
+    <symbol id="i-mail" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.4"><rect x="2" y="3.5" width="12" height="9" rx="1"/><path d="M2.5 4.5 L8 9 L13.5 4.5"/></g></symbol>
+    <symbol id="i-x" viewBox="0 0 16 16"><g stroke="currentColor" stroke-width="1.6"><line x1="4" y1="4" x2="12" y2="12"/><line x1="12" y1="4" x2="4" y2="12"/></g></symbol>
+    <symbol id="i-check" viewBox="0 0 16 16"><polyline points="3,8.5 6.5,12 13,4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+  </defs>
+
+  <rect width="780" height="560" fill="#1e1e1e"/>
   <text x="20" y="28" fill="#e0e0e0" font-size="13" font-weight="700">Card anatomy (tray density)</text>
 
   <!-- ===== the card ===== -->
   <g>
-    <rect x="40" y="50" width="360" height="296" rx="4" fill="#2d2d30" stroke="#3c3c3c"/>
-    <rect x="40" y="50" width="3" height="296" rx="1.5" fill="#cca700"/>
+    <rect x="40" y="50" width="360" height="216" rx="4" fill="#2d2d30" stroke="#3c3c3c"/>
+    <rect x="40" y="50" width="3" height="216" rx="1.5" fill="#cca700"/>
     <!-- header -->
-    <rect x="52" y="60" width="48" height="14" rx="7" fill="#1f3a5f"/>
-    <text x="76" y="70" fill="#9cc3ee" font-size="8" text-anchor="middle">fleet-api</text>
-    <text x="106" y="71" fill="#3794ff" font-size="10" font-weight="600">#155</text>
-    <text x="136" y="71" fill="#cccccc" font-size="10" font-weight="600">Rate limiter</text>
-    <rect x="300" y="60" width="48" height="14" rx="7" fill="#3c3c3c"/>
-    <text x="324" y="70" fill="#aaaaaa" font-size="8" text-anchor="middle">review</text>
-    <text x="392" y="70" fill="#6e6e6e" font-size="8" text-anchor="end">14h</text>
+    <rect x="52" y="60" width="46" height="13" rx="6.5" fill="#1f3a5f"/>
+    <text x="75" y="69.5" fill="#9cc3ee" font-size="8" text-anchor="middle">fleet-api</text>
+    <text x="104" y="70" fill="#3794ff" font-size="10" font-weight="600">#155</text>
+    <text x="134" y="70" fill="#cccccc" font-size="10" font-weight="600">Rate limiter</text>
+    <text x="356" y="70" fill="#6e6e6e" font-size="8" text-anchor="end">review</text>
+    <text x="390" y="70" fill="#6e6e6e" font-size="8" text-anchor="end">14h</text>
     <!-- headline -->
     <text x="54" y="90" fill="#9a9a9a" font-size="9">T1a+T1b implemented and green; stack ready for first</text>
     <text x="54" y="102" fill="#9a9a9a" font-size="9">review pass starting at #512.</text>
-    <!-- waiting banner -->
-    <rect x="52" y="110" width="336" height="18" rx="3" fill="#3a3320"/>
-    <text x="58" y="122" fill="#cca700" font-size="9">👀 review · PR #512 awaits your review · waiting 14h</text>
+    <!-- waiting line -->
+    <use href="#i-eye" x="53" y="110" width="11" height="11" color="#cca700"/>
+    <text x="69" y="119" fill="#cca700" font-size="9">PR #512 awaits your review · 14h</text>
     <!-- blockers -->
-    <text x="54" y="142" fill="#f48771" font-size="9">⛔ blocker text renders here verbatim, never truncated</text>
-    <!-- PR row 1 -->
-    <text x="62" y="160" fill="#6e6e6e" font-size="8">↑ main</text>
-    <rect x="52" y="164" width="336" height="20" rx="3" fill="#252526"/>
-    <text x="58" y="178" fill="#3794ff" font-size="9" font-weight="600">#512</text>
-    <rect x="84" y="168" width="24" height="12" rx="6" fill="#1f3a5f"/>
-    <text x="96" y="177" fill="#9cc3ee" font-size="7" text-anchor="middle">T1a</text>
-    <text x="114" y="178" fill="#8a8a8a" font-size="8">rate-limit-core</text>
-    <text x="218" y="178" fill="#89d185" font-size="9">✓ CI</text>
-    <text x="246" y="178" fill="#aaaaaa" font-size="8">💬 5 · 2/3</text>
-    <text x="302" y="178" fill="#aaaaaa" font-size="8">☑ 1/4</text>
-    <text x="340" y="178" fill="#3794ff" font-size="8">→ #91</text>
-    <text x="62" y="196" fill="#6e6e6e" font-size="8">↓ T1b #513, T2 #530</text>
+    <text x="54" y="137" fill="#f48771" font-size="9">blocker text renders here verbatim, never truncated</text>
+    <!-- PR row -->
+    <text x="60" y="155" fill="#6e6e6e" font-size="8">↑ main</text>
+    <rect x="52" y="159" width="336" height="18" rx="3" fill="#252526"/>
+    <text x="58" y="171.5" fill="#3794ff" font-size="9" font-weight="600">#512</text>
+    <text x="86" y="171.5" fill="#9cc3ee" font-size="8">T1a</text>
+    <text x="106" y="171.5" fill="#8a8a8a" font-size="8">rate-limit-core</text>
+    <use href="#i-comment" x="252" y="163" width="10" height="10" color="#cca700"/>
+    <text x="266" y="171.5" fill="#cca700" font-size="8">2</text>
+    <use href="#i-checklist" x="284" y="163" width="10" height="10" color="#cca700"/>
+    <text x="298" y="171.5" fill="#cca700" font-size="8">1</text>
+    <text x="322" y="171.5" fill="#3794ff" font-size="8">→ PROJ-91</text>
+    <text x="60" y="189" fill="#6e6e6e" font-size="8">↓ T1b #513, T2 #530</text>
     <!-- action row -->
-    <rect x="52" y="206" width="128" height="18" rx="3" fill="#3c3c3c"/>
-    <text x="116" y="218" fill="#cccccc" font-size="9" text-anchor="middle">✋ Ready for another look</text>
-    <!-- ack note popover -->
-    <rect x="52" y="232" width="336" height="58" rx="4" fill="#252526" stroke="#0e639c"/>
-    <text x="60" y="248" fill="#8a8a8a" font-size="8">optional note to the agent:</text>
-    <rect x="60" y="254" width="248" height="18" rx="3" fill="#3c3c3c"/>
-    <text x="66" y="266" fill="#cccccc" font-size="8">Replied to all 4 threads; see #512 discussion</text>
-    <rect x="316" y="254" width="62" height="18" rx="3" fill="#0e639c"/>
-    <text x="347" y="266" fill="#ffffff" font-size="8" text-anchor="middle">Send ✋</text>
-    <text x="60" y="284" fill="#6e6e6e" font-size="7">writes .autopilot/inbox/issue-155/ack-9b21d4ee.json (atomic, idempotent)</text>
-    <!-- ack chip (post-send state) -->
-    <rect x="52" y="300" width="172" height="16" rx="8" fill="#1f3a2a"/>
-    <text x="138" y="311" fill="#89d185" font-size="8" text-anchor="middle">✓ sent 14:02 · awaiting pickup · withdraw</text>
-    <text x="54" y="336" fill="#6e6e6e" font-size="8" font-style="italic">card body click → expands (tray: accordion · editor: right pane)</text>
+    <rect x="52" y="198" width="122" height="17" rx="3" fill="#3c3c3c"/>
+    <text x="113" y="209.5" fill="#cccccc" font-size="9" text-anchor="middle">Ready for another look</text>
+    <!-- ack chip -->
+    <use href="#i-mail" x="186" y="201" width="11" height="11" color="#89d185"/>
+    <text x="201" y="210" fill="#89d185" font-size="8">sent 14:02</text>
+    <text x="54" y="234" fill="#6e6e6e" font-size="8" font-style="italic">card body click → expands (tray: accordion · editor: right pane)</text>
+    <text x="54" y="250" fill="#6e6e6e" font-size="8" font-style="italic">row/chip hover → secondary actions (withdraw, open state file, …)</text>
   </g>
 
   <!-- ===== callouts ===== -->
-  <g stroke="#6e6e6e" stroke-width="1" fill="none">
+  <g stroke="#5a5a5a" stroke-width="1" fill="none">
     <line x1="43" y1="56" x2="430" y2="56"/>
-    <line x1="404" y1="67" x2="430" y2="67"/>
+    <line x1="394" y1="67" x2="430" y2="67"/>
     <line x1="392" y1="96" x2="430" y2="96"/>
-    <line x1="392" y1="119" x2="430" y2="119"/>
-    <line x1="392" y1="139" x2="430" y2="139"/>
-    <line x1="392" y1="158" x2="430" y2="158"/>
-    <line x1="392" y1="174" x2="430" y2="174"/>
-    <line x1="392" y1="193" x2="430" y2="193"/>
-    <line x1="184" y1="215" x2="430" y2="215"/>
-    <line x1="392" y1="261" x2="430" y2="261"/>
-    <line x1="228" y1="308" x2="430" y2="308"/>
+    <line x1="392" y1="116" x2="430" y2="116"/>
+    <line x1="392" y1="134" x2="430" y2="134"/>
+    <line x1="392" y1="152" x2="430" y2="152"/>
+    <line x1="392" y1="168" x2="430" y2="168"/>
+    <line x1="392" y1="186" x2="430" y2="186"/>
+    <line x1="392" y1="207" x2="430" y2="207"/>
   </g>
   <g fill="#9a9a9a" font-size="9">
-    <text x="436" y="59">health accent: red blocked/error · amber waiting · blue running · green done</text>
-    <text x="436" y="70">repo badge (per-repo color) · issue # → tracking issue · phase chip · relative age</text>
-    <text x="436" y="99">headline — the agent's own sentence, verbatim; 2-line clamp + tooltip</text>
-    <text x="436" y="122">waitingOn banner: kind icon + detail + live duration; click → waitingOn.ref</text>
-    <text x="436" y="142">blockers[] verbatim (red); presence forces NEEDS YOU lane</text>
-    <text x="436" y="161">upstream indicator (small/dim): base branch, or part+PR if base is tracked</text>
-    <text x="436" y="172">PR row: number → forge · part chip · head branch · CI aggregate ·</text>
-    <text x="436" y="183">comments total · unresolved/resolvable · ☑ tasks (Bitbucket) · linked issues</text>
-    <text x="436" y="196">downstream indicator: every tracked PR whose base = this head</text>
-    <text x="436" y="218">single contextual primary action per card state</text>
-    <text x="436" y="264">ack note popover (opens on click; note optional)</text>
-    <text x="436" y="311">ack chip states: pending → picked up → superseded / stale (re-badges)</text>
+    <text x="436" y="59">health accent (the only health indicator): red blocked/error · amber</text>
+    <text x="436" y="70">waiting · blue running · green done — then repo badge (fleet mode only),</text>
+    <text x="436" y="81">issue # → tracking ticket, phase as dim text, relative age</text>
+    <text x="436" y="99">headline — the agent's own sentence verbatim; 2-line clamp, full on hover</text>
+    <text x="436" y="119">waiting line: kind glyph + detail + live duration (amber text, no banner)</text>
+    <text x="436" y="137">blockers[] verbatim — red text is the indicator, no icon</text>
+    <text x="436" y="155">upstream (small/dim): base branch, or part+PR when base is tracked</text>
+    <text x="436" y="168">PR row: only non-default badges — unresolved comments, unresolved</text>
+    <text x="436" y="179">tasks (Bitbucket), draft, CI x/clock, changes-req., ticket link. Green row = bare.</text>
+    <text x="436" y="190">downstream: every tracked PR whose base = this head</text>
+    <text x="436" y="210">one text-only primary action per card state · ack chip (mail glyph + time)</text>
+  </g>
+
+  <!-- ===== hover inset: PR row tooltip ===== -->
+  <text x="40" y="300" fill="#e0e0e0" font-size="11" font-weight="700">PR-row hover (all detail lives here, not on the row)</text>
+  <rect x="40" y="310" width="360" height="92" rx="4" fill="#252526" stroke="#454545"/>
+  <g font-size="9">
+    <text x="52" y="328" fill="#cccccc" font-weight="600">#512 — Rate limiter core (T1a)</text>
+    <use href="#i-check" x="52" y="336" width="10" height="10" color="#89d185"/>
+    <text x="66" y="345" fill="#9a9a9a">checks 3/3: build (22.x) · lint · e2e-playwright</text>
+    <use href="#i-comment" x="52" y="352" width="10" height="10" color="#9a9a9a"/>
+    <text x="66" y="361" fill="#9a9a9a">5 comments total · 3 resolvable (review threads) · 2 unresolved</text>
+    <text x="66" y="373" fill="#6e6e6e">PR-level comments are not resolvable on this forge</text>
+    <use href="#i-checklist" x="52" y="380" width="10" height="10" color="#9a9a9a"/>
+    <text x="66" y="389" fill="#9a9a9a">tasks 1 of 4 unresolved · review: changes requested · ticket PROJ-91</text>
   </g>
 
   <!-- ===== badge legend ===== -->
-  <text x="40" y="386" fill="#e0e0e0" font-size="11" font-weight="700">CI badge</text>
+  <text x="40" y="436" fill="#e0e0e0" font-size="11" font-weight="700">Indicators (shown only when non-default)</text>
   <g font-size="9">
-    <text x="40" y="406" fill="#89d185">✓ passing</text>
-    <text x="110" y="406" fill="#f48771">✗ failing (click → failing check URL)</text>
-    <text x="310" y="406" fill="#cca700">● pending</text>
-    <text x="380" y="406" fill="#6e6e6e">– none/unknown</text>
+    <use href="#i-x" x="40" y="448" width="10" height="10" color="#f48771"/>
+    <text x="56" y="457" fill="#9a9a9a">CI failing (click → failing check)</text>
+    <text x="220" y="457" fill="#cca700">◔</text>
+    <text x="236" y="457" fill="#9a9a9a">CI pending (clock glyph)</text>
+    <text x="400" y="457" fill="#9a9a9a">CI passing / no checks → nothing rendered</text>
+    <use href="#i-comment" x="40" y="468" width="10" height="10" color="#cca700"/>
+    <text x="56" y="477" fill="#9a9a9a">unresolved comments (count) — zero → nothing</text>
+    <use href="#i-checklist" x="290" y="468" width="10" height="10" color="#cca700"/>
+    <text x="306" y="477" fill="#9a9a9a">unresolved Bitbucket tasks — zero or unsupported → nothing</text>
+    <text x="40" y="497" fill="#6e6e6e">draft</text>
+    <text x="70" y="497" fill="#9a9a9a">dim text, only when draft</text>
+    <use href="#i-check" x="220" y="488" width="10" height="10" color="#89d185"/>
+    <text x="236" y="497" fill="#9a9a9a">approved · </text>
+    <text x="290" y="497" fill="#cca700">changes requested (text)</text>
+    <text x="460" y="497" fill="#9a9a9a">neutral review state → nothing</text>
   </g>
-  <text x="40" y="432" fill="#e0e0e0" font-size="11" font-weight="700">Comment caption rule</text>
-  <text x="40" y="450" fill="#9a9a9a" font-size="9">"💬 5 · 2/3" = 5 total comments (incl. PR-level); 3 carry a resolved bit on this forge, 2 unresolved.</text>
-  <text x="40" y="462" fill="#9a9a9a" font-size="9">Forges without PR-level resolution are captioned honestly — counts never imply resolvability that doesn't exist.</text>
+  <text x="40" y="530" fill="#6e6e6e" font-size="9" font-style="italic">Ticket links: GitHub native closes-refs (→ #91) · Bitbucket Cloud via Jira keys (→ PROJ-91), key parsed per Bitbucket's own</text>
+  <text x="40" y="542" fill="#6e6e6e" font-size="9" font-style="italic">Jira-integration convention (branch name / title); both open the ticket in the browser.</text>
 </svg>

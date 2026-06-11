@@ -10,6 +10,8 @@ writes and the agent loop consumes.
 
 ```
 <repo>/
+├── .status-pipe-launch            # committed, optional: how to launch this repo's
+│                                  # agent loop (see 09-launch-and-supervision.md)
 └── .autopilot/
     ├── state.schema.json          # committed: JSON Schema for issue state files
     ├── README.md                  # committed: protocol docs
@@ -34,7 +36,7 @@ consumes, and how it interprets them:
 |---|---|---|
 | `schemaVersion` | `1` | Files with a higher version render as a degraded "unknown schema" card (title + link only) rather than being hidden — never silently drop work. |
 | `repo` | `owner/name` | Cross-checked against the forge repository inferred from the git remote; mismatch shows a warning badge. |
-| `issue` | int | Cache key; card identity is `(workspaceFolder, issue)`. |
+| `issue` | int *or string* | Cache key; card identity is `(workspaceFolder, issue)`. Schema v1 says integer (GitHub issue number); on Bitbucket + Jira repos the tracking ticket is a Jira key, so status-pipe and the plugin accept a string (`"PROJ-123"`, file `issue-PROJ-123.json`) as a forward-compatible relaxation — existing GitHub repos are unaffected. |
 | `title`, `slug`, `url` | string | Card header; `url` is the tracking-issue deep link. |
 | `phase` | enum `planning…abandoned` | Card phase chip. `merged`/`abandoned` move the card to the Done section. |
 | `health` | enum `ok\|waiting\|blocked\|error\|done` | Drives card accent color and queue bucket (see [05-ui.md](05-ui.md)). |

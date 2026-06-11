@@ -26,6 +26,13 @@ Primary targets — all pure or dependency-injected:
   fixtures → `PullRequestInfo`/`ChecksInfo`/`CommentCounts`, including the
   capability differences (tasks present/absent, `prLevelResolvable` captioning,
   Bitbucket status aggregation rules).
+- **Enrichment cache policy**: terminal-state freeze, change-driven fetch
+  narrowing, rate-budget interval stretching and backoff math (injected clock
+  and fake transport recording request counts — assertions are "N requests for
+  this scenario", the rate-limit budget being a tested invariant).
+- **Agent supervisor**: tick/daemon state machine against a fake launch target
+  (a small script that exits 0 / exits 1 / hangs / streams NDJSON) — schedule,
+  timeout-kill, backoff, failed escalation, trust-hash gating logic.
 - **Webview components**: jsdom + @testing-library/react for card states (ack
   chip state machine, badge rendering, lane headers) — the
   git-spice-code-extension `reactTestHelper` pattern.

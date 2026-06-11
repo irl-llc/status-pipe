@@ -62,8 +62,8 @@ export interface ForgeRepository {
   /** Aggregate + per-check CI status for one PR head. */
   getChecks(prNumber: number): Promise<ChecksInfo>;
 
-  /** Issues linked to a PR (closes #N, Bitbucket issue links). May be empty. */
-  getLinkedIssues(prNumber: number): Promise<IssueRef[]>;
+  /** Tickets linked to a PR (closes #N, Jira keys). May be empty. */
+  getLinkedTickets(prNumber: number): Promise<TicketRef[]>;
 }
 
 export interface PullRequestInfo {
@@ -102,7 +102,8 @@ export interface ChecksInfo {
   checks: Array<{ name: string; status: 'passing' | 'failing' | 'pending' | 'skipped'; url?: string }>;
 }
 
-export interface IssueRef { number: number; title?: string; url: string; }
+/** key is "91" (GitHub issue) or "PROJ-91" (Jira) — always treated as opaque text. */
+export interface TicketRef { key: string; title?: string; url: string; }
 ```
 
 ### Capability model
@@ -118,8 +119,8 @@ export interface ForgeCapabilities {
   tasks: boolean;
   /** GitHub review threads: true. Bitbucket comment resolution: true. */
   threadResolution: boolean;
-  /** Whether PR→issue links are first-class (GitHub closes-refs) or heuristic. */
-  issueLinks: 'native' | 'heuristic' | 'none';
+  /** Whether PR→ticket links are first-class (GitHub closes-refs) or key-parsed (Jira). */
+  ticketLinks: 'native' | 'key-parsed' | 'none';
 }
 export interface Forge { /* … */ readonly capabilities: ForgeCapabilities; }
 ```
@@ -157,7 +158,8 @@ Base-URL overrides for self-hosted instances:
 - **Counts**: `total = comments.totalCount + sum(reviewThreads.comments)`;
   `resolvable/unresolved` from review threads; `prLevelResolvable: false`.
 - **Tasks**: capability off.
-- **Issue links**: `closingIssuesReferences` (native).
+- **Ticket links**: `closingIssuesReferences` (native); GitHub issues are the
+  ticketing source.
 - **Auth** (in order): `statusPipe.forge.github.token` setting →
   `GITHUB_TOKEN` env → `gh auth token` (if gh CLI on PATH) → VS Code's built-in
   GitHub authentication provider (`vscode.authentication.getSession`). The
@@ -176,8 +178,10 @@ Base-URL overrides for self-hosted instances:
   PR-level comments don't (`prLevelResolvable: false` — this is the "some
   forges don't have overall-comment resolution" case the UI captions).
 - **Tasks**: native — `TaskCounts` from the tasks endpoint.
-- **Issue links**: heuristic — parse `#N` / Jira-key patterns from the PR
-  description; capability reported as `heuristic`.
+- **Ticket links**: **Jira Cloud is the ticketing source** for Bitbucket Cloud
+  repos (see "Ticketing sources" below). Jira keys are parsed from branch
+  name / PR title / description — the same convention Bitbucket's own Jira
+  integration uses — capability reported as `key-parsed`.
 - **Build status**: commit statuses aggregated exactly like git-spice's
   bitbucket `aggregateStatuses` (empty ⇒ `none`, any FAILED/STOPPED ⇒ failing,
   any INPROGRESS ⇒ pending, else passing).
@@ -185,19 +189,91 @@ Base-URL overrides for self-hosted instances:
   `BITBUCKET_TOKEN` env. Tokens entered interactively are stored via
   `vscode.SecretStorage`, never in settings.json plaintext.
 
-## Error and rate-limit posture
+## Ticketing sources
 
+A forge hosts PRs; a **ticketing source** hosts the tracking tickets agents
+communicate on. GitHub plays both roles; Bitbucket Cloud pairs with **Jira
+Cloud**. Modeled as a sibling abstraction so the pairing is explicit rather
+than smeared into the forge:
+
+```ts
+export interface TicketSource {
+  readonly id: 'github-issues' | 'jira-cloud';
+  ticketUrl(key: string): string;
+  /** Title/status for display; cached aggressively (tickets change slowly). */
+  getTicket(key: string): Promise<TicketRef & { status?: string }>;
+}
+```
+
+- **Resolution**: GitHub forge → `github-issues` automatically. Bitbucket forge
+  → `jira-cloud`, requiring `statusPipe.tickets.jira.siteUrl`
+  (`https://<site>.atlassian.net`); unset ⇒ ticket links render as plain text
+  keys (degraded, not broken).
+- **Jira auth**: Atlassian email + API token
+  (`statusPipe.tickets.jira.email` + token via `JIRA_API_TOKEN` env or
+  SecretStorage). Jira REST v3 `GET /issue/{key}?fields=summary,status`.
+- **State-file impact**: on Jira-tracked repos the tracking ticket key is a
+  string (`PROJ-123`), not an integer — see the contract note in
+  [02-state-schema.md](02-state-schema.md). The card's ticket deep link goes to
+  Jira; PRs still deep-link to Bitbucket.
+- Ticket fetches ride the same cache/backoff machinery below, with a much
+  longer TTL (15 min) since ticket titles rarely change.
+
+## Caching, debouncing, and rate limits
+
+Rate limits — GitHub's especially — are a first-class design constraint, not an
+error case. The budget mindset: a fleet of 30 tracked PRs across 3 repos must
+idle at **a few requests per minute total**, not per PR.
+
+### Cache layers
+
+1. **In-memory enrichment cache**: `(repo, pr) → {data, fetchedAt, etag}`.
+   Every render reads from here; network only ever *updates* it.
+2. **Persisted cache** (`workspaceState`): the same map, serialized. On window
+   reload the view renders instantly from yesterday's data (with staleness
+   tint) and refreshes in the background — reload never causes a request storm.
+3. **Terminal-state freeze**: PRs whose state is `merged`/`closed` are
+   immutable for our purposes — fetched once, then never re-fetched. With
+   long-running epics most of `prs[]` is merged tranches; this alone removes
+   the majority of steady-state traffic.
+
+### Request shaping
+
+- **GitHub**: one aliased GraphQL query per repo per refresh covering every
+  open tracked PR (metadata + threads + checks + linked tickets). Cost scales
+  with refreshes, not PR count.
+- **Bitbucket**: REST is N+1 by nature, so every GET sends `If-None-Match`;
+  304s don't consume the (already generous) Bitbucket quota meaningfully and
+  skip response processing. 4-way concurrency cap.
+- **Change-driven fetching**: a state-file change triggers enrichment only for
+  the PRs *referenced by the changed file* (plus any PR whose row is missing
+  data). The periodic refresh covers drift on the rest.
+
+### Refresh triggers and debouncing
+
+| Trigger | Behavior |
+|---|---|
+| State-file change burst | coalesced 5s, then change-driven fetch (only affected PRs) |
+| Periodic | every `refreshIntervalSeconds` (default 60s) **only while a status-pipe view is visible**; hidden views don't poll |
+| Window focus regained | refresh if cache older than the min interval |
+| Manual refresh button | bypasses min-interval and change-driven narrowing: refetches all open PRs in the clicked scope (per-view button = everything; per-repo on the repo header) — but still uses ETags and still respects an active rate-limit backoff rather than burning the remaining budget |
+
+### Budgeting and backoff
+
+- Track `X-RateLimit-Remaining`/`Reset` (GitHub) on every response; below a
+  threshold (default 10% remaining) the refresh interval stretches
+  automatically (×2, ×4 …) until the reset time passes. The UI's staleness
+  tooltip says so ("throttled to protect rate budget — resets 16:02").
+- 403/429: exponential backoff per repo honoring `Retry-After`; one indicator
+  in the reserved activity slot (see [05-ui.md](05-ui.md)) — never per-card
+  spam, never a toast.
 - All forge calls are **enrichment** — failures degrade, never block. A card
-  whose enrichment failed shows its state-file data plus a subdued
-  "forge data unavailable (rate limited / offline / auth)" footer with a retry
-  affordance.
-- Per-repo enrichment refresh is debounced (default 60s min interval,
-  `statusPipe.forge.refreshIntervalSeconds`), triggered by state-file changes
-  and view focus, not a hot poll. 403/429 responses back off exponentially per
-  repo and surface a single status-bar warning, not per-card spam.
+  whose enrichment failed renders from state-file data with a staleness tint;
+  detail (cause, retry time, retry-now) lives in the activity indicator's
+  tooltip/click, not in the cards.
 - `ForgeError` carries `kind: 'auth' | 'rate-limit' | 'network' | 'not-found'`;
-  `not-found` on a PR marks that row "deleted on forge" rather than failing the
-  card.
+  `not-found` on a PR marks that row "deleted on forge" (hover detail) rather
+  than failing the card.
 
 ## Testing
 

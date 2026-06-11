@@ -33,14 +33,19 @@ plugin/
 
 Mirrors the two real workflows:
 
-1. **Issue mode** (`work-issue`) — pure forge flow, the
-   git-spice-code-extension style: a GitHub/Bitbucket issue is the work spec
-   and the communication channel. Cache key = issue number.
+1. **Issue mode** (`work-issue`) — pure ticket flow, the
+   git-spice-code-extension style: a tracking ticket is the work spec and the
+   communication channel. Cache key = ticket key. The **ticketing source**
+   follows the forge: GitHub repos use GitHub issues (key = issue number);
+   Bitbucket Cloud repos use **Jira Cloud** (key = `PROJ-123`; inventory via a
+   JQL label query instead of `gh issue list`; design-intent comments go on
+   the Jira ticket via its REST API; Jira site/project configured in the
+   plugin's repo config).
 2. **Epic mode** (`work-epic`) — the irl-llc style: an `epics/<slug>.md` file
-   is the spec (with `> **Tracking issue:** owner/repo#N` header; the command
-   creates the tracking issue and inserts the header if missing). The tracking
-   issue is the agent↔human design-intent channel. Cache key = tracking issue
-   number.
+   is the spec (with `> **Tracking issue:** owner/repo#N` — or `PROJ-123` on
+   Jira-tracked repos — in the header; the command creates the tracking ticket
+   and inserts the header if missing). The tracking ticket is the agent↔human
+   design-intent channel. Cache key = tracking ticket key.
 
 Both modes write the identical `issue-<N>.json`; status-pipe (the extension)
 renders them identically. Epic-mode cards additionally deep-link the epic file.
@@ -91,7 +96,13 @@ State-writing discipline (enforced by the `state-contract` skill):
 ### `launch` — recurring wrapper
 
 Invokes the `/loop` skill with the chosen interval (default 10m) running
-`fanout`. Same shape as irl-llc's `launch-epic-iterator`.
+`fanout`. Same shape as irl-llc's `launch-epic-iterator`. This is the
+*interactive* way to run the loop (single-repo mode, Claude pane open); in
+fleet mode the extension's supervisor launches `fanout` directly as a headless
+tick (`claude -p "/status-pipe-agent:fanout" --output-format stream-json`) per
+[09-launch-and-supervision.md](09-launch-and-supervision.md). `fanout` is
+deliberately a one-pass, zero-prompt command so both paths share it. The plugin
+README ships a reference `.status-pipe-launch` for Claude Code.
 
 ### `ack-check` — standalone inbox sweep
 

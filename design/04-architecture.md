@@ -44,11 +44,24 @@ IssueState>, acks: Map<number, AckFile[]> }`.
 
 ### `forgeEnricher`
 Per repo: collects all PR numbers across that repo's issue states, batch-calls
-`ForgeRepository.getPullRequests` / `getChecks` / `getLinkedIssues`, caches
-results with timestamps. Triggers: state-file change (debounced 5s), visible
-view + stale cache (>60s), manual refresh command. Enrichment results merge
-into the store as an overlay — the state file is never mutated, and a card can
-always render without the overlay.
+`ForgeRepository.getPullRequests` / `getChecks` / `getLinkedTickets`, caches
+results with timestamps. Triggers: state-file change (debounced 5s,
+change-driven — only the PRs the changed file references), visible view +
+stale cache (>60s), focus regained, manual refresh. The full cache/budget
+design (persisted `workspaceState` cache, terminal-state freeze, ETags, rate
+budgeting and backoff) is in [03-forge.md](03-forge.md). Enrichment results
+merge into the store as an overlay — the state file is never mutated, and a
+card can always render without the overlay. Enricher activity/degradation is
+published to the views' reserved activity slot, never as per-card errors.
+
+### `agentSupervisor` (fleet mode; see [09-launch-and-supervision.md](09-launch-and-supervision.md))
+Reads `.status-pipe-launch` per repo (trust-gated by content hash), runs the
+tick/daemon state machine per `(repo, agent)`, spawns children via
+`child_process.spawn` with stdout/stderr to per-agent OutputChannels, tracks
+`lastOutputAt` liveness and exit codes, applies backoff, and feeds the
+`DisplayState` agents strip plus synthetic launcher-failed queue cards.
+Strictly separate from `.autopilot/` state — process health is
+supervisor-owned, work-item health is agent-owned.
 
 ### `queueModel` (pure, unit-test target #1)
 `(issueStates, feedback, enrichment, now) → DisplayState`. Implements the queue
@@ -77,8 +90,9 @@ pattern). Webview → host messages:
 | `showHistory {repoRoot, issue}` | switch card to expanded timeline (editor mode) |
 | `ack {repoRoot, issue, target, note}` | create `inbox/issue-<N>/ack-<id>.json` (atomic temp+rename; idempotent id) |
 | `withdrawAck {repoRoot, issue, ackId}` | unlink an unconsumed ack file we authored |
-| `restartRun {repoRoot, issue}` | run the user-configured per-repo resume command in the integrated terminal |
-| `refresh {repoRoot?}` | force enrichment refresh |
+| `restartRun {repoRoot, issue}` | supervisor tick-now when a launch file exists; else the configured resume command in the integrated terminal |
+| `agentControl {repoRoot, agentId, action: start\|stop\|tickNow\|openLog}` | drive the supervisor |
+| `refresh {repoRoot?}` | force enrichment refresh (semantics per [03-forge.md](03-forge.md)) |
 
 Host → webview: `displayState` (full snapshot — small data, no need for
 diffing), `enrichmentStatus` (per-repo fetching/error indicators).
@@ -111,14 +125,22 @@ for iconography; CSP with nonce exactly as git-spice-code-extension's
 | `statusPipe.forge.type` | `auto` | `auto\|github\|bitbucket`, resource-scoped |
 | `statusPipe.forge.github.baseUrl/apiUrl/token` | github.com | token falls back to env/gh/VS Code auth |
 | `statusPipe.forge.bitbucket.baseUrl/apiUrl/token` | bitbucket.org | token falls back to env/SecretStorage |
+| `statusPipe.tickets.jira.siteUrl/email` | — | Jira Cloud ticketing for Bitbucket repos; token via env/SecretStorage |
 | `statusPipe.forge.refreshIntervalSeconds` | 60 | enrichment min interval |
 | `statusPipe.stateDir` | `.autopilot` | escape hatch for future conventions |
 | `statusPipe.staleRunMinutesDefault` | 30 | when run.json absent |
+| `statusPipe.launch.enabled` | true | master switch for the supervisor |
+| `statusPipe.launch.autoStart` | false | auto-start approved agents on workspace open |
+| `statusPipe.launch.pauseWhenIdle` | true | pause tick scheduling after 30 min without window focus |
+| `statusPipe.launch.maxRestarts` | 3 | consecutive failures before `failed` |
+| `statusPipe.resumeCommand` | — | fallback restart command when no launch file |
 
 ## Commands
 
 `statusPipe.openInEditor`, `statusPipe.refresh`, `statusPipe.signIn.github`,
-`statusPipe.signIn.bitbucket`, `statusPipe.revealStateFile`.
+`statusPipe.signIn.bitbucket`, `statusPipe.revealStateFile`,
+`statusPipe.agents.startAll`, `statusPipe.agents.stopAll`,
+`statusPipe.agents.tickNow`, `statusPipe.agents.openLog`.
 
 ## Build tooling
 
