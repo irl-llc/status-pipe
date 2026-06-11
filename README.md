@@ -30,6 +30,53 @@ attribution); gitignored `tickets/<key>.json` (agent-owned work-item state),
 (operator → orchestrator signals, the one thing the extension writes). Full
 spec: [design/02-protocol.md](design/02-protocol.md).
 
+## What it looks like
+
+These images are the **checked-in Playwright snapshot baselines** — every CI
+run re-renders the real extension inside headless VS Code and pixel-compares
+against them, so what you see here is what the code actually produces.
+
+### The queue as an editor tab
+
+Lanes (NEEDS YOU / WAITING / QUIET), priority ordering, stack indicators, and
+worker status — [queueLanes.spec.ts](src/test/e2e/playwright/queueLanes.spec.ts):
+
+![Queue lanes in the editor](src/test/e2e/playwright/queueLanes.spec.ts-snapshots/lanes-editor-linux.png)
+
+### The compact tray view
+
+The same queue as a side-bar triage index:
+
+![Queue tray view](src/test/e2e/playwright/queueLanes.spec.ts-snapshots/lanes-tray-linux.png)
+
+### Forge enrichment badges
+
+CI state, comment counts, and review decisions served by the in-process fake
+forge — [enrichedBadges.spec.ts](src/test/e2e/playwright/enrichedBadges.spec.ts):
+
+![Enriched badges](src/test/e2e/playwright/enrichedBadges.spec.ts-snapshots/enriched-badges-linux.png)
+
+### The ack flow
+
+After clicking **Ready for another look** the chip appears and the ack file is
+asserted on disk with the protocol-correct id —
+[ackFlow.spec.ts](src/test/e2e/playwright/ackFlow.spec.ts):
+
+![Ack sent chip](src/test/e2e/playwright/ackFlow.spec.ts-snapshots/ack-sent-chip-linux.png)
+
+### Degraded and quiet states
+
+A ticket from an unknown future schema renders a degraded card (never hidden),
+and an empty needs-you lane renders the product sentence:
+
+![Degraded card](src/test/e2e/playwright/queueLanes.spec.ts-snapshots/degraded-card-linux.png)
+
+![All quiet](src/test/e2e/playwright/allQuiet.spec.ts-snapshots/all-quiet-linux.png)
+
+To regenerate after an intentional UI change:
+`npm run test:e2e:playwright:docker:update` (or the `update_snapshots`
+workflow dispatch in CI, which is the oracle for the Linux baselines).
+
 ## Development
 
 ```sh
