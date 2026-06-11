@@ -77,6 +77,24 @@ To regenerate after an intentional UI change:
 `npm run test:e2e:playwright:docker:update` (or the `update_snapshots`
 workflow dispatch in CI, which is the oracle for the Linux baselines).
 
+## Installing from source
+
+The extension is not on the marketplace yet; build and install the `.vsix`
+yourself:
+
+```sh
+git clone https://github.com/ed-irl/status-pipe.git
+cd status-pipe
+npm install
+npm run package:vsix     # produces status-pipe-<version>.vsix
+code --install-extension status-pipe-*.vsix
+```
+
+(Or in VS Code: Extensions view → `…` menu → **Install from VSIX…** and pick
+the file.) The packaged extension activates when any workspace folder
+contains a `.status-pipe/` directory. To use the companion Claude Code
+plugin from source, see [plugin/README.md](plugin/README.md).
+
 ## Development
 
 ```sh

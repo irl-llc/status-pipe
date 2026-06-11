@@ -270,6 +270,7 @@
 		"test:e2e:playwright": "playwright test",
 		"test:e2e:playwright:docker": "docker compose -f docker-compose.test.yml run --rm playwright",
 		"test:e2e:playwright:docker:update": "docker compose -f docker-compose.test.yml run --rm -e PW_FLAGS=--update-snapshots playwright",
+		"package:vsix": "vsce package --no-dependencies",
 		"deploy": "vsce publish --no-dependencies",
 		"deploy:openvsx": "ovsx publish --no-dependencies"
 	},
