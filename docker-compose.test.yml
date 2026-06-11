@@ -1,9 +1,13 @@
-# One-platform test environment for Playwright snapshot tests.
-# Same container runs on macOS dev and ubuntu-latest CI so the PNG
-# snapshots checked into LFS are byte-identical from both sides.
+# One-platform test environment for every test that launches a real
+# VS Code (the e2e suite and the Playwright snapshot suite). ALL VS Code
+# test sessions run headless in this container — never on the host
+# desktop, where the spawned Electron windows steal focus and mess up
+# desktop state. The same container runs on macOS dev and ubuntu-latest
+# CI so the PNG snapshots checked into LFS are byte-identical.
 #
 # Usage (locally):
-#   npm run test:e2e:playwright:docker          # verify
+#   npm run test:e2e:docker                     # @vscode/test-cli suite, headless
+#   npm run test:e2e:playwright:docker          # snapshot verify
 #   npm run test:e2e:playwright:docker:update   # regenerate snapshots
 #
 # The `:update` script sets PW_FLAGS=--update-snapshots in the container
@@ -45,6 +49,33 @@ services:
         else
           xvfb-run -a npm run test:e2e:playwright
         fi
+
+  e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: status-pipe-playwright:v1.60.0-jammy
+    working_dir: /work
+    init: true
+    ipc: host
+    volumes:
+      - .:/work
+      - playwright-node-modules:/work/node_modules
+      - playwright-vscode-test:/work/.vscode-test
+    environment:
+      HOME: /tmp
+      npm_config_cache: /tmp/.npm
+      CI: 'true'
+    entrypoint:
+      - bash
+      - -c
+    command:
+      - |
+        set -euo pipefail
+        npm ci --prefer-offline --no-audit --fund=false
+        npm run compile
+        npm run compile-tests
+        xvfb-run -a npm run test:e2e
 
 volumes:
   playwright-node-modules:

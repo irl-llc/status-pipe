@@ -12,7 +12,7 @@ import { RepoContext, scanForRepos } from '../discovery/repoScan';
 import { ForgeEnricher, PersistedEnrichment } from '../forge/enricher';
 import { buildAck } from '../protocol/ackId';
 import { LaunchAgent } from '../protocol/types';
-import { withdrawAckFile, writeAckFile } from '../protocol/ackWriter';
+import { sweepOrphanedInboxDirs, withdrawAckFile, writeAckFile } from '../protocol/ackWriter';
 import { DisplayState } from '../queue/displayTypes';
 import { QueueModelInput, RepoState } from '../queue/queueInputs';
 import { buildDisplayState } from '../queue/queueModel';
@@ -166,6 +166,7 @@ export class StatusPipeController implements vscode.Disposable {
 		this.feedSupervisor(repo);
 		this.detectNewAcks(repo);
 		this.ensureEpicWatcher(repo);
+		void sweepOrphanedInboxDirs(repo.context.protocolDir, Date.now()).catch(() => undefined);
 		this.pushSoon();
 	}
 
@@ -382,9 +383,10 @@ export class StatusPipeController implements vscode.Disposable {
 	}
 
 	async revealTicketFile(repoRoot: string, ticketKey: string): Promise<void> {
-		const repo = this.repos.get(repoRoot);
-		if (!repo) return;
-		const file = path.join(repo.context.protocolDir, 'tickets', `${ticketKey}.json`);
+		// Fall back to the conventional path when discovery has not landed yet.
+		const protocolDir =
+			this.repos.get(repoRoot)?.context.protocolDir ?? path.join(repoRoot, settings.protocolDirName());
+		const file = path.join(protocolDir, 'tickets', `${ticketKey}.json`);
 		await vscode.window.showTextDocument(vscode.Uri.file(file));
 	}
 

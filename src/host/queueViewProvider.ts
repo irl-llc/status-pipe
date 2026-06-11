@@ -85,11 +85,25 @@ export class QueueEditorPanel {
 			localResourceRoots: [extensionUri],
 		});
 		const wired = wireWebview(panel.webview, 'editor', controller, extensionUri);
+		const statusBar = QueueEditorPanel.buildStatusBar(controller);
 		controller.setViewVisible(true);
 		panel.onDidDispose(() => {
 			wired.dispose();
+			statusBar.dispose();
 			QueueEditorPanel.current = null;
 		});
 		QueueEditorPanel.current = panel;
+	}
+
+	/** Editor-mode status-bar item: NEEDS-YOU count at a glance (design/05). */
+	private static buildStatusBar(controller: StatusPipeController): vscode.Disposable {
+		const item = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 50);
+		item.command = 'statusPipe.openInEditor';
+		const subscription = controller.subscribe((state) => {
+			item.text = state.counts.needsYou > 0 ? `$(mail) ${state.counts.needsYou} need you` : '$(check) all quiet';
+			item.tooltip = 'Status Pipe queue';
+			item.show();
+		});
+		return vscode.Disposable.from(item, subscription);
 	}
 }

@@ -28,8 +28,7 @@
 		"Other"
 	],
 	"activationEvents": [
-		"workspaceContains:**/.status-pipe/",
-		"onView:statusPipe.queue"
+		"workspaceContains:**/.status-pipe/"
 	],
 	"main": "./dist/extension.js",
 	"files": [
@@ -266,7 +265,8 @@
 		"format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
 		"test": "vscode-test",
 		"test:unit": "mocha 'out/test/unit/**/*.test.js'",
-		"test:e2e": "vscode-test --config .vscode-test.e2e.mjs",
+		"test:e2e": "node scripts/gen-e2e-fixture.mjs && vscode-test --config .vscode-test.e2e.mjs",
+		"test:e2e:docker": "docker compose -f docker-compose.test.yml run --rm e2e",
 		"test:e2e:playwright": "playwright test",
 		"test:e2e:playwright:docker": "docker compose -f docker-compose.test.yml run --rm playwright",
 		"test:e2e:playwright:docker:update": "docker compose -f docker-compose.test.yml run --rm -e PW_FLAGS=--update-snapshots playwright",

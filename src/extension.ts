@@ -32,8 +32,9 @@ function registerCommands(context: vscode.ExtensionContext, controller: StatusPi
 	register('statusPipe.signIn.bitbucket', () => signInBitbucket(context.secrets));
 	register('statusPipe.revealTicketFile', (repoRoot, ticket) => {
 		if (typeof repoRoot === 'string' && typeof ticket === 'string') {
-			void controller.revealTicketFile(repoRoot, ticket);
+			return controller.revealTicketFile(repoRoot, ticket);
 		}
+		return undefined;
 	});
 	registerAgentCommands(register, controller);
 }

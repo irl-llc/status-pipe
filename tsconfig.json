@@ -10,6 +10,7 @@
 		"esModuleInterop": true,
 		"allowSyntheticDefaultImports": true,
 		"resolveJsonModule": true,
+		"skipLibCheck": true,
 		"types": ["node", "vscode", "mocha"],
 		"noImplicitReturns": true,
 		"noFallthroughCasesInSwitch": true,

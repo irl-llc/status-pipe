@@ -9,8 +9,13 @@ npm run lint            # eslint src --max-warnings=0 (the CI gate)
 npm run format:check    # prettier check
 npm run compile-tests   # tsc -> out/ (required before unit tests)
 npm run test:unit       # mocha unit tests (out/test/unit/**)
-npm run test:e2e        # mocha E2E suite in a real VS Code (xvfb on Linux)
+npm run test:e2e:docker # mocha E2E suite in a real VS Code, headless in Docker
 ```
+
+Anything that launches a real VS Code (the e2e suite, the Playwright
+snapshots) should run through the Docker scripts locally — a natively
+spawned VS Code window steals focus and disturbs your desktop session.
+`npm run test:e2e` exists for CI (xvfb) and debugging only.
 
 ### Playwright snapshot tests
 

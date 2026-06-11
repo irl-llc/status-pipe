@@ -11,7 +11,7 @@ import { formatAge, formatDuration, plainHeadline } from '../format';
 import { WAITING_ICON } from '../icons';
 import { AckControl } from './AckControl';
 import { PrRows } from './PrRows';
-import { usePost } from './QueueApp';
+import { usePost, useRepoFilter } from './QueueApp';
 
 const ACCENT: Record<Health, string> = {
 	blocked: 'accent-error',
@@ -59,10 +59,18 @@ export function TicketCard({ card, state, selected, onSelect }: TicketCardProps)
 
 function CardHeader({ card, state }: { card: CardDisplay; state: DisplayState }): JSX.Element {
 	const post = usePost();
+	const filterToRepo = useRepoFilter();
 	return (
 		<div className="card-header">
 			{state.multiRepo && (
-				<span className="repo-badge" title={`filter to ${card.repoName}`}>
+				<span
+					className="repo-badge"
+					title={`filter to ${card.repoName}`}
+					onClick={(e) => {
+						e.stopPropagation();
+						filterToRepo(card.repoRoot);
+					}}
+				>
 					{card.repoName}
 				</span>
 			)}

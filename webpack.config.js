@@ -40,8 +40,8 @@ const extensionConfig = {
 	},
 };
 
-/** @type WebpackConfig */
-const webviewConfig = {
+/** @type {(mode: string) => WebpackConfig} */
+const webviewConfig = (mode) => ({
 	target: 'web', // webview runs in a browser context
 	mode: 'none',
 
@@ -67,9 +67,10 @@ const webviewConfig = {
 	plugins: [
 		// React reads process.env.NODE_ENV at runtime to pick its dev/prod
 		// builds. The webview has no `process`, so webpack must inline this
-		// value (at mode 'none' the default DefinePlugin does not fire).
+		// value (at mode 'none' the default DefinePlugin does not fire);
+		// it follows the build mode so `npm run package` ships prod React.
 		new webpack.DefinePlugin({
-			'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV ?? 'development'),
+			'process.env.NODE_ENV': JSON.stringify(mode === 'production' ? 'production' : 'development'),
 		}),
 		new CopyWebpackPlugin({
 			patterns: [
@@ -84,6 +85,14 @@ const webviewConfig = {
 	infrastructureLogging: {
 		level: 'log',
 	},
-};
+});
 
-module.exports = [extensionConfig, webviewConfig];
+module.exports = (env, argv) => {
+	const mode = (argv && argv.mode) || 'none';
+	const webview = webviewConfig(mode);
+	if (mode === 'production') {
+		extensionConfig.mode = 'production';
+		webview.mode = 'production';
+	}
+	return [extensionConfig, webview];
+};

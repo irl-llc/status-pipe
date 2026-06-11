@@ -15,6 +15,10 @@ import { LaneSection } from './LaneSection';
 export const PostContext = createContext<(message: WebviewMessage) => void>(() => undefined);
 export const usePost = (): ((message: WebviewMessage) => void) => useContext(PostContext);
 
+/** Repo-badge click target: filter the queue to one repo (design/05 click table). */
+export const RepoFilterContext = createContext<(repoRoot: string) => void>(() => undefined);
+export const useRepoFilter = (): ((repoRoot: string) => void) => useContext(RepoFilterContext);
+
 export interface QueueAppProps {
 	postMessage: (message: WebviewMessage) => void;
 	subscribeMessages: (handler: (message: ExtensionMessage) => void) => () => void;
@@ -55,27 +59,29 @@ export function QueueApp({ postMessage, subscribeMessages }: QueueAppProps): JSX
 		);
 	return (
 		<PostContext.Provider value={postMessage}>
-			<div className="queue-app">
-				<Header state={state} options={options} onOptions={setOptions} />
-				<AgentsStrip state={state} />
-				{options.repoFilter && (
-					<div className="monitor-note">
-						filtered to {shortName(options.repoFilter)} ·{' '}
-						<a href="#" onClick={() => setOptions({ ...options, repoFilter: null })}>
-							clear
-						</a>
-					</div>
-				)}
-				{state.repos.map(
-					(r) =>
-						r.monitorOnlyNote && (
-							<div key={r.repoRoot} className="monitor-note">
-								{r.monitorOnlyNote}
-							</div>
-						),
-				)}
-				{body}
-			</div>
+			<RepoFilterContext.Provider value={(repoRoot) => setOptions({ ...options, repoFilter: repoRoot })}>
+				<div className="queue-app">
+					<Header state={state} options={options} onOptions={setOptions} />
+					<AgentsStrip state={state} />
+					{options.repoFilter && (
+						<div className="monitor-note">
+							filtered to {shortName(options.repoFilter)} ·{' '}
+							<a href="#" onClick={() => setOptions({ ...options, repoFilter: null })}>
+								clear
+							</a>
+						</div>
+					)}
+					{state.repos.map(
+						(r) =>
+							r.monitorOnlyNote && (
+								<div key={r.repoRoot} className="monitor-note">
+									{r.monitorOnlyNote}
+								</div>
+							),
+					)}
+					{body}
+				</div>
+			</RepoFilterContext.Provider>
 		</PostContext.Provider>
 	);
 }
