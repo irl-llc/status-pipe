@@ -138,6 +138,22 @@ describe('supervisor/agentSupervisor', () => {
 			assert.equal(h.spawner.requests.length, 2);
 		});
 
+		it('noteOrchestrator parked stops a RUNNING daemon and an ack relaunches it', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [agent({ id: 'daemon', mode: 'daemon' })]);
+			h.supervisor.control(REPO, 'daemon', 'start');
+			assert.equal(h.supervisor.states()[0].state, 'running');
+
+			h.supervisor.noteOrchestrator(REPO, orchestratorFile(PARKED));
+			assert.equal(h.spawner.kills, 1);
+			assert.equal(h.supervisor.states()[0].state, 'parked');
+			assert.equal(h.supervisor.states()[0].detail, 'all work waiting on you');
+
+			h.supervisor.noteAckCreated(REPO);
+			assert.equal(h.supervisor.states()[0].state, 'running');
+			assert.equal(h.spawner.requests.length, 2);
+		});
+
 		it('armParkedRecheck schedules a wake at recheckAfter', async () => {
 			const h = makeSupervisor();
 			h.supervisor.setAgents(REPO, [agent()]);

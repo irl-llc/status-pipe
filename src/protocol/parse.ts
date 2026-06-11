@@ -253,6 +253,13 @@ function ackFromJson(json: Json, identity: AckIdentity): AckFile {
 export function parseAckFile(raw: string): ParseResult<AckFile> {
 	const versioned = parseVersioned(raw);
 	if (!versioned.ok) return versioned;
+	// kind is an enum from day one (design/02): a kind this reader does not
+	// know is a newer protocol, not a ready-for-look — misreading it could
+	// withdraw (unlink) a signal the operator meant to keep.
+	const kind = str(versioned.value.kind) ?? 'ready-for-look';
+	if (kind !== 'ready-for-look') {
+		return { ok: false, reason: 'unknown-schema', raw, detail: `unknown ack kind "${kind}" — update status-pipe` };
+	}
 	const identity = ackIdentityFromJson(versioned.value);
 	if (!identity) {
 		return { ok: false, reason: 'corrupt', raw, detail: 'missing/invalid ticket, ackId, or target' };

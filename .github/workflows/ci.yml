@@ -31,10 +31,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          # Snapshot PNGs in src/test/e2e/playwright/*.spec.ts-snapshots/
-          # are git-lfs-tracked.
-          lfs: true
 
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
@@ -94,7 +90,6 @@ jobs:
         run: xvfb-run -a npm run test:e2e
         env:
           DISPLAY: ':99.0'
-        continue-on-error: true
 
       - name: Cache Docker test image layers
         uses: actions/cache@v4

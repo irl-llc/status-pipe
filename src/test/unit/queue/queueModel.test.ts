@@ -494,7 +494,9 @@ describe('queue/queueModel buildDisplayState', () => {
 			const card860 = state.cards.find((c) => c.ticket === '860');
 			assert.strictEqual(card853?.prs[0].upstream, 'main');
 			assert.deepStrictEqual(card853?.prs[0].downstream, ['T2 #861']);
-			assert.strictEqual(card860?.prs[0].upstream, '↑ T1a #855');
+			// Bare label — the view owns the ↑ glyph (model+view each adding one
+			// shipped a doubled "↑ ↑" once).
+			assert.strictEqual(card860?.prs[0].upstream, 'T1a #855');
 			assert.deepStrictEqual(card860?.prs[0].downstream, []);
 		});
 

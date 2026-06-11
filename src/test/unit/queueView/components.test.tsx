@@ -467,4 +467,13 @@ describe('queueView/components', () => {
 			assert.equal(done.result.container.querySelectorAll('.pr-badge').length, 0);
 		});
 	});
+
+	describe('stack indicators', () => {
+		it('renders exactly one ↑ glyph for a stacked upstream and one ↓ per downstream', () => {
+			const pr = makePr({ upstream: 'T1a #855', downstream: ['T2 #861'] });
+			const { result } = renderWithPost(<PrRows card={makeCard({ prs: [pr] })} />);
+			const refs = Array.from(result.container.querySelectorAll('.stack-ref')).map((el) => el.textContent);
+			assert.deepEqual(refs, ['↑ T1a #855', '↓ T2 #861']);
+		});
+	});
 });

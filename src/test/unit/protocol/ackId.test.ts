@@ -29,6 +29,15 @@ describe('protocol/ackId', () => {
 			assert.strictEqual(deriveAckId('853', 'owner', '2026-06-11T07:55:22Z'), expected);
 		});
 
+		it('matches the protocol known-answer vectors byte-for-byte', () => {
+			// Literal vectors, NOT derived in-test: these are the only thing
+			// that byte-pins this implementation to the plugin's independent
+			// derivation (plugin/skills/protocol/SKILL.md) and to the worked
+			// example in design/02-protocol.md without sharing code.
+			assert.strictEqual(deriveAckId('142', 'owner', '2026-06-11T07:55:22Z'), 'bcd313df');
+			assert.strictEqual(deriveAckId('853', 'owner', '2026-06-10T22:14:03Z'), 'ac2cc979');
+		});
+
 		it('is always exactly 8 lowercase hex chars', () => {
 			const id = deriveAckId('PROJ-123', 'blockers', '2026-06-11T07:55:22Z');
 			assert.match(id, /^[0-9a-f]{8}$/);

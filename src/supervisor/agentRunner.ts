@@ -99,12 +99,33 @@ export class AgentRunner {
 
 	stop(): void {
 		this.clearTimers();
+		// A wake aimed at the loop the operator just stopped must not fire a
+		// phantom launch after a later manual start.
+		this.pendingWake = false;
 		if (this.handle) {
 			this.detail = 'stopped by operator';
 			this.handle.kill();
 			this.handle = null;
 		}
+		this.runningSince = null;
 		this.setState('stopped');
+	}
+
+	/**
+	 * Orchestrator declared `parked`: a daemon is stopped and relaunched on
+	 * the same wake triggers (design/09). The recheck timer lands in
+	 * onTimerFired, whose parking gate keeps it suspended until a wake.
+	 */
+	parkDaemon(): void {
+		if (this.agent.mode !== 'daemon') return;
+		if (this.state !== 'running' && this.state !== 'launching') return;
+		this.clearTimers();
+		this.pendingWake = false;
+		this.detail = this.deps.isParked()?.reason ?? 'parked';
+		this.handle?.kill();
+		this.handle = null;
+		this.runningSince = null;
+		this.scheduleNext(PARKED_RECHECK_MS);
 	}
 
 	private pendingWake = false;
@@ -154,19 +175,30 @@ export class AgentRunner {
 		this.launch();
 	}
 
+	private spawnSeq = 0;
+
 	private launch(): void {
 		this.setState('launching');
 		this.detail = null;
 		this.timedOut = false;
+		const seq = ++this.spawnSeq;
 		try {
-			this.handle = this.deps.spawn(this.spawnRequest(), {
+			const handle = this.deps.spawn(this.spawnRequest(), {
 				onOutput: (chunk) => this.onOutput(chunk),
-				onExit: (code) => this.onExit(code),
+				onExit: (code) => this.onExit(code, seq),
 			});
+			// A spawner may report exit synchronously; the machine has
+			// already routed it — don't resurrect the run.
+			if (this.state !== 'launching' || seq !== this.spawnSeq) return;
+			this.handle = handle;
 		} catch (err) {
-			this.onExit(spawnFailureCode(err, this.deps.log));
+			this.onExit(spawnFailureCode(err, this.deps.log), seq);
 			return;
 		}
+		this.markRunning();
+	}
+
+	private markRunning(): void {
 		this.runningSince = this.deps.now();
 		this.lastOutputAt = null;
 		this.setState('running');
@@ -199,14 +231,19 @@ export class AgentRunner {
 		this.deps.onStateChange();
 	}
 
-	private onExit(code: number | null): void {
+	private onExit(code: number | null, seq: number): void {
+		// Inert exits: a stale event from a previous spawn, a spawner that
+		// double-fires, or the late SIGTERM landing after stop()/parkDaemon()
+		// already settled the machine. stop/park clear runningSince/handle
+		// themselves, so there is no bookkeeping left to do here.
+		if (seq !== this.spawnSeq) return;
+		if (this.state !== 'running' && this.state !== 'launching') return;
 		this.cancelTimeout?.();
 		this.cancelTimeout = null;
 		this.handle = null;
 		this.lastExitCode = code;
 		const uptimeMs = this.runningSince !== null ? this.deps.now() - this.runningSince : 0;
 		this.runningSince = null;
-		if (this.state === 'stopped') return; // operator stop — no reschedule
 		this.routeExit(code, uptimeMs);
 	}
 

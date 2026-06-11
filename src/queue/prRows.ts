@@ -23,9 +23,10 @@ export function buildHeadIndex(tickets: TicketFile[]): Map<string, TicketPr> {
 	return index;
 }
 
+// Bare label — the views own the ↑/↓ glyphs, same contract as downstream.
 function upstreamLabel(pr: TicketPr, headIndex: Map<string, TicketPr>): string {
 	const basePr = headIndex.get(pr.base);
-	return basePr ? `↑ ${prLabel(basePr)}` : pr.base;
+	return basePr ? prLabel(basePr) : pr.base;
 }
 
 function downstreamLabels(pr: TicketPr, allPrs: TicketPr[]): string[] {

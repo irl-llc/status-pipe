@@ -239,6 +239,42 @@ describe('supervisor/agentRunner', () => {
 			assert.equal(h.spawner.requests.length, 2);
 		});
 
+		it('parkDaemon stops a running daemon without failure accounting and wakes cleanly', async () => {
+			const h = makeRunner({ mode: 'daemon' });
+			h.runner.start();
+			await h.clock.advance(5_000); // even an unhealthy-uptime park is not a failure
+			h.parked.value = PARKED;
+			h.runner.parkDaemon();
+			assert.equal(h.spawner.kills, 1);
+			const snap = h.runner.snapshot();
+			assert.equal(snap.state, 'parked');
+			assert.equal(snap.detail, 'all work waiting on you');
+			assert.equal(snap.consecutiveFailures, 0);
+
+			// The killed process's exit arrives late — it must not reroute.
+			h.spawner.exitLast(null);
+			assert.equal(h.runner.snapshot().state, 'parked');
+			assert.equal(h.runner.snapshot().consecutiveFailures, 0);
+
+			// Wake trigger relaunches the daemon immediately.
+			h.parked.value = null;
+			h.runner.wake();
+			assert.equal(h.spawner.requests.length, 2);
+			assert.equal(h.runner.snapshot().state, 'running');
+		});
+
+		it('parkDaemon is a no-op for tick agents and non-running daemons', () => {
+			const tick = makeRunner();
+			tick.runner.start();
+			tick.runner.parkDaemon();
+			assert.equal(tick.spawner.kills, 0);
+			assert.equal(tick.runner.snapshot().state, 'running');
+
+			const idleDaemon = makeRunner({ mode: 'daemon' });
+			idleDaemon.runner.parkDaemon();
+			assert.equal(idleDaemon.runner.snapshot().state, 'stopped');
+		});
+
 		it('treats idle pause exactly like parking, with its own detail', async () => {
 			const h = makeRunner();
 			h.runner.start();
@@ -249,6 +285,42 @@ describe('supervisor/agentRunner', () => {
 			assert.equal(h.runner.snapshot().detail, 'paused (window idle)');
 			assert.equal(h.runner.snapshot().nextTickAt, h.clock.now + 60_000);
 		});
+	});
+
+	it('stop() clears a pendingWake — no phantom launch after a later restart', async () => {
+		const h = makeRunner();
+		h.runner.start();
+		h.runner.wake(); // pendingWake while running
+		h.runner.stop();
+		h.spawner.exitLast(null); // SIGTERM lands
+
+		h.runner.start();
+		assert.equal(h.spawner.requests.length, 2);
+		h.spawner.exitLast(0);
+		// The stale wake must not fire a third launch; normal interval applies.
+		assert.equal(h.spawner.requests.length, 2);
+		const snap = h.runner.snapshot();
+		assert.equal(snap.state, 'scheduled');
+		assert.equal(snap.nextTickAt, h.clock.now + 10 * 60_000);
+	});
+
+	it('ignores duplicate and stale exit events from earlier spawns', () => {
+		const h = makeRunner();
+		h.runner.start();
+		h.spawner.exitLast(0);
+		const scheduledAt = h.runner.snapshot().nextTickAt;
+		// Spawner double-fires (error + exit): the second event is inert.
+		h.spawner.exitLast(1);
+		assert.equal(h.runner.snapshot().state, 'scheduled');
+		assert.equal(h.runner.snapshot().nextTickAt, scheduledAt);
+		assert.equal(h.runner.snapshot().consecutiveFailures, 0);
+
+		// Stale event from a previous spawn after a relaunch is inert too.
+		h.runner.wake();
+		assert.equal(h.spawner.requests.length, 2);
+		h.spawner.events[0].onExit(1);
+		assert.equal(h.runner.snapshot().state, 'running');
+		assert.equal(h.runner.snapshot().consecutiveFailures, 0);
 	});
 
 	it('records spawn failures as exit 127', () => {

@@ -302,6 +302,20 @@ describe('protocol/parse', () => {
 			const { ticket: _ticket, ...rest } = VALID_ACK;
 			assert.strictEqual(failure(parseAckFile(JSON.stringify(rest))).reason, 'corrupt');
 		});
+
+		it('surfaces a future ack kind as unknown-schema, never as ready-for-look', () => {
+			// Misreading a future `pause` as ready-for-look could unlink a
+			// signal the operator meant to keep (design/02: kind is an enum
+			// from day one).
+			const result = failure(parseAckFile(JSON.stringify({ ...VALID_ACK, kind: 'pause' })));
+			assert.strictEqual(result.reason, 'unknown-schema');
+			assert.match(result.detail, /pause/);
+		});
+
+		it('treats a missing kind as ready-for-look (the only v1 kind)', () => {
+			const { kind: _kind, ...rest } = VALID_ACK;
+			assert.strictEqual(ok(parseAckFile(JSON.stringify(rest))).kind, 'ready-for-look');
+		});
 	});
 
 	describe('parseLaunchFile', () => {

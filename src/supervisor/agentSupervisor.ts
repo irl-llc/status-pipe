@@ -105,6 +105,9 @@ export class AgentSupervisor {
 		repo.parked = file?.parked ?? null;
 		const finished = file?.lastPassFinishedAt ? Date.parse(file.lastPassFinishedAt) : NaN;
 		repo.lastPassFinishedAt = Number.isNaN(finished) ? repo.lastPassFinishedAt : finished;
+		// A parked daemon is stopped, not left running (design/09) — ticks
+		// park themselves at the next timer, daemons need the supervisor.
+		if (repo.parked) for (const runner of repo.runners.values()) runner.parkDaemon();
 		this.armParkedRecheck(repo);
 		this.deps.onStateChange();
 	}
