@@ -97,6 +97,15 @@ export class AgentRunner {
 		this.launch();
 	}
 
+	/**
+	 * Manual tick-now: an immediate pass no matter the state — a running
+	 * agent gets a follow-up pass on exit instead of being skipped.
+	 */
+	tickNow(): void {
+		if (this.state === 'running' || this.state === 'launching') this.wake();
+		else this.start();
+	}
+
 	stop(): void {
 		this.clearTimers();
 		// A wake aimed at the loop the operator just stopped must not fire a

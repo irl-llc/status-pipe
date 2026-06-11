@@ -371,6 +371,11 @@ export class StatusPipeController implements vscode.Disposable {
 		this.supervisor.stopAll();
 	}
 
+	/** Immediate pass on already-installed agents; never (re)installs or prompts. */
+	tickNow(): void {
+		this.supervisor.tickNow();
+	}
+
 	refresh(repoRoot?: string): void {
 		this.enricher.forceRefresh(repoRoot);
 		for (const repo of this.repos.values()) {

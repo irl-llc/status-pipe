@@ -18,7 +18,6 @@ import { Forge, ForgeRepository, RepositoryId } from '../forge/types';
 import { ConfigFile } from '../protocol/types';
 
 export const BITBUCKET_TOKEN_SECRET = 'statusPipe.bitbucket.token';
-export const JIRA_TOKEN_SECRET = 'statusPipe.jira.token';
 
 export interface ForgeConnection {
 	forge: Forge;
@@ -60,7 +59,10 @@ export async function connectRepo(
 	if (!resolved) return null;
 	const token = await resolveToken(resolved.forge.id, cfg, secrets);
 	if (!token) return null;
-	const repository = resolved.forge.openRepository(resolved.id, { token });
+	// A Bitbucket username/email switches authHeader to Basic (app
+	// passwords / Atlassian API tokens); without it the token rides Bearer.
+	const username = resolved.forge.id === 'bitbucket' ? cfg.get<string>('forge.bitbucket.username') || undefined : undefined;
+	const repository = resolved.forge.openRepository(resolved.id, { token, username });
 	return { forge: resolved.forge, id: resolved.id, repository };
 }
 

@@ -1,0 +1,14 @@
+{
+	"name": "status-pipe",
+	"owner": {
+		"name": "IRL AI LLC",
+		"email": "ed@irl.llc"
+	},
+	"plugins": [
+		{
+			"name": "status-pipe",
+			"source": "./plugin",
+			"description": "Baseline agent workflow emitting the status-pipe protocol: orchestration ticks, per-ticket/epic workers, ack-inbox consumption, and the trust-gated comment gateway."
+		}
+	]
+}

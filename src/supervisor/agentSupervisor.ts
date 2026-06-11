@@ -156,6 +156,7 @@ export class AgentSupervisor {
 		if (!runner) return;
 		if (action === 'stop') runner.stop();
 		else if (action === 'retry') runner.retry();
+		else if (action === 'tickNow') runner.tickNow();
 		else runner.start();
 	}
 
@@ -169,7 +170,7 @@ export class AgentSupervisor {
 
 	tickNow(repoRoot?: string): void {
 		this.forEachRunner((r) => {
-			if (!repoRoot || r.repoRoot === repoRoot) r.start();
+			if (!repoRoot || r.repoRoot === repoRoot) r.tickNow();
 		});
 	}
 

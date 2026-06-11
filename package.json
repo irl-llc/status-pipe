@@ -93,6 +93,11 @@
 					"default": "",
 					"markdownDescription": "Bitbucket app password or token. Leave empty to fall back to `BITBUCKET_TOKEN` or secret storage (Status Pipe: Sign in to Bitbucket)."
 				},
+				"statusPipe.forge.bitbucket.username": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Bitbucket username (or Atlassian account email) paired with an app password / API token for Basic auth. Leave empty to send the token as a Bearer (OAuth or workspace/repository access tokens)."
+				},
 				"statusPipe.forge.refreshIntervalSeconds": {
 					"type": "number",
 					"default": 60,
@@ -102,11 +107,6 @@
 					"type": "string",
 					"default": "",
 					"markdownDescription": "Jira Cloud site URL (e.g. `https://your-org.atlassian.net`) used as the ticketing source for Bitbucket repos."
-				},
-				"statusPipe.tickets.jira.email": {
-					"type": "string",
-					"default": "",
-					"markdownDescription": "Jira account email for API token auth. Token comes from `JIRA_API_TOKEN` or secret storage."
 				},
 				"statusPipe.launch.enabled": {
 					"type": "boolean",

@@ -225,15 +225,21 @@ export interface TicketSource {
   present — one committed truth shared with the plugin — with
   `statusPipe.tickets.jira.siteUrl` as the user-level fallback; neither set ⇒
   ticket links render as plain text keys (degraded, not broken).
-- **Jira auth**: Atlassian email + API token
-  (`statusPipe.tickets.jira.email` + token via `JIRA_API_TOKEN` env or
-  SecretStorage). Jira REST v3 `GET /issue/{key}?fields=summary,status`.
 - **Ticket-file impact**: on Jira-tracked repos the tracking ticket key is a
   string (`PROJ-123`), not an integer — see the contract note in
   [02-protocol.md](02-protocol.md). The card's ticket deep link goes to
   Jira; PRs still deep-link to Bitbucket.
-- Ticket fetches ride the same cache/backoff machinery below, with a much
-  longer TTL (15 min) since ticket titles rarely change.
+- **Implementation status (2026-06-11)**: the deep-link half (ticketUrl via
+  jiraSiteUrl / parsed keys) is implemented and wired. `getTicket`
+  title/status enrichment is **deferred**: the source classes exist
+  (`src/forge/ticketSources.ts`) but nothing in the UI renders live ticket
+  titles/status yet, so the enricher does not call them and no Jira auth
+  surface is exposed (the previously documented
+  `statusPipe.tickets.jira.email` setting was removed as dead config). When
+  a view consumes ticket status, wire the sources through the cache
+  machinery below with a long TTL (15 min — ticket titles rarely change)
+  and Jira auth = Atlassian email + API token via `JIRA_API_TOKEN` env or
+  SecretStorage.
 
 ## Caching, debouncing, and rate limits
 

@@ -42,7 +42,7 @@ function registerCommands(context: vscode.ExtensionContext, controller: StatusPi
 function registerAgentCommands(register: Register, controller: StatusPipeController): void {
 	register('statusPipe.agents.startAll', () => controller.startAll());
 	register('statusPipe.agents.stopAll', () => controller.stopAll());
-	register('statusPipe.agents.tickNow', () => controller.startAll());
+	register('statusPipe.agents.tickNow', () => controller.tickNow());
 	register('statusPipe.agents.openLog', (repoRoot, agentId) => {
 		if (typeof repoRoot === 'string' && typeof agentId === 'string') {
 			void controller.agentControl(repoRoot, agentId, 'openLog');

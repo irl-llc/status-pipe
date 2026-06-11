@@ -158,6 +158,15 @@ describe('supervisor/agentRunner', () => {
 		assert.equal(h.clock.pendingCount(), 1); // only the new timeout is armed
 	});
 
+	it('tickNow() launches immediately when idle and queues a follow-up pass when running', () => {
+		const h = makeRunner();
+		h.runner.tickNow(); // from stopped: behaves like start
+		assert.equal(h.spawner.requests.length, 1);
+		h.runner.tickNow(); // while running: pendingWake, not a skip
+		h.spawner.exitLast(0);
+		assert.equal(h.spawner.requests.length, 2);
+	});
+
 	it('wake() while running marks pendingWake and relaunches right after a clean exit', () => {
 		const h = makeRunner();
 		h.runner.start();
