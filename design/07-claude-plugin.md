@@ -222,6 +222,12 @@ above, so a missing or spoofed marker can embarrass but never escalate.
 
 ### `tick` — one orchestration tick (main agent, idempotent, zero-prompt)
 
+0. **Worktree preflight**: refuse to orchestrate from a linked worktree —
+   if `git rev-parse --git-dir` ≠ `--git-common-dir`, exit 0 with the message
+   "worktree checkout of `<primary>`; run the tick there". Worktrees are where
+   *workers* run, never orchestrators; without this guard a tick launched in a
+   worktree would re-orchestrate the same backlog and create nested worktrees
+   on every pass.
 1. **Inventory**: epics under `<config.epics.dir>/*.md` (epic mode) and/or
    open tickets matching `config.inventory.label` (default `agent-queue`,
    ticket mode), **filtered per the trust mode** (assignee/author ∈ operators
@@ -256,6 +262,11 @@ bot comments answered; never block waiting on CI) → **wrap**.
 
 State-writing discipline (enforced by the `protocol` skill):
 
+- **all protocol writes anchor at the primary checkout**: the protocol dir is
+  always `<git common dir>/../.status-pipe/` (`git rev-parse
+  --git-common-dir`), never relative to the worker's cwd — a worker running
+  inside a worktree heartbeats into the *main* repo's `.status-pipe/`, so
+  nested protocol dirs can never come into existence
 - rewrite `tickets/<key>.json` atomically at every phase transition and at wrap;
   heartbeat (`worker.heartbeatAt`) at least every few minutes while running
 - `headline` is always one sentence, present tense, operator-readable

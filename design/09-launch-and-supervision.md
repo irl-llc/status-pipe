@@ -104,6 +104,12 @@ A committed file that causes process execution is an attack surface, so:
 - nothing ever auto-starts unless `statusPipe.launch.autoStart` is enabled
   *and* the current hash was previously approved. Defaults: launching enabled,
   auto-start off.
+- **never in a worktree**: the supervisor refuses to launch from a checkout
+  whose `.git` is a `gitdir:` pointer file — worktrees carry the committed
+  `launch.json` but supervising one would re-orchestrate the primary's backlog
+  and create nested worktrees every tick (full guard set:
+  [02-protocol.md](02-protocol.md), [04-architecture.md](04-architecture.md),
+  [07-claude-plugin.md](07-claude-plugin.md)).
 
 ## Why tick mode fits Claude Code well
 

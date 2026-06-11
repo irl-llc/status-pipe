@@ -43,6 +43,18 @@ ignored. JSON Schemas ship in this repository
 under `schemas/` and are vendored by both the extension and the plugin — they
 are not copied per-repo.
 
+**One protocol dir per repository, at the primary checkout.** Linked worktrees
+are full checkouts and therefore carry the committed `launch.json` /
+`config.json`, but they never host a live protocol dir: agents anchor every
+protocol write at `git rev-parse --git-common-dir`/../`.status-pipe/`, the
+extension never supervises or separately lists a worktree (it resolves the
+worktree's `gitdir:` pointer back to the primary), and the orchestrator
+refuses to tick from a worktree. Three independent guards against the
+recursion where supervising a worktree would re-orchestrate the same backlog
+and mint nested worktrees each pass — details in
+[04-architecture.md](04-architecture.md) and
+[07-claude-plugin.md](07-claude-plugin.md).
+
 ## `tickets/<key>.json` (agent-side–owned)
 
 Schema: `schemas/ticket.schema.json`, `schemaVersion: 1`. The filename is the

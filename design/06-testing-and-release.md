@@ -33,6 +33,11 @@ Primary targets — all pure or dependency-injected:
 - **Agent supervisor**: tick/daemon state machine against a fake launch target
   (a small script that exits 0 / exits 1 / hangs / streams NDJSON) — schedule,
   timeout-kill, backoff, failed escalation, trust-hash gating logic.
+- **Worktree recursion guard**: discovery against fixture repos containing
+  linked worktrees (`.git` pointer files, `.claude/worktrees/<slug>` layouts) —
+  worktrees classified, never supervised, protocol dir resolved to the
+  primary; a worktree opened as the sole workspace folder renders the
+  primary's queue monitor-only.
 - **Webview components**: jsdom + @testing-library/react for card states (ack
   chip state machine, badge rendering, lane headers) — the
   git-spice-code-extension `reactTestHelper` pattern.

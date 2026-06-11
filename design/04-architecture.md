@@ -32,8 +32,23 @@ remote.origin.url` **by parsing `.git/config` directly** — no git exec, keepin
 the no-git-dependency promise. When `.git` is a *file* (worktrees, submodules)
 its `gitdir:` pointer is followed to the real config; `url.*.insteadOf`
 rewrites are explicitly out of scope (raw remote URLs are matched). Emits
-`RepoContext { folder, repoRoot, protocolDir, remoteUrl, forgeRepo? }`. Re-runs
-on workspace-folder changes.
+`RepoContext { folder, repoRoot, protocolDir, remoteUrl, role: 'primary' |
+'worktree', primaryRoot?, forgeRepo? }`. Re-runs on workspace-folder changes.
+
+**Worktree guard (recursion safety).** A checkout whose `.git` file points
+into another repo's `.git/worktrees/` is classified `role: 'worktree'` —
+worktrees are full checkouts, so they carry the committed `launch.json`, and
+naively supervising one would spawn a second orchestrator over the same
+backlog that mints nested worktrees every tick. Rules: worktrees are **never
+supervised** (no launch, no fleet-strip entry, launch.json ignored) and never
+produce their own queue entries; their `protocolDir` resolves through the
+`gitdir:` pointer to the **primary** checkout's `.status-pipe/`. If the
+primary is also a workspace folder the worktree folder is skipped outright;
+if only the worktree is open (a legitimate way to work), it renders the
+primary's queue monitor-only with a "worktree of `<primary>` — supervision
+disabled" note in the inactive-roots footer. This is one of three independent
+recursion guards (the others live in the plugin:
+[07-claude-plugin.md](07-claude-plugin.md)).
 
 ### `protocolWatcher` / `protocolStore`
 One `vscode.FileSystemWatcher` per protocol dir on the pattern
