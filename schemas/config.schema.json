@@ -1,0 +1,104 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://github.com/ed-irl/status-pipe/schemas/config.schema.json",
+	"title": "status-pipe repo configuration",
+	"description": "Committed at .status-pipe/config.json: this repo's conventions — epic dir, inventory label, ticketing source, trust mode, attribution. Read by the plugin (binding) and the extension (display hints). Trust and execution config is read from the local working tree only, never from a PR branch.",
+	"type": "object",
+	"required": ["schemaVersion"],
+	"additionalProperties": true,
+	"properties": {
+		"schemaVersion": { "const": 1 },
+		"epics": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"dir": {
+					"type": "string",
+					"default": "epics",
+					"description": "Epic folder name relative to the repo root"
+				}
+			}
+		},
+		"inventory": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"label": {
+					"type": "string",
+					"default": "agent-queue",
+					"description": "Forge label / JQL label selecting tickets for the agent's inventory"
+				}
+			}
+		},
+		"tickets": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"source": { "enum": ["github-issues", "jira-cloud"] },
+				"jira": {
+					"type": "object",
+					"additionalProperties": true,
+					"properties": {
+						"siteUrl": { "type": "string", "format": "uri" },
+						"projectKey": { "type": "string" }
+					}
+				}
+			}
+		},
+		"staleWorkerMinutes": {
+			"type": "number",
+			"default": 30,
+			"description": "Committed source of truth for the worker-heartbeat staleness threshold; the orchestrator echoes it into orchestrator.json"
+		},
+		"trust": {
+			"type": "object",
+			"description": "Who may drive the agent through forge comments. The plugin refuses to tick a public repo without a declared mode; a private repo without this block defaults to single-maintainer with the authenticated forge user.",
+			"required": ["mode"],
+			"additionalProperties": true,
+			"properties": {
+				"mode": { "enum": ["single-maintainer", "multi-maintainer", "public"] },
+				"operators": {
+					"oneOf": [
+						{
+							"type": "array",
+							"items": { "type": "string" },
+							"description": "Forge usernames (single identity namespace)"
+						},
+						{
+							"type": "object",
+							"description": "Split form for Bitbucket+Jira repos: per-channel stable ids (Bitbucket account UUID, Jira account id), never display names",
+							"additionalProperties": {
+								"type": "array",
+								"items": { "type": "string" }
+							}
+						}
+					]
+				},
+				"minAssociation": {
+					"type": ["string", "null"],
+					"description": "Optional additional GitHub author_association requirement (e.g. OWNER, MEMBER). Never sufficient alone."
+				}
+			}
+		},
+		"attribution": {
+			"type": "object",
+			"additionalProperties": true,
+			"properties": {
+				"commentPrefix": {
+					"type": "string",
+					"default": "**CLAUDE COMMENT**",
+					"description": "Prepended to every agent-posted comment. Social transparency only — never a trust input."
+				},
+				"prBanner": {
+					"type": "string",
+					"description": "Placed near the top of every agent-authored PR description, naming the responsible operator"
+				},
+				"includeAgentId": {
+					"type": "boolean",
+					"default": false,
+					"description": "Extend the prefix with the posting context (epic/part), for repos where several epics' workers share an account"
+				}
+			}
+		}
+	}
+}

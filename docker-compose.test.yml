@@ -1,0 +1,51 @@
+# One-platform test environment for Playwright snapshot tests.
+# Same container runs on macOS dev and ubuntu-latest CI so the PNG
+# snapshots checked into LFS are byte-identical from both sides.
+#
+# Usage (locally):
+#   npm run test:e2e:playwright:docker          # verify
+#   npm run test:e2e:playwright:docker:update   # regenerate snapshots
+#
+# The `:update` script sets PW_FLAGS=--update-snapshots in the container
+# env. We use `$$PW_FLAGS` (escaped) in the command so compose passes
+# the literal `$PW_FLAGS` through to the container's bash, which then
+# expands the env var. (Plain `${PW_FLAGS}` would be interpolated by
+# compose at YAML-load time from the host shell, not the container.)
+#
+# Named volumes survive between runs so npm install doesn't re-run every
+# invocation.
+
+services:
+  playwright:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: status-pipe-playwright:v1.60.0-jammy
+    working_dir: /work
+    init: true
+    ipc: host # Chromium needs more shared memory than the Docker default
+    volumes:
+      - .:/work
+      - playwright-node-modules:/work/node_modules
+      - playwright-vscode-test:/work/.vscode-test
+    environment:
+      HOME: /tmp
+      npm_config_cache: /tmp/.npm
+      CI: 'true'
+      PW_FLAGS: ''
+    entrypoint:
+      - bash
+      - -c
+    command:
+      - |
+        set -euo pipefail
+        npm ci --prefer-offline --no-audit --fund=false
+        if [ -n "$${PW_FLAGS}" ]; then
+          xvfb-run -a npm run test:e2e:playwright -- $${PW_FLAGS}
+        else
+          xvfb-run -a npm run test:e2e:playwright
+        fi
+
+volumes:
+  playwright-node-modules:
+  playwright-vscode-test:

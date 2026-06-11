@@ -1,0 +1,41 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://github.com/ed-irl/status-pipe/schemas/orchestrator.schema.json",
+	"title": "status-pipe orchestrator pass metadata",
+	"description": "Gitignored at .status-pipe/orchestrator.json. Written by the orchestrator at tick wrap; read by the extension for repo-header display, stale-worker threshold, and parking.",
+	"type": "object",
+	"required": ["schemaVersion"],
+	"additionalProperties": true,
+	"properties": {
+		"schemaVersion": { "const": 1 },
+		"repo": { "type": "string" },
+		"passCount": { "type": "number" },
+		"lastPassStartedAt": { "type": "string", "format": "date-time" },
+		"lastPassFinishedAt": { "type": "string", "format": "date-time" },
+		"staleWorkerMinutes": {
+			"type": "number",
+			"description": "Echoed from config.json so the extension sees the live value"
+		},
+		"parked": {
+			"oneOf": [
+				{ "type": "null" },
+				{
+					"type": "object",
+					"required": ["since", "reason"],
+					"additionalProperties": true,
+					"properties": {
+						"since": { "type": "string", "format": "date-time" },
+						"reason": { "type": "string" },
+						"recheckAfter": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Safety horizon: a slow discovery tick fires when this elapses, so parking can never strand the loop"
+						}
+					}
+				}
+			],
+			"description": "Declared when nothing is dispatchable and every active item waits on the operator with an empty inbox; cleared on any pass that finds work. The supervisor suspends ticks while set."
+		},
+		"note": { "type": "string" }
+	}
+}

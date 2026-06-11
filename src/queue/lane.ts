@@ -1,0 +1,109 @@
+/**
+ * Lane assignment + priority ranking (design/05-ui.md "Queue semantics").
+ *
+ * The underlying NEEDS-YOU predicate is "agent parked, AND parked on me".
+ * Priority is (class rank, age) — explainable at a glance; a blended
+ * staleness score was deliberately rejected as unauditable.
+ */
+
+import { TicketFile, WorkerState } from '../protocol/types';
+import { Lane, NeedsYouReason, PrRowDisplay } from './displayTypes';
+import { RepoEnrichment } from './queueInputs';
+
+/** Rank within NEEDS YOU; lower sorts first. Launcher cards are rank 0. */
+export const REASON_RANK: Record<NeedsYouReason, number> = {
+	'launcher-failed': 0,
+	'worker-crashed': 1,
+	'stale-ack': 2,
+	blocked: 3,
+	owner: 4,
+	review: 5,
+	merge: 6,
+	'orphaned-ci': 7,
+	degraded: 8,
+};
+
+export interface LaneContext {
+	staleWorkerMinutes: number;
+	now: number;
+	enrichment: RepoEnrichment | null;
+	/** A fresh pending ack suppresses the ackable classes (→ WAITING). */
+	freshAckPending: boolean;
+	staleAck: boolean;
+	/** Effective (enrichment-merged) PR rows for the orphaned-CI rule. */
+	prRows: PrRowDisplay[];
+}
+
+export interface LaneAssignment {
+	lane: Lane;
+	reason: NeedsYouReason | null;
+}
+
+export function isWorkerStale(worker: WorkerState | null, staleWorkerMinutes: number, now: number): boolean {
+	if (!worker || worker.status !== 'running') return false;
+	const beat = worker.heartbeatAt ?? worker.startedAt;
+	if (!beat) return true; // running with no evidence of life
+	const beatMs = Date.parse(beat);
+	if (Number.isNaN(beatMs)) return true;
+	// Clamp clock skew: a heartbeat from the "future" is fresh, not negative-age.
+	return Math.max(0, now - beatMs) > staleWorkerMinutes * 60_000;
+}
+
+function isQuiet(ticket: TicketFile): boolean {
+	return ticket.phase === 'merged' || ticket.phase === 'abandoned' || ticket.health === 'done';
+}
+
+function workerCrashed(ticket: TicketFile, ctx: LaneContext): boolean {
+	return ticket.worker?.status === 'error' || isWorkerStale(ticket.worker, ctx.staleWorkerMinutes, ctx.now);
+}
+
+/**
+ * Review demotion: when the forge attributes the requested reviewers and
+ * none of them is the local user, the review isn't ours → WAITING. If
+ * unattributable, include — false positives beat silent starvation.
+ */
+function reviewIsSomeoneElses(ticket: TicketFile, ctx: LaneContext): boolean {
+	const viewer = ctx.enrichment?.viewerLogin;
+	const prNumber = ticket.waitingOn?.pr;
+	if (!viewer || typeof prNumber !== 'number') return false;
+	const requests = ctx.enrichment?.prs[prNumber]?.info?.reviewRequests;
+	if (!requests || requests.length === 0) return false;
+	return !requests.includes(viewer);
+}
+
+function orphanedFailingCi(ticket: TicketFile, ctx: LaneContext): boolean {
+	const workerIdle = !ticket.worker || ticket.worker.status === 'idle';
+	if (!workerIdle || ticket.phase === 'fixing') return false;
+	return ctx.prRows.some((pr) => pr.state === 'open' && pr.ci === 'failing');
+}
+
+function ackableReason(ticket: TicketFile, ctx: LaneContext): NeedsYouReason | null {
+	if (ticket.health === 'blocked' || ticket.blockers.length > 0) return 'blocked';
+	const kind = ticket.waitingOn?.kind;
+	// 'comment': a reply is awaited and the operator is the default
+	// responder. Demoting when the awaited reply is attributably someone
+	// else's needs attribution data the forge layer doesn't fetch — so,
+	// per the review rule's fallback, unattributable ⇒ include.
+	if (kind === 'owner' || kind === 'comment') return 'owner';
+	if (kind === 'review') return reviewIsSomeoneElses(ticket, ctx) ? null : 'review';
+	if (kind === 'merge') return 'merge';
+	return null;
+}
+
+function needsYouReason(ticket: TicketFile, ctx: LaneContext): NeedsYouReason | null {
+	if (workerCrashed(ticket, ctx)) return 'worker-crashed';
+	if (ctx.staleAck) return 'stale-ack';
+	if (!ctx.freshAckPending) {
+		const reason = ackableReason(ticket, ctx);
+		if (reason) return reason;
+	}
+	if (orphanedFailingCi(ticket, ctx)) return 'orphaned-ci';
+	return null;
+}
+
+export function assignLane(ticket: TicketFile, ctx: LaneContext): LaneAssignment {
+	if (isQuiet(ticket)) return { lane: 'quiet', reason: null };
+	const reason = needsYouReason(ticket, ctx);
+	if (reason) return { lane: 'needs-you', reason };
+	return { lane: 'waiting', reason: null };
+}

@@ -1,0 +1,210 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  # Run on every PR regardless of base branch so stacked PRs (which target
+  # other feature branches, not main) also get CI.
+  pull_request:
+  release:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      update_snapshots:
+        description: 'Regenerate Playwright snapshot baselines and upload them as an artifact'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [22.x]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Snapshot PNGs in src/test/e2e/playwright/*.spec.ts-snapshots/
+          # are git-lfs-tracked.
+          lfs: true
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Format check
+        run: npm run format:check
+
+      # Advisory annotations only — posts inline lint comments for reviewer
+      # context. The real gate is the "Lint (fail on warnings)" step below,
+      # which runs the same `eslint --max-warnings=0` as the local checks, so
+      # CI, reviewdog, and local checks all agree. reviewdog can exit non-zero
+      # on its own comment-management (e.g. 404 deleting a stale annotation
+      # after a force-push), so don't let that fail the build.
+      - name: Lint with reviewdog annotations
+        continue-on-error: true
+        uses: reviewdog/action-eslint@v1
+        with:
+          reporter: github-pr-review
+          eslint_flags: 'src/ --max-warnings=0'
+          fail_level: none
+
+      # Hard gate: `eslint --max-warnings=0`, same as local.
+      - name: Lint (fail on warnings)
+        run: npm run lint
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Compile tests
+        run: npm run compile-tests
+
+      - name: Run unit tests
+        id: unit-tests
+        run: npm run test:unit -- --reporter json --reporter-option output=test-results.json
+        continue-on-error: true
+
+      - name: Report test results
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Unit Tests
+          path: test-results.json
+          reporter: mocha-json
+
+      - name: Fail if tests failed
+        if: steps.unit-tests.outcome == 'failure'
+        run: exit 1
+
+      - name: Run E2E tests
+        id: e2e-tests
+        run: xvfb-run -a npm run test:e2e
+        env:
+          DISPLAY: ':99.0'
+        continue-on-error: true
+
+      - name: Cache Docker test image layers
+        uses: actions/cache@v4
+        with:
+          path: /tmp/.docker-buildx-cache
+          key: docker-buildx-${{ runner.os }}-${{ hashFiles('Dockerfile') }}
+          restore-keys: |
+            docker-buildx-${{ runner.os }}-
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Run buildx directly (not docker/build-push-action) so we can retry:
+      # the base-image manifest resolve against mcr.microsoft.com intermittently
+      # 403s, and the layer cache doesn't avoid that registry round-trip.
+      # Truncated exponential backoff with full jitter.
+      - name: Build Playwright Docker image
+        shell: bash
+        run: |
+          set -uo pipefail
+          build() {
+            docker buildx build \
+              --file Dockerfile \
+              --tag status-pipe-playwright:v1.60.0-jammy \
+              --load \
+              --cache-from type=local,src=/tmp/.docker-buildx-cache \
+              --cache-to type=local,dest=/tmp/.docker-buildx-cache-new,mode=max \
+              .
+          }
+          attempt=0
+          max_attempts=5
+          base=5 # seconds
+          cap=60 # truncate the exponential window here
+          until build; do
+            attempt=$((attempt + 1))
+            if [ "$attempt" -ge "$max_attempts" ]; then
+              echo "buildx failed after ${attempt} attempts" >&2
+              exit 1
+            fi
+            window=$((base * (2 ** (attempt - 1))))
+            [ "$window" -gt "$cap" ] && window=$cap
+            delay=$((RANDOM % (window + 1))) # full jitter in [0, window]
+            echo "buildx attempt ${attempt} failed; retrying in ${delay}s (window ${window}s)" >&2
+            sleep "$delay"
+          done
+
+      - name: Move Docker cache (per actions/cache best practice)
+        run: rm -rf /tmp/.docker-buildx-cache && mv /tmp/.docker-buildx-cache-new /tmp/.docker-buildx-cache
+
+      - name: Run Playwright snapshot tests (Linux container)
+        id: playwright-tests
+        # On a normal run, the Docker image renders Linux/amd64 baselines, so a
+        # missing-baseline spec writes its PNG into the bind-mounted workspace
+        # (and still reports failure). With the update_snapshots dispatch input
+        # it regenerates ALL baselines. Either way the generated PNGs are
+        # uploaded below so they can be reviewed + committed — local arm64
+        # renders are not byte-identical to CI, so CI is the baseline oracle.
+        run: |
+          if [ "${{ github.event.inputs.update_snapshots }}" = "true" ]; then
+            npm run test:e2e:playwright:docker:update
+          else
+            npm run test:e2e:playwright:docker
+          fi
+        continue-on-error: true
+
+      - name: Upload Playwright artifacts on failure
+        if: steps.playwright-tests.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-results
+          path: |
+            test-results/
+            playwright-report/
+          retention-days: 7
+
+      # Generated/updated baselines (missing-baseline writes on a normal run, or
+      # all baselines under update_snapshots) ride out as a reviewable artifact.
+      - name: Upload generated Playwright snapshots
+        if: always() && (steps.playwright-tests.outcome == 'failure' || github.event.inputs.update_snapshots == 'true')
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-snapshots
+          path: src/test/e2e/playwright/**/*-snapshots/**
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Fail if Playwright tests failed
+        if: steps.playwright-tests.outcome == 'failure'
+        run: exit 1
+
+      - name: Package extension
+        run: npm run package
+
+      - name: Upload extension artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-vsix
+          path: '*.vsix'
+          retention-days: 7
+
+  # Publish to the Marketplace + Open VSX when a human creates a GitHub Release.
+  # Gated on the build job so we never publish a red build. The scheduled
+  # auto-release path does NOT come through here — GitHub won't re-trigger a
+  # workflow from a Release created with the default GITHUB_TOKEN (the failure
+  # git-spice-code-extension hit as its issue #29), so auto-release.yml calls
+  # the same reusable workflow itself.
+  publish:
+    needs: build
+    if: github.event_name == 'release'
+    uses: ./.github/workflows/publish.yml
+    secrets:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}

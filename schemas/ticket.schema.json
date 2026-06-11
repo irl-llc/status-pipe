@@ -1,0 +1,136 @@
+{
+	"$schema": "http://json-schema.org/draft-07/schema#",
+	"$id": "https://github.com/ed-irl/status-pipe/schemas/ticket.schema.json",
+	"title": "status-pipe ticket state file",
+	"description": "One file per tracked ticket at .status-pipe/tickets/<key>.json. Owned by the agent side (orchestrator/worker); the extension only reads it.",
+	"type": "object",
+	"required": ["schemaVersion", "repo", "ticket", "title", "phase", "health", "updatedAt"],
+	"additionalProperties": true,
+	"properties": {
+		"schemaVersion": { "const": 1 },
+		"repo": {
+			"type": "string",
+			"description": "owner/name, cross-checked against the git remote",
+			"pattern": "^[^/\\s]+/[^/\\s]+$"
+		},
+		"ticket": {
+			"type": "string",
+			"description": "Opaque ticket key: GitHub issue number as a string ('853') or Jira key ('PROJ-123'). Must equal the filename stem.",
+			"minLength": 1
+		},
+		"title": { "type": "string" },
+		"slug": { "type": "string" },
+		"url": { "type": "string", "format": "uri" },
+		"phase": {
+			"enum": [
+				"planning",
+				"implementation",
+				"review",
+				"fixing",
+				"merging",
+				"awaiting-merge",
+				"merged",
+				"blocked",
+				"abandoned"
+			]
+		},
+		"health": { "enum": ["ok", "waiting", "blocked", "error", "done"] },
+		"headline": {
+			"type": "string",
+			"description": "One present-tense sentence: what just happened, operator-readable."
+		},
+		"waitingOn": {
+			"oneOf": [
+				{ "type": "null" },
+				{
+					"type": "object",
+					"required": ["kind", "since"],
+					"additionalProperties": true,
+					"properties": {
+						"kind": { "enum": ["build", "review", "comment", "owner", "merge"] },
+						"ref": {
+							"type": ["string", "null"],
+							"description": "Deep link to the exact comment/run/PR being waited on"
+						},
+						"pr": { "type": ["number", "null"] },
+						"since": { "type": "string", "format": "date-time" },
+						"detail": { "type": ["string", "null"] }
+					}
+				}
+			]
+		},
+		"prs": {
+			"type": "array",
+			"items": {
+				"type": "object",
+				"required": ["number", "head", "base"],
+				"additionalProperties": true,
+				"properties": {
+					"number": { "type": "number" },
+					"url": { "type": "string", "format": "uri" },
+					"head": { "type": "string" },
+					"base": { "type": "string" },
+					"draft": { "type": "boolean" },
+					"state": { "enum": ["open", "merged", "closed"] },
+					"ci": { "enum": ["unknown", "pending", "passing", "failing"] },
+					"part": {
+						"type": ["string", "null"],
+						"description": "Free-form part label within the ticket's stack, e.g. 'T1a'"
+					}
+				}
+			}
+		},
+		"blockers": {
+			"type": "array",
+			"items": { "type": "string" },
+			"description": "Non-empty forces the NEEDS YOU lane regardless of health"
+		},
+		"subTickets": {
+			"type": "array",
+			"description": "Discussion channels carved out of an epic's tracking ticket. Not work items.",
+			"items": {
+				"type": "object",
+				"required": ["key", "topic"],
+				"additionalProperties": true,
+				"properties": {
+					"key": { "type": "string" },
+					"url": { "type": "string", "format": "uri" },
+					"topic": { "type": "string" },
+					"status": { "type": "string" }
+				}
+			}
+		},
+		"agentCommentIds": {
+			"type": "array",
+			"items": { "type": "string" },
+			"description": "Forge API ids of comments posted by the agent itself (written by plugin/bin/post-comment). Trust input for shared-account self-recognition; never rendered."
+		},
+		"history": {
+			"type": "array",
+			"description": "Append-only log; ack consumption/supersession is recorded here naming the ackId.",
+			"items": {
+				"type": "object",
+				"required": ["at", "note"],
+				"additionalProperties": true,
+				"properties": {
+					"at": { "type": "string", "format": "date-time" },
+					"phase": { "type": "string" },
+					"note": { "type": "string" },
+					"runId": { "type": ["string", "null"] }
+				}
+			}
+		},
+		"worker": {
+			"type": "object",
+			"required": ["status"],
+			"additionalProperties": true,
+			"properties": {
+				"status": { "enum": ["idle", "running", "error"] },
+				"taskId": { "type": ["string", "null"] },
+				"startedAt": { "type": ["string", "null"], "format": "date-time" },
+				"heartbeatAt": { "type": ["string", "null"], "format": "date-time" }
+			}
+		},
+		"updatedAt": { "type": "string", "format": "date-time" }
+	}
+}

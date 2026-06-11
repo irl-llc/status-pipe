@@ -1,0 +1,309 @@
+{
+	"name": "status-pipe",
+	"displayName": "Status Pipe",
+	"description": "Review/response queue over fleets of autonomous coding agents. Monitors status-pipe protocol state files, enriches them with forge data (GitHub, Bitbucket), and supervises agent loops.",
+	"version": "0.1.0",
+	"publisher": "IRLAILLC",
+	"icon": "icon.png",
+	"license": "GPL-3.0-or-later",
+	"keywords": [
+		"agents",
+		"claude",
+		"automation",
+		"code review",
+		"orchestration",
+		"scm"
+	],
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/ed-irl/status-pipe.git"
+	},
+	"bugs": {
+		"url": "https://github.com/ed-irl/status-pipe/issues"
+	},
+	"engines": {
+		"vscode": "^1.98.0"
+	},
+	"categories": [
+		"Other"
+	],
+	"activationEvents": [
+		"workspaceContains:**/.status-pipe/",
+		"onView:statusPipe.queue"
+	],
+	"main": "./dist/extension.js",
+	"files": [
+		"dist",
+		"media",
+		"schemas",
+		"icon.png",
+		"LICENSE"
+	],
+	"contributes": {
+		"configuration": {
+			"title": "Status Pipe",
+			"properties": {
+				"statusPipe.protocolDir": {
+					"type": "string",
+					"default": ".status-pipe",
+					"description": "Name of the protocol state directory at each repo root."
+				},
+				"statusPipe.staleWorkerMinutesDefault": {
+					"type": "number",
+					"default": 30,
+					"description": "Minutes without a worker heartbeat before a worker is considered stale, when the repo's config.json does not specify staleWorkerMinutes."
+				},
+				"statusPipe.forge.type": {
+					"type": "string",
+					"enum": [
+						"auto",
+						"github",
+						"bitbucket"
+					],
+					"default": "auto",
+					"scope": "resource",
+					"description": "Forge backend. 'auto' guesses from the remote URL; set explicitly to override."
+				},
+				"statusPipe.forge.github.baseUrl": {
+					"type": "string",
+					"default": "https://github.com",
+					"description": "GitHub web base URL."
+				},
+				"statusPipe.forge.github.apiUrl": {
+					"type": "string",
+					"default": "https://api.github.com",
+					"description": "GitHub API base URL."
+				},
+				"statusPipe.forge.github.token": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "GitHub token. Leave empty to fall back to `GITHUB_TOKEN`, the VS Code GitHub authentication provider, then the `gh` CLI."
+				},
+				"statusPipe.forge.bitbucket.baseUrl": {
+					"type": "string",
+					"default": "https://bitbucket.org",
+					"description": "Bitbucket web base URL."
+				},
+				"statusPipe.forge.bitbucket.apiUrl": {
+					"type": "string",
+					"default": "https://api.bitbucket.org/2.0",
+					"description": "Bitbucket API base URL."
+				},
+				"statusPipe.forge.bitbucket.token": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Bitbucket app password or token. Leave empty to fall back to `BITBUCKET_TOKEN` or secret storage (Status Pipe: Sign in to Bitbucket)."
+				},
+				"statusPipe.forge.refreshIntervalSeconds": {
+					"type": "number",
+					"default": 60,
+					"description": "Minimum interval between enrichment refreshes for a visible view."
+				},
+				"statusPipe.tickets.jira.siteUrl": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Jira Cloud site URL (e.g. `https://your-org.atlassian.net`) used as the ticketing source for Bitbucket repos."
+				},
+				"statusPipe.tickets.jira.email": {
+					"type": "string",
+					"default": "",
+					"markdownDescription": "Jira account email for API token auth. Token comes from `JIRA_API_TOKEN` or secret storage."
+				},
+				"statusPipe.launch.enabled": {
+					"type": "boolean",
+					"default": true,
+					"description": "Master switch for the agent supervisor (launching agents from .status-pipe/launch.json)."
+				},
+				"statusPipe.launch.autoStart": {
+					"type": "boolean",
+					"default": false,
+					"description": "Automatically start previously approved agents when the workspace opens."
+				},
+				"statusPipe.launch.pauseWhenIdle": {
+					"type": "boolean",
+					"default": false,
+					"markdownDescription": "Pause tick scheduling after 30 minutes without window focus. Off by default: it conflicts with overnight runs — parking already stops the loop when all work waits on you."
+				},
+				"statusPipe.launch.maxRestarts": {
+					"type": "number",
+					"default": 3,
+					"description": "Consecutive failures before an agent is marked failed and surfaces in the queue."
+				},
+				"statusPipe.resumeCommand": {
+					"type": "string",
+					"default": "",
+					"description": "Fallback command run in the integrated terminal for 'Restart worker' when the repo has no launch.json."
+				},
+				"statusPipe.quietRetentionHours": {
+					"type": "number",
+					"default": 24,
+					"description": "How long done/merged items stay visible in the QUIET lane."
+				},
+				"statusPipe.notifications.blocker": {
+					"type": "boolean",
+					"default": true,
+					"description": "Toast when a ticket reports a new blocker or owner question."
+				},
+				"statusPipe.notifications.crashOrStale": {
+					"type": "boolean",
+					"default": true,
+					"description": "Toast when a worker crashes or goes stale, or an agent launcher fails."
+				},
+				"statusPipe.notifications.completed": {
+					"type": "boolean",
+					"default": true,
+					"description": "Toast when a ticket reaches merged/done."
+				},
+				"statusPipe.notifications.orphanedCi": {
+					"type": "boolean",
+					"default": true,
+					"description": "Toast when CI fails on a PR no worker is watching."
+				},
+				"statusPipe.notifications.doNotDisturb": {
+					"type": "boolean",
+					"default": false,
+					"description": "Suppress all Status Pipe toasts (queue badges still update)."
+				}
+			}
+		},
+		"commands": [
+			{
+				"command": "statusPipe.openInEditor",
+				"title": "Open in Editor",
+				"category": "Status Pipe",
+				"icon": "$(open-preview)"
+			},
+			{
+				"command": "statusPipe.refresh",
+				"title": "Refresh",
+				"category": "Status Pipe",
+				"icon": "$(refresh)"
+			},
+			{
+				"command": "statusPipe.signIn.github",
+				"title": "Sign in to GitHub",
+				"category": "Status Pipe"
+			},
+			{
+				"command": "statusPipe.signIn.bitbucket",
+				"title": "Sign in to Bitbucket",
+				"category": "Status Pipe"
+			},
+			{
+				"command": "statusPipe.revealTicketFile",
+				"title": "Reveal Ticket File",
+				"category": "Status Pipe"
+			},
+			{
+				"command": "statusPipe.agents.startAll",
+				"title": "Start All Agents",
+				"category": "Status Pipe",
+				"icon": "$(play)"
+			},
+			{
+				"command": "statusPipe.agents.stopAll",
+				"title": "Stop All Agents",
+				"category": "Status Pipe",
+				"icon": "$(stop-circle)"
+			},
+			{
+				"command": "statusPipe.agents.tickNow",
+				"title": "Tick Now",
+				"category": "Status Pipe",
+				"icon": "$(run)"
+			},
+			{
+				"command": "statusPipe.agents.openLog",
+				"title": "Open Agent Log",
+				"category": "Status Pipe",
+				"icon": "$(output)"
+			}
+		],
+		"viewsContainers": {
+			"activitybar": [
+				{
+					"id": "statusPipe",
+					"title": "Status Pipe",
+					"icon": "media/status-pipe.svg"
+				}
+			]
+		},
+		"views": {
+			"statusPipe": [
+				{
+					"id": "statusPipe.queue",
+					"name": "Queue",
+					"type": "webview"
+				}
+			]
+		},
+		"menus": {
+			"view/title": [
+				{
+					"command": "statusPipe.refresh",
+					"when": "view == statusPipe.queue",
+					"group": "navigation@1"
+				},
+				{
+					"command": "statusPipe.openInEditor",
+					"when": "view == statusPipe.queue",
+					"group": "navigation@2"
+				}
+			]
+		}
+	},
+	"scripts": {
+		"vscode:prepublish": "npm run package",
+		"compile": "webpack",
+		"watch": "webpack --watch",
+		"package": "webpack --mode production --devtool hidden-source-map",
+		"compile-tests": "tsc -p . --outDir out",
+		"watch-tests": "tsc -p . -w --outDir out",
+		"pretest": "npm run compile-tests && npm run compile && npm run lint && npm run format:check",
+		"lint": "eslint src --max-warnings=0",
+		"lint:fix": "eslint src --fix",
+		"format": "prettier --write \"src/**/*.{ts,tsx}\"",
+		"format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
+		"test": "vscode-test",
+		"test:unit": "mocha 'out/test/unit/**/*.test.js'",
+		"test:e2e": "vscode-test --config .vscode-test.e2e.mjs",
+		"test:e2e:playwright": "playwright test",
+		"test:e2e:playwright:docker": "docker compose -f docker-compose.test.yml run --rm playwright",
+		"test:e2e:playwright:docker:update": "docker compose -f docker-compose.test.yml run --rm -e PW_FLAGS=--update-snapshots playwright",
+		"deploy": "vsce publish --no-dependencies",
+		"deploy:openvsx": "ovsx publish --no-dependencies"
+	},
+	"devDependencies": {
+		"@playwright/test": "^1.60.0",
+		"@testing-library/dom": "^10.4.1",
+		"@testing-library/react": "^16.3.2",
+		"@testing-library/user-event": "^14.6.1",
+		"@types/jsdom": "^28.0.0",
+		"@types/mocha": "^10.0.10",
+		"@types/node": "22.x",
+		"@types/react": "^19.2.15",
+		"@types/react-dom": "^19.2.3",
+		"@types/vscode": "^1.98.0",
+		"@typescript-eslint/eslint-plugin": "^8.45.0",
+		"@typescript-eslint/parser": "^8.45.0",
+		"@vscode/test-cli": "^0.0.11",
+		"@vscode/test-electron": "^2.5.2",
+		"@vscode/vsce": "^3.7.1",
+		"copy-webpack-plugin": "^12.0.2",
+		"eslint": "^9.36.0",
+		"eslint-config-prettier": "^10.1.8",
+		"jsdom": "^28.1.0",
+		"mocha": "^11.0.1",
+		"ovsx": "^0.10.11",
+		"prettier": "3.6.2",
+		"ts-loader": "^9.5.4",
+		"typescript": "^5.9.3",
+		"webpack": "^5.102.0",
+		"webpack-cli": "^6.0.1"
+	},
+	"dependencies": {
+		"@vscode/codicons": "^0.0.41",
+		"react": "^19.2.6",
+		"react-dom": "^19.2.6"
+	}
+}

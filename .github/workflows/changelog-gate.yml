@@ -1,0 +1,41 @@
+name: Changelog Gate
+
+# Enforces the Changie change-fragment workflow: every PR that makes
+# release-worthy changes must add a fragment under .changes/unreleased/. PRs that
+# only touch docs/CI are skipped automatically; a PR can opt out explicitly with
+# the `skip-changelog` label. The decision logic is the unit-tested pure module
+# src/utils/changelogGate.ts, invoked via scripts/changelog-gate.mjs.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  changelog-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Compiles the TypeScript gate logic to out/utils/changelogGate.js, which
+      # the gate script imports. This is the same compile step the unit tests use.
+      - name: Compile gate logic
+        run: npm run compile-tests
+
+      - name: Evaluate change-fragment gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node scripts/changelog-gate.mjs

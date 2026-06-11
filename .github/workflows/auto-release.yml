@@ -1,0 +1,96 @@
+name: Auto Release
+
+# Scheduled daily auto-release (see design/06-testing-and-release.md). If there
+# are pending Changie fragments under .changes/unreleased/, this batches them
+# into a new 0.x version (minor for a feature/breaking change, patch for bug
+# fixes), bumps package.json, tags v<version>, and creates a GitHub Release —
+# then publishes via the chained `publish` job below. With no pending fragments
+# it no-ops silently, so quiet days make no release.
+#
+# The bump derivation is the unit-tested pure module src/utils/releaseBump.ts,
+# invoked via scripts/auto-release.mjs.
+
+on:
+  schedule:
+    # 05:00 UTC ≈ midnight US Eastern (00:00 EST). During EDT this lands at
+    # 01:00 ET; an hour of DST drift is acceptable for a once-daily release.
+    - cron: '0 5 * * *'
+  # Manual trigger keeps a manual-release path: an operator can fire a release
+  # on demand. DRY_RUN computes and prints the plan without mutating git/forge.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Compute the release plan without tagging/publishing'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write # create the version commit + tag
+  # `gh release create` needs contents:write (above). No PR writes required.
+
+# Never run two releases at once; a second trigger waits rather than racing.
+concurrency:
+  group: auto-release
+  cancel-in-progress: false
+
+jobs:
+  auto-release:
+    runs-on: ubuntu-latest
+    outputs:
+      # 'true' only when a release was actually cut (pending fragments, not a
+      # dry run). Gates the downstream publish job.
+      released: ${{ steps.release.outputs.released }}
+      # The freshly created tag (e.g. v0.1.0); the publish job checks it out.
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so tagging + changelog merge see prior tags
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Compiles the TypeScript bump logic to out/utils/releaseBump.js, which
+      # the release script imports. Same compile step the unit tests use.
+      - name: Compile release logic
+        run: npm run compile-tests
+
+      - name: Install Changie
+        uses: miniscruff/changie-action@v2
+        with:
+          version: latest
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Run auto-release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || '' }}
+        run: node scripts/auto-release.mjs
+
+  # Publish to the Marketplace + Open VSX after a release is cut. This runs in
+  # the SAME workflow run as the release (not via `on: release`) because GitHub
+  # won't re-trigger workflows from a Release created with the default
+  # GITHUB_TOKEN (the failure git-spice-code-extension hit as its issue #29).
+  # Calls the shared reusable workflow, the same one ci.yml uses for
+  # human-created releases, so publish logic lives in one place.
+  publish:
+    needs: auto-release
+    if: needs.auto-release.outputs.released == 'true'
+    uses: ./.github/workflows/publish.yml
+    with:
+      ref: ${{ needs.auto-release.outputs.tag }}
+    secrets:
+      VSCE_PAT: ${{ secrets.VSCE_PAT }}
+      OVSX_PAT: ${{ secrets.OVSX_PAT }}

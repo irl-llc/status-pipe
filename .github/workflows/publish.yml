@@ -1,0 +1,80 @@
+name: Publish
+
+# Reusable publish workflow: builds the extension and publishes it to the VS
+# Code Marketplace and Open VSX. It is invoked via `workflow_call` from two
+# places so the publish logic lives in exactly one spot:
+#
+#   1. ci.yml — when a human creates a GitHub Release (`on: release`), after the
+#      build/test job succeeds.
+#   2. auto-release.yml — directly, as a downstream job, after the scheduled
+#      auto-release job tags + creates the Release.
+#
+# Why a reusable workflow at all? GitHub deliberately does NOT trigger new
+# workflow runs from events (tag push / release) created with the default
+# GITHUB_TOKEN. The scheduled auto-release job creates its Release with that
+# token, so an `on: release` publish job in ci.yml would never fire for auto
+# releases (the failure git-spice-code-extension hit as its issue #29). By
+# calling this reusable workflow as a job *within* the auto-release run, the
+# publish happens in the same run — no token re-trigger, and no new PAT secret
+# required.
+#
+# Caller responsibility: the ref checked out is whatever the caller's run is on.
+# For both callers that is the tagged release commit (the auto-release job tags
+# HEAD before this runs; the `on: release` event runs on the tag), so the
+# version in package.json is the one being published.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: >-
+          Git ref (tag/sha) to check out and publish. Defaults to the caller's
+          checked-out commit. The auto-release caller passes the freshly created
+          tag so we publish the version it just bumped, not the pre-release SHA
+          the run started on.
+        required: false
+        type: string
+        default: ''
+    secrets:
+      VSCE_PAT:
+        description: 'VS Code Marketplace personal access token'
+        required: true
+      OVSX_PAT:
+        description: 'Open VSX personal access token'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Empty `ref` falls back to the default checkout (the caller's commit),
+          # which is correct for the `on: release` caller. The auto-release
+          # caller passes the new tag so the bumped version gets published.
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Package extension
+        run: npm run package
+
+      - name: Publish to VS Code Marketplace
+        run: npm run deploy
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+
+      - name: Publish to Open VSX
+        run: npm run deploy:openvsx
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
