@@ -2,7 +2,7 @@
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"$id": "https://github.com/ed-irl/status-pipe/schemas/config.schema.json",
 	"title": "status-pipe repo configuration",
-	"description": "Committed at .status-pipe/config.json: this repo's conventions — epic dir, inventory label, ticketing source, trust mode, attribution. Read by the plugin (binding) and the extension (display hints). Trust and execution config is read from the local working tree only, never from a PR branch.",
+	"description": "Committed at .status-pipe/config.json: this repo's conventions — epic dir, inventory label, ticketing source, trust mode, attribution. Read by the plugin (binding) and the extension (display hints). Trust and execution config is read from the primary checkout's working tree only (anchored at the git common dir) — never from the branch a linked worktree has checked out, and never from a fetched ref.",
 	"type": "object",
 	"required": ["schemaVersion"],
 	"additionalProperties": true,

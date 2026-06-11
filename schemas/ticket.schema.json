@@ -19,8 +19,8 @@
 			"minLength": 1
 		},
 		"title": { "type": "string" },
-		"slug": { "type": "string" },
-		"url": { "type": "string", "format": "uri" },
+		"slug": { "type": ["string", "null"] },
+		"url": { "type": ["string", "null"], "format": "uri" },
 		"phase": {
 			"enum": [
 				"planning",
@@ -36,8 +36,8 @@
 		},
 		"health": { "enum": ["ok", "waiting", "blocked", "error", "done"] },
 		"headline": {
-			"type": "string",
-			"description": "One present-tense sentence: what just happened, operator-readable."
+			"type": ["string", "null"],
+			"description": "One present-tense sentence: what just happened, operator-readable. For every optional field, an explicit null is equivalent to omitting it (the readers are tolerant; writers may emit either)."
 		},
 		"waitingOn": {
 			"oneOf": [
@@ -67,7 +67,7 @@
 				"additionalProperties": true,
 				"properties": {
 					"number": { "type": "number" },
-					"url": { "type": "string", "format": "uri" },
+					"url": { "type": ["string", "null"], "format": "uri" },
 					"head": { "type": "string" },
 					"base": { "type": "string" },
 					"draft": { "type": "boolean" },
@@ -121,15 +121,20 @@
 			}
 		},
 		"worker": {
-			"type": "object",
-			"required": ["status"],
-			"additionalProperties": true,
-			"properties": {
-				"status": { "enum": ["idle", "running", "error"] },
-				"taskId": { "type": ["string", "null"] },
-				"startedAt": { "type": ["string", "null"], "format": "date-time" },
-				"heartbeatAt": { "type": ["string", "null"], "format": "date-time" }
-			}
+			"oneOf": [
+				{ "type": "null" },
+				{
+					"type": "object",
+					"required": ["status"],
+					"additionalProperties": true,
+					"properties": {
+						"status": { "enum": ["idle", "running", "error"] },
+						"taskId": { "type": ["string", "null"] },
+						"startedAt": { "type": ["string", "null"], "format": "date-time" },
+						"heartbeatAt": { "type": ["string", "null"], "format": "date-time" }
+					}
+				}
+			]
 		},
 		"updatedAt": { "type": "string", "format": "date-time" }
 	}

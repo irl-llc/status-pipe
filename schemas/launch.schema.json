@@ -13,13 +13,13 @@
 			"minItems": 1,
 			"items": {
 				"type": "object",
-				"required": ["id", "command", "mode"],
+				"required": ["command", "mode"],
 				"additionalProperties": true,
 				"properties": {
 					"id": {
 						"type": "string",
 						"pattern": "^[A-Za-z0-9_-]+$",
-						"description": "Unique within the file; supervisor state is keyed (repo, id)"
+						"description": "Unique within the file; supervisor state is keyed (repo, id). When omitted, readers synthesize a positional agent-<index> — set it explicitly if the file lists more than one agent, or reordering re-keys supervisor state."
 					},
 					"title": { "type": "string" },
 					"command": { "type": "string", "minLength": 1 },
