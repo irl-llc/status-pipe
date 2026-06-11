@@ -80,6 +80,15 @@ status-pipe uses `staleRunMinutes` for the stale-heartbeat computation and shows
 `lastPassFinishedAt` in the repo section header ("orchestrator last ran 12m ago").
 If `run.json` is missing, stale detection falls back to a 30-minute default.
 
+One **additive optional field** is introduced by status-pipe (written by
+orchestrators that adopt the plugin's fanout contract): `parked` —
+`{since, reason, recheckAfter}` declaring that no work is dispatchable and
+everything active is waiting on the operator. The extension's supervisor stops
+scheduling ticks while it is set and wakes on ack/inbox/epic changes or
+`recheckAfter`. Full semantics in
+[09-launch-and-supervision.md](09-launch-and-supervision.md). Orchestrators
+that never write it are unaffected.
+
 ## <a name="feedback-signal"></a>Schema extension: the ack inbox (operator-owned)
 
 The one capability the existing contract lacks: when the agent asks for the

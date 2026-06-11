@@ -69,7 +69,12 @@ renders them identically. Epic-mode cards additionally deep-link the epic file.
    `--max-concurrent` cap; dispatch `work-issue`/`work-epic` loops as
    background tasks in per-work-item git worktrees.
 5. **Write `run.json`** (passCount, timestamps) and report: needs-you items,
-   ready-to-merge PRs, in-flight work.
+   ready-to-merge PRs, in-flight work. If nothing was dispatchable and every
+   active item is parked on the operator with an empty inbox, set
+   `run.json.parked` (`{since, reason, recheckAfter}`) so the extension's
+   supervisor stops the tick cadence until an ack or backlog change wakes it
+   ([09-launch-and-supervision.md](09-launch-and-supervision.md)); clear it on
+   any pass that finds work.
 
 ### `work-issue` / `work-epic` — one work-item pass
 

@@ -135,11 +135,66 @@ disabled → idle → scheduled(nextTickAt) → launching → running(pid, since
   (`statusPipe.launch.pauseWhenIdle`, default on) — no point burning agent
   passes while the operator is away; resumes on focus with an immediate tick
   if one was missed. Off by default? No — **on** by default; fleet operators
-  who want continuous operation turn it off.
+  who want continuous operation turn it off. Note this is a presence
+  heuristic only; the work-aware stop is **parking**, below.
 - The supervisor never touches `.autopilot/` — process health
   (supervisor-owned) and work-item health (`run` block in state files,
   agent-owned) are deliberately separate layers; the UI shows both and labels
   them distinctly.
+
+### Parking: when everything is blocked on the operator
+
+A productive overnight run ends in a predictable state: every work item is
+parked on the operator (owner questions, reviews, merges) and nothing is
+dispatchable. Without a stop condition the tick loop would relaunch every
+`intervalMinutes` forever, reconciling, finding nothing, and exiting — burned
+passes all night. `pauseWhenIdle` doesn't fix this (wrong predicate: it
+measures the operator's presence, not the existence of work).
+
+The extension cannot decide this itself — it only sees state files, so it
+can't tell whether an epic still has un-started tranches the orchestrator
+could dispatch. The orchestrator knows exactly this at wrap time. So the
+responsibility splits along the existing ownership line:
+
+**The orchestrator declares.** The fanout wrap step writes an optional,
+additive field to `run.json` when (a) no tranche/issue is dispatchable, (b)
+every active item is waiting on the operator (`waitingOn.kind ∈ {owner,
+review, merge}` or blocked), and (c) the inbox has no unconsumed acks:
+
+```json
+"parked": {
+  "since": "2026-06-12T03:40:00Z",
+  "reason": "4 active items all waiting on owner; no dispatchable tranches",
+  "recheckAfter": "2026-06-12T09:40:00Z"
+}
+```
+
+Cleared (set null / omitted) on any pass that finds work. An empty backlog
+("everything merged, nothing tracked") parks the same way with its own reason.
+
+**The supervisor honors it.** While `parked` is set, scheduled ticks are
+skipped. Wake triggers, any of which clears the pause and ticks immediately:
+
+1. **An ack file appears** — the "Ready for another look" click *is* the
+   resume button. (Ack-triggered immediate ticks apply even when not parked:
+   they cut hand-back latency from "next interval" to seconds; the running
+   pass consumes the ack, or a new tick fires on exit if one remains.)
+2. An epic file or inbox change on disk (operator edited the backlog).
+3. Manual tick-now / start.
+4. `recheckAfter` elapses — a slow safety/discovery tick (orchestrator picks
+   the horizon, default a few hours) that catches out-of-band new work (a
+   freshly labeled issue on the forge, a CI flip on stale info). Parking can
+   therefore never strand the loop; worst case it degrades to a very slow
+   poll.
+
+Daemon mode: a daemon that declares `parked` is stopped by the supervisor and
+relaunched on the same wake triggers.
+
+**The UI says so.** Agents strip: `parked — all work waiting on you` (distinct
+from `scheduled`/`stopped`); and when NEEDS YOU is non-empty with nothing in
+flight, the summary line reads "Parked — 4 items need you, nothing in flight."
+Loops that predate the field simply never park — behavior is unchanged for
+them.
 
 ### Relationship to the "Restart run" action
 
