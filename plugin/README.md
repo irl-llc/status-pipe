@@ -32,7 +32,18 @@ claude --plugin-dir /path/to/status-pipe/plugin   # then /status-pipe:tick etc.
 ```
 
 `bin/fetch-comments` and `bin/post-comment` are plain Node (≥18) scripts with
-no npm dependencies; nothing to build.
+no npm dependencies; nothing to build. They talk to the forges over direct
+REST — the `gh` CLI is **not** required. Auth follows the git-spice
+credential model, first match wins:
+
+| Forge | Order |
+|---|---|
+| GitHub | `GITHUB_TOKEN` / `GH_TOKEN` env → `git credential fill` for the remote's host (git-credential-manager, osxkeychain, gh's helper, …) → `gh auth token` if gh happens to be installed |
+| Bitbucket | `BITBUCKET_TOKEN` env (Bearer) → `git credential fill` for bitbucket.org (username+password ⇒ Basic — the app-password / Atlassian API token form) |
+| Jira | `JIRA_EMAIL` + `JIRA_API_TOKEN` env |
+
+The credential-helper lookup runs with `GIT_TERMINAL_PROMPT=0` — it answers
+from storage or fails; it never prompts mid-run.
 
 ## Per-repo setup
 

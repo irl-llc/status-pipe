@@ -169,9 +169,13 @@ Base-URL overrides for self-hosted instances:
   ticketing source.
 - **Auth** (in order): `statusPipe.forge.github.token` setting →
   `GITHUB_TOKEN` env → VS Code's built-in GitHub authentication provider
-  (`vscode.authentication.getSession`) → `gh auth token` (if gh CLI on PATH).
-  The VS Code provider is the expected interactive default and is therefore
-  tried before `gh`, which remains as parity with the agents' own auth.
+  (`vscode.authentication.getSession`) → `gh auth token` (if gh CLI on PATH)
+  → `git credential fill` for the GitHub host (the git-spice credential
+  model: whatever helper the local git is configured with —
+  git-credential-manager, osxkeychain, gh's helper — answers; never
+  interactive, `GIT_TERMINAL_PROMPT=0`). The VS Code provider is the
+  expected interactive default and is therefore tried before `gh`, which
+  remains as parity with the agents' own auth.
 
 ### Bitbucket Cloud (`forge/bitbucket/`)
 
@@ -198,9 +202,12 @@ Base-URL overrides for self-hosted instances:
 - **Build status**: commit statuses aggregated exactly like git-spice's
   bitbucket `aggregateStatuses` (empty ⇒ `none`, any FAILED/STOPPED ⇒ failing,
   any INPROGRESS ⇒ pending, else passing).
-- **Auth**: `statusPipe.forge.bitbucket.token` setting (API token) →
-  `BITBUCKET_TOKEN` env. Tokens entered interactively are stored via
-  `vscode.SecretStorage`, never in settings.json plaintext.
+- **Auth**: `statusPipe.forge.bitbucket.token` setting (API token, with
+  `statusPipe.forge.bitbucket.username` for the Basic app-password form) →
+  `BITBUCKET_TOKEN` env → `git credential fill` for the Bitbucket host
+  (username+password from the helper ⇒ Basic; bare token ⇒ Bearer) →
+  `vscode.SecretStorage`. Tokens entered interactively are stored via
+  SecretStorage, never in settings.json plaintext.
 
 ## Ticketing sources
 

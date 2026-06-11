@@ -150,7 +150,7 @@ multi-maintainer ⇒ label **and** assignee ∈ operators; public ⇒ label **an
 ticket author/assignee ∈ operators.
 
 - **Fail closed.** Check repo visibility at every tick start
-  (`gh repo view --json visibility` / Bitbucket `is_private`). Visibility
+  (GitHub `GET /repos/{owner}/{repo}` `.private` / Bitbucket `is_private`). Visibility
   check fails ⇒ treat the repo as public. Public (or treated-as-public) repo
   with no declared `trust.mode` ⇒ **refuse to operate**. A private repo with
   no `trust` block defaults to single-maintainer with the authenticated forge

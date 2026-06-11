@@ -128,7 +128,7 @@ PR-opening agent is an unacceptable failure mode, and even on private team
 repos two operators' agents must not act on each other's tickets. Three
 explicit modes; the plugin **refuses to tick a public repo whose config does
 not declare a trust mode**. Visibility is checked at every tick start via the
-forge API (`gh repo view --json visibility` / Bitbucket `is_private`), so a
+forge API (GitHub `GET /repos/{owner}/{repo}` `.private` / Bitbucket `is_private`), so a
 private→public flip takes effect on the next pass; if the visibility check
 itself fails, the repo is treated as public — misconfiguration and API
 failure both fail closed. A *private* repo with no `trust` block defaults to

@@ -6,8 +6,12 @@
  *   1. prepends the attribution marker (config.attribution.commentPrefix,
  *      default "**CLAUDE COMMENT**"; with includeAgentId=true and --context,
  *      the prefix becomes "<prefix> (<context>)");
- *   2. posts via `gh api` (GitHub) or Bitbucket/Jira REST (env tokens
- *      BITBUCKET_TOKEN / JIRA_EMAIL+JIRA_API_TOKEN);
+ *   2. posts via direct REST over Node's global fetch — the gh CLI is never
+ *      required. Auth (the git-spice credential model): GitHub uses
+ *      GITHUB_TOKEN / GH_TOKEN env → `git credential fill` for the remote's
+ *      host → ambient `gh auth token`; Bitbucket uses BITBUCKET_TOKEN env →
+ *      `git credential fill` for bitbucket.org (username+password ⇒ Basic);
+ *      Jira uses JIRA_EMAIL+JIRA_API_TOKEN env;
  *   3. records the created comment's API id into the ticket file's
  *      agentCommentIds[] with an atomic read-modify-write (tmp + rename) —
  *      the comment-ID ledger that lets the trust gateway exclude the agent's
@@ -118,54 +122,116 @@ function detectForge(repoRoot) {
 		const m = url.match(/bitbucket\.org[:/]([^/]+)\/([^/.]+)/);
 		return { kind: 'bitbucket', workspace: m ? m[1] : null, slug: m ? m[2] : null };
 	}
-	return { kind: 'github' };
+	const m = url.match(/([^/@:\s]+)[:/]([^/\s]+\/[^/\s]+?)(?:\.git)?\/?$/);
+	return { kind: 'github', host: m ? m[1] : 'github.com', slug: m ? m[2] : null };
 }
 
-function ghApiPost(repoRoot, endpoint, body) {
-	let out;
+// API bases; env overrides serve tests and GHES/self-hosted setups.
+const GITHUB_API = (process.env.GITHUB_API_URL || 'https://api.github.com').replace(/\/$/, '');
+const BITBUCKET_API = (process.env.BITBUCKET_API_URL || 'https://api.bitbucket.org/2.0').replace(/\/$/, '');
+
+/**
+ * git-credential lookup (the git-spice pattern): whatever credential helper
+ * the local git is configured with answers for the host;
+ * GIT_TERMINAL_PROMPT=0 keeps it non-interactive.
+ */
+function gitCredentialFill(repoRoot, host) {
 	try {
-		out = execFileSync(
-			'gh',
-			['api', '--method', 'POST', endpoint, '-f', `body=${body}`],
-			{ cwd: repoRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
-		);
+		const out = execFileSync('git', ['credential', 'fill'], {
+			cwd: repoRoot,
+			input: `protocol=https\nhost=${host}\n\n`,
+			encoding: 'utf8',
+			env: { ...process.env, GIT_TERMINAL_PROMPT: '0' },
+			stdio: ['pipe', 'pipe', 'ignore'],
+		});
+		const cred = {};
+		for (const line of out.split('\n')) {
+			const eq = line.indexOf('=');
+			if (eq > 0) cred[line.slice(0, eq)] = line.slice(eq + 1);
+		}
+		return cred.password ? { username: cred.username || null, password: cred.password } : null;
+	} catch {
+		return null;
+	}
+}
+
+/** GITHUB_TOKEN/GH_TOKEN env → git credential helper → ambient gh CLI. */
+function githubToken(repoRoot, host) {
+	if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
+	if (process.env.GH_TOKEN) return process.env.GH_TOKEN;
+	const cred = gitCredentialFill(repoRoot, host || 'github.com');
+	if (cred) return cred.password;
+	return tryExec('gh', ['auth', 'token'], repoRoot);
+}
+
+/** BITBUCKET_TOKEN env (Bearer) → git credential helper (Basic / Bearer). */
+function bitbucketAuthHeader(repoRoot) {
+	if (process.env.BITBUCKET_TOKEN) return `Bearer ${process.env.BITBUCKET_TOKEN}`;
+	const cred = gitCredentialFill(repoRoot, 'bitbucket.org');
+	if (!cred) return null;
+	if (cred.username) {
+		return `Basic ${Buffer.from(`${cred.username}:${cred.password}`).toString('base64')}`;
+	}
+	return `Bearer ${cred.password}`;
+}
+
+async function githubPost(forge, issueNumber, body, token) {
+	if (!forge.slug) die('could not parse the GitHub owner/repo from the origin remote.');
+	let res;
+	try {
+		res = await fetch(`${GITHUB_API}/repos/${forge.slug}/issues/${issueNumber}/comments`, {
+			method: 'POST',
+			headers: {
+				accept: 'application/vnd.github+json',
+				'content-type': 'application/json',
+				'user-agent': 'status-pipe-plugin',
+				...(token ? { authorization: `Bearer ${token}` } : {}),
+			},
+			body: JSON.stringify({ body }),
+		});
 	} catch (e) {
-		const detail = e.stderr ? String(e.stderr).trim().split('\n')[0] : e.message;
+		die(`GitHub API request failed (${e.message}). Nothing was posted.`);
+	}
+	if (!res.ok) {
 		die(
-			`GitHub post failed (gh api ${endpoint}): ${detail}. ` +
-				'Is `gh` installed and authenticated? Nothing was posted.',
+			`GitHub API returned ${res.status} posting to issue ${issueNumber}. Set ` +
+				'GITHUB_TOKEN, configure a git credential helper, or run `gh auth login`. ' +
+				'Nothing was posted.',
 		);
 	}
-	const created = JSON.parse(out);
+	const created = await res.json();
 	return { id: String(created.id), url: created.html_url || null };
 }
 
-async function bitbucketPost(forge, pr, body) {
-	if (!process.env.BITBUCKET_TOKEN) {
-		die('BITBUCKET_TOKEN must be set to post Bitbucket PR comments. Nothing was posted.');
+async function bitbucketPost(forge, pr, body, authHeader) {
+	if (!authHeader) {
+		die(
+			'no Bitbucket credentials: set BITBUCKET_TOKEN or configure a git ' +
+				'credential helper for bitbucket.org. Nothing was posted.',
+		);
 	}
 	if (!forge.workspace || !forge.slug) {
 		die('could not parse the Bitbucket workspace/slug from the origin remote.');
 	}
 	let res;
 	try {
-		res = await fetch(
-			`https://api.bitbucket.org/2.0/repositories/${forge.workspace}/${forge.slug}/pullrequests/${pr}/comments`,
-			{
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${process.env.BITBUCKET_TOKEN}`,
-					'Content-Type': 'application/json',
-					Accept: 'application/json',
-				},
-				body: JSON.stringify({ content: { raw: body } }),
+		res = await fetch(`${BITBUCKET_API}/repositories/${forge.workspace}/${forge.slug}/pullrequests/${pr}/comments`, {
+			method: 'POST',
+			headers: {
+				Authorization: authHeader,
+				'Content-Type': 'application/json',
+				Accept: 'application/json',
 			},
-		);
+			body: JSON.stringify({ content: { raw: body } }),
+		});
 	} catch (e) {
 		die(`Bitbucket API request failed (${e.message}). Nothing was posted.`);
 	}
 	if (!res.ok) {
-		die(`Bitbucket API returned ${res.status}. Check BITBUCKET_TOKEN. Nothing was posted.`);
+		die(
+			`Bitbucket API returned ${res.status}. Set BITBUCKET_TOKEN or configure ` +
+				'a git credential helper for bitbucket.org. Nothing was posted.',
+		);
 	}
 	const created = await res.json();
 	return {
@@ -285,11 +351,11 @@ async function main() {
 	if (args.jira) {
 		created = await jiraPost(config, args.jira, body);
 	} else if (args.pr && forge.kind === 'bitbucket') {
-		created = await bitbucketPost(forge, args.pr, body);
+		created = await bitbucketPost(forge, args.pr, body, bitbucketAuthHeader(repoRoot));
 	} else {
 		// GitHub: PR conversation comments are issue comments.
 		const n = args.pr || args.issue;
-		created = ghApiPost(repoRoot, `repos/{owner}/{repo}/issues/${n}/comments`, body);
+		created = await githubPost(forge, n, body, githubToken(repoRoot, forge.host));
 	}
 
 	recordAgentCommentId(ticketFile, created.id);

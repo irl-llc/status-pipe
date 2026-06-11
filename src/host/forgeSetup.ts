@@ -1,9 +1,14 @@
 /**
  * Per-repo forge connection (design/03-forge.md "Detection and
  * configuration" + auth orders). The explicit statusPipe.forge.type
- * setting wins; otherwise the registry matches the remote URL. Auth:
+ * setting wins; otherwise the registry matches the remote URL. Auth
+ * (the git-spice credential model — env/setting token, the local git
+ * credential helper, or a tool-specific ambient source):
  *   GitHub:    setting → GITHUB_TOKEN → VS Code auth provider → gh CLI
- *   Bitbucket: setting → BITBUCKET_TOKEN → SecretStorage
+ *              → `git credential fill` for the GitHub host
+ *   Bitbucket: setting (+ username setting) → BITBUCKET_TOKEN →
+ *              `git credential fill` for the Bitbucket host (username+
+ *              password ⇒ Basic) → SecretStorage
  */
 
 import { execFile } from 'child_process';
@@ -11,10 +16,11 @@ import * as vscode from 'vscode';
 
 import { RepoContext } from '../discovery/repoScan';
 import { BitbucketForge } from '../forge/bitbucket';
+import { fillGitCredential, hostOfUrl } from '../forge/gitCredential';
 import { GithubForge } from '../forge/github';
 import { RateListener, fetchHttpClient } from '../forge/http';
 import { resolveForge } from '../forge/registry';
-import { Forge, ForgeRepository, RepositoryId } from '../forge/types';
+import { Forge, ForgeAuth, ForgeRepository, RepositoryId } from '../forge/types';
 import { ConfigFile } from '../protocol/types';
 
 export const BITBUCKET_TOKEN_SECRET = 'statusPipe.bitbucket.token';
@@ -57,32 +63,34 @@ export async function connectRepo(
 	const forges = buildForges(context, config, onRateInfo);
 	const resolved = resolveForge(forges, context.remoteUrl, cfg.get<string>('forge.type') ?? 'auto');
 	if (!resolved) return null;
-	const token = await resolveToken(resolved.forge.id, cfg, secrets);
-	if (!token) return null;
-	// A Bitbucket username/email switches authHeader to Basic (app
-	// passwords / Atlassian API tokens); without it the token rides Bearer.
-	const username =
-		resolved.forge.id === 'bitbucket' ? cfg.get<string>('forge.bitbucket.username') || undefined : undefined;
-	const repository = resolved.forge.openRepository(resolved.id, { token, username });
+	const auth = await resolveAuth(resolved.forge, cfg, secrets);
+	if (!auth) return null;
+	const repository = resolved.forge.openRepository(resolved.id, auth);
 	return { forge: resolved.forge, id: resolved.id, repository };
 }
 
-async function resolveToken(
-	forgeId: string,
+async function resolveAuth(
+	forge: Forge,
 	cfg: vscode.WorkspaceConfiguration,
 	secrets: vscode.SecretStorage,
-): Promise<string | null> {
-	if (forgeId === 'github') return resolveGithubToken(cfg);
-	return resolveBitbucketToken(cfg, secrets);
+): Promise<ForgeAuth | null> {
+	if (forge.id === 'github') {
+		const token = await resolveGithubToken(cfg, forge.baseUrl);
+		return token ? { token } : null;
+	}
+	return resolveBitbucketAuth(cfg, secrets, forge.baseUrl);
 }
 
-async function resolveGithubToken(cfg: vscode.WorkspaceConfiguration): Promise<string | null> {
+async function resolveGithubToken(cfg: vscode.WorkspaceConfiguration, baseUrl: string): Promise<string | null> {
 	const fromSetting = cfg.get<string>('forge.github.token');
 	if (fromSetting) return fromSetting;
 	if (process.env.GITHUB_TOKEN) return process.env.GITHUB_TOKEN;
 	const session = await getGithubSession(false);
 	if (session) return session.accessToken;
-	return ghCliToken();
+	const fromGh = await ghCliToken();
+	if (fromGh) return fromGh;
+	const cred = await fillGitCredential(hostOfUrl(baseUrl));
+	return cred?.password ?? null;
 }
 
 export async function getGithubSession(interactive: boolean): Promise<vscode.AuthenticationSession | undefined> {
@@ -104,14 +112,24 @@ function ghCliToken(): Promise<string | null> {
 	});
 }
 
-async function resolveBitbucketToken(
+/**
+ * Bitbucket auth: a username (setting or credential-helper) switches the
+ * client's authHeader to Basic — the app-password / Atlassian-API-token
+ * form; a bare token rides Bearer (OAuth / access tokens).
+ */
+async function resolveBitbucketAuth(
 	cfg: vscode.WorkspaceConfiguration,
 	secrets: vscode.SecretStorage,
-): Promise<string | null> {
+	baseUrl: string,
+): Promise<ForgeAuth | null> {
+	const username = cfg.get<string>('forge.bitbucket.username') || undefined;
 	const fromSetting = cfg.get<string>('forge.bitbucket.token');
-	if (fromSetting) return fromSetting;
-	if (process.env.BITBUCKET_TOKEN) return process.env.BITBUCKET_TOKEN;
-	return (await secrets.get(BITBUCKET_TOKEN_SECRET)) ?? null;
+	if (fromSetting) return { token: fromSetting, username };
+	if (process.env.BITBUCKET_TOKEN) return { token: process.env.BITBUCKET_TOKEN, username };
+	const cred = await fillGitCredential(hostOfUrl(baseUrl));
+	if (cred) return { token: cred.password, username: username ?? cred.username ?? undefined };
+	const stored = await secrets.get(BITBUCKET_TOKEN_SECRET);
+	return stored ? { token: stored, username } : null;
 }
 
 /** Interactive sign-in commands (tokens go to SecretStorage, never settings). */
