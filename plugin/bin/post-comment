@@ -232,8 +232,10 @@ async function main() {
 	const repoRoot = path.resolve(args.repoRoot);
 	if (!fs.existsSync(repoRoot)) die(`repo root does not exist: ${repoRoot}`, 2);
 
-	// Attribution config: LOCAL WORKING TREE only.
-	const configPath = path.join(repoRoot, '.status-pipe', 'config.json');
+	// Attribution config: the PRIMARY checkout's working tree only —
+	// anchored at the git common dir like the ticket files, so a work branch
+	// checked out in a linked worktree can never alter attribution rules.
+	const configPath = path.join(protocolDir(repoRoot), 'config.json');
 	let config = {};
 	if (fs.existsSync(configPath)) {
 		try {

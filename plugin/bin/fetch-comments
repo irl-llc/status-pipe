@@ -19,10 +19,10 @@
  *   - a private repo with no trust block defaults to single-maintainer with
  *     the authenticated forge user as sole operator.
  *
- * Trust/execution config is read from the LOCAL WORKING TREE only
- * (<repo-root>/.status-pipe/config.json), never from a PR branch or fetched
- * ref. Ticket files are read at the protocol dir anchored at
- * `git rev-parse --git-common-dir`/../.status-pipe/.
+ * Trust/execution config is read from the PRIMARY checkout's working tree
+ * only — like the ticket files, it is anchored at the protocol dir derived
+ * from `git rev-parse --git-common-dir`/../.status-pipe/, never from the
+ * branch a linked worktree has checked out and never from a fetched ref.
  *
  * Usage:
  *   fetch-comments --repo-root <path> --pr <N>
@@ -374,8 +374,12 @@ async function main() {
 	const repoRoot = path.resolve(args.repoRoot);
 	if (!fs.existsSync(repoRoot)) die(`repo root does not exist: ${repoRoot}`, 2);
 
-	// Trust/execution config: LOCAL WORKING TREE only.
-	const configPath = path.join(repoRoot, '.status-pipe', 'config.json');
+	// Trust/execution config: the PRIMARY checkout's working tree only —
+	// anchored at the git common dir like the ticket files. A worker running
+	// in a linked worktree must never read config from its work branch: a PR
+	// editing config.json (e.g. adding a trusted operator) is just a diff to
+	// review and has no effect until the operator merges it.
+	const configPath = path.join(protocolDir(repoRoot), 'config.json');
 	let config = {};
 	if (fs.existsSync(configPath)) {
 		try {
