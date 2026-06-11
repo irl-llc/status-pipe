@@ -4,7 +4,7 @@ A VS Code extension that gives a human operator a **review/response queue** over
 a fleet of autonomous coding agents, plus a Claude Code plugin providing the
 baseline agent workflow that feeds it.
 
-Agents publish state as JSON files under `.autopilot/run/` in each repo;
+Agents publish state as JSON files under `.status-pipe/` in each repo;
 status-pipe watches those files across the workspace, enriches them with live
 forge data (GitHub or Bitbucket), and renders a prioritized queue of what needs
 the operator — blockers, design questions, review requests, merges — alongside

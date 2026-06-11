@@ -20,7 +20,7 @@ strip collapses to a single row. With several: badges on, agents strip lists
 every repo. Everything in this document is additive — a repo with no launch
 file is simply monitor-only, exactly the original design.
 
-## `.status-pipe-launch` — the launcher contract
+## `.status-pipe/launch.json` — the launcher contract
 
 A committed JSON file at the repo root describing how to launch that repo's
 agent loop. Backend-agnostic by construction: it describes a *process* (name,
@@ -32,11 +32,11 @@ arg vector, stdin payload), not a Claude invocation. JSON Schema ships at
   "schemaVersion": 1,
   "agents": [
     {
-      "id": "fanout",
-      "title": "Epic fanout loop",
+      "id": "tick",
+      "title": "Orchestrator loop",
       "command": "claude",
       "args": [
-        "-p", "/status-pipe-agent:fanout --max-concurrent 3",
+        "-p", "/status-pipe:tick --max-concurrent 3",
         "--output-format", "stream-json", "--verbose",
         "--permission-mode", "acceptEdits"
       ],
@@ -86,13 +86,13 @@ gives us for free:
 
 - **`claude -p "<prompt>"`** runs one non-interactive turn and exits — a
   natural tick. Slash commands work as the prompt, so the plugin's
-  `/status-pipe-agent:fanout` (or any repo-local `.claude/commands/` command,
+  `/status-pipe:tick` (or any repo-local `.claude/commands/` command,
   including the existing bespoke autopilot commands) is directly launchable.
 - **`--output-format stream-json --verbose`** emits NDJSON events on stdout
   (init, assistant turns, tool calls, final result with cost/duration). The
   supervisor parses this for *process-level* liveness — output events are a
   heartbeat at the transport layer, independent of the agent remembering to
-  write `run.heartbeatAt` — and for a structured final result line.
+  write `worker.heartbeatAt` — and for a structured final result line.
 - **Exit codes** distinguish clean passes from fatal errors (auth, crash),
   feeding health directly.
 - **Unattended permissions** come from the repo's committed
@@ -121,7 +121,7 @@ disabled → idle → scheduled(nextTickAt) → launching → running(pid, since
 
 - Child processes via `child_process.spawn` (not the integrated terminal):
   stdout/stderr go to a per-agent **OutputChannel** ("Status Pipe: fleet-api ·
-  fanout"); "Open log" jumps there. A "Run in terminal" secondary action exists
+  tick"); "Open log" jumps there. A "Run in terminal" secondary action exists
   for interactive debugging.
 - **Liveness**: `lastOutputAt` from stdout activity (stream-json makes this
   dense); a running tick with no output for `timeoutMinutes` is killed.
@@ -137,8 +137,8 @@ disabled → idle → scheduled(nextTickAt) → launching → running(pid, since
   if one was missed. Off by default? No — **on** by default; fleet operators
   who want continuous operation turn it off. Note this is a presence
   heuristic only; the work-aware stop is **parking**, below.
-- The supervisor never touches `.autopilot/` — process health
-  (supervisor-owned) and work-item health (`run` block in state files,
+- The supervisor never touches the protocol's agent-owned files — process health
+  (supervisor-owned) and work-item health (`worker` block in ticket files,
   agent-owned) are deliberately separate layers; the UI shows both and labels
   them distinctly.
 
@@ -151,13 +151,13 @@ dispatchable. Without a stop condition the tick loop would relaunch every
 passes all night. `pauseWhenIdle` doesn't fix this (wrong predicate: it
 measures the operator's presence, not the existence of work).
 
-The extension cannot decide this itself — it only sees state files, so it
+The extension cannot decide this itself — it only sees ticket files, so it
 can't tell whether an epic still has un-started tranches the orchestrator
 could dispatch. The orchestrator knows exactly this at wrap time. So the
 responsibility splits along the existing ownership line:
 
-**The orchestrator declares.** The fanout wrap step writes an optional,
-additive field to `run.json` when (a) no tranche/issue is dispatchable, (b)
+**The orchestrator declares.** The tick wrap step writes an optional,
+additive field to `orchestrator.json` when (a) no tranche/issue is dispatchable, (b)
 every active item is waiting on the operator (`waitingOn.kind ∈ {owner,
 review, merge}` or blocked), and (c) the inbox has no unconsumed acks:
 
@@ -196,9 +196,9 @@ flight, the summary line reads "Parked — 4 items need you, nothing in flight."
 Loops that predate the field simply never park — behavior is unchanged for
 them.
 
-### Relationship to the "Restart run" action
+### Relationship to the "Restart worker" action
 
-The simulation's per-card "Restart run" becomes, when a launch file exists,
+The simulation's per-card "Restart worker" becomes, when a launch file exists,
 "trigger a tick now" on that repo's supervisor (no terminal involved). Without
 a launch file it falls back to the original behavior: run
 `statusPipe.resumeCommand` in the integrated terminal.

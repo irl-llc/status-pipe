@@ -4,8 +4,8 @@
 
 status-pipe is a VS Code extension that gives a human operator a **review/response
 queue** over a fleet of autonomous coding agents. Agents (Claude Code epic/issue
-loops) publish their state as JSON files in a per-repo state directory
-(`.autopilot/run/issue-<N>.json`). status-pipe watches those files across every
+loops) publish their state as JSON files in a per-repo protocol directory
+(`.status-pipe/tickets/<key>.json`). status-pipe watches those files across every
 repo in the workspace, enriches them with live forge data (GitHub or Bitbucket),
 and renders a prioritized queue of "what needs *me*" — blockers, review requests,
 design questions, ready-to-merge PRs — alongside everything that is quietly
@@ -13,8 +13,9 @@ in flight.
 
 The companion deliverable is a **Claude Code plugin** (`plugin/`) providing a
 baseline multi-agent workflow (slash commands + workflow script) that writes the
-same state contract, usable in any repo instead of the bespoke `autopilot`
-command set that exists in `irl-llc` and `git-spice-code-extension` today.
+same protocol, usable in any repo instead of the bespoke `autopilot` command
+set that exists in `irl-llc` and `git-spice-code-extension` today (those repos
+migrate to this protocol per the mapping in [10-naming.md](10-naming.md)).
 
 ## Goals
 
@@ -23,7 +24,7 @@ command set that exists in `irl-llc` and `git-spice-code-extension` today.
    operating modes, same machinery: **single-repo** (one repo, the operator
    drives the agent from a Claude Code pane; the extension monitors) and
    **fleet** (multi-root workspace; the extension also launches and supervises
-   each repo's orchestrator via a committed `.status-pipe-launch` file). See
+   each repo's orchestrator via a committed `.status-pipe/launch.json` file). See
    [09-launch-and-supervision.md](09-launch-and-supervision.md).
 2. **Queue, not dashboard**: ordering and grouping is by *what the operator
    should do next*, not by repo or recency. Blocked > review-ready > waiting >
@@ -31,7 +32,7 @@ command set that exists in `irl-llc` and `git-spice-code-extension` today.
 3. **Close the loop**: a "ready for another look" action per feedback request,
    so the operator can hand work back to the agent without touching a terminal.
    This is the one schema extension status-pipe introduces (see
-   [02-state-schema.md](02-state-schema.md#feedback-signal)).
+   [02-protocol.md](02-protocol.md#feedback-signal)).
 4. **Forge-portable**: GitHub and Bitbucket Cloud both supported through an
    internal forge abstraction (modeled on git-spice's), selected by remote-URL
    inference with a `statusPipe.forge.type` override. Ticketing follows the
@@ -54,7 +55,7 @@ command set that exists in `irl-llc` and `git-spice-code-extension` today.
 - Replacing the forge's review UI. Reviewing happens on GitHub/Bitbucket;
   status-pipe deep-links there.
 - Git operations of any kind. status-pipe never runs git; everything it knows
-  comes from state files + forge APIs.
+  comes from protocol files + forge APIs.
 - GitLab support (the abstraction leaves room; not in scope now).
 - Requiring git-spice. The *concept* of the forge abstraction is borrowed; the
   binary is not a dependency.
@@ -63,7 +64,7 @@ command set that exists in `irl-llc` and `git-spice-code-extension` today.
 
 | Concern | Borrowed from | Reference |
 |---|---|---|
-| State file contract | `irl-llc/.autopilot/state.schema.json` (schemaVersion 1) | [02-state-schema.md](02-state-schema.md) |
+| Protocol (renamed per [10-naming.md](10-naming.md)) | `irl-llc/.autopilot/state.schema.json` (prototype convention) | [02-protocol.md](02-protocol.md) |
 | Forge abstraction shape | `git-spice/internal/forge/forge.go` (core interface + optional capability interfaces) | [03-forge.md](03-forge.md) |
 | Extension architecture | `git-spice-code-extension` (dual webpack bundle, typed message router, webview React UI) | [04-architecture.md](04-architecture.md) |
 | CI / release | `git-spice-code-extension` branch `ci-auto-release-publish` (changie + scheduled auto-release + reusable publish), `ci/playwright-snapshot-artifacts` | [06-testing-and-release.md](06-testing-and-release.md) |
@@ -72,11 +73,12 @@ command set that exists in `irl-llc` and `git-spice-code-extension` today.
 ## Document map
 
 - [01-overview.md](01-overview.md) — this file
-- [02-state-schema.md](02-state-schema.md) — the state directory contract status-pipe consumes, plus the feedback-signal extension it introduces
+- [02-protocol.md](02-protocol.md) — the status-pipe protocol: directory layout, ticket files, orchestrator metadata, the ack inbox
 - [03-forge.md](03-forge.md) — TypeScript forge abstraction (GitHub/Bitbucket), capability model, auth, configuration
 - [04-architecture.md](04-architecture.md) — extension internals: discovery, watching, enrichment pipeline, webview messaging
 - [05-ui.md](05-ui.md) — queue semantics, card anatomy, side-tray vs editor layouts; SVG wireframes in [wireframes/](wireframes/)
 - [06-testing-and-release.md](06-testing-and-release.md) — test layers and release automation
 - [07-claude-plugin.md](07-claude-plugin.md) — the baseline Claude Code plugin (slash commands + workflow) that emits this contract
 - [08-workflow-simulation.md](08-workflow-simulation.md) — the step-by-step operator-day simulation that drove the queue semantics and feedback-signal design
-- [09-launch-and-supervision.md](09-launch-and-supervision.md) — single-repo vs fleet operating modes, the `.status-pipe-launch` contract, agent-process supervision and health
+- [09-launch-and-supervision.md](09-launch-and-supervision.md) — single-repo vs fleet operating modes, the `.status-pipe/launch.json` contract, agent-process supervision and health
+- [10-naming.md](10-naming.md) — terminology decision record: role taxonomy, protocol file names, migration mapping from the prototype `.autopilot` convention

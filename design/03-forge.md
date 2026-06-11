@@ -139,7 +139,7 @@ Resolution order per repo (mirrors "url-based guess with explicit override"):
    used to parse the slug.
 2. Otherwise iterate the registry calling `matchRemoteUrl(remote)` for the
    repo's `origin` (then first remote) URL.
-3. No match → card renders from state file alone with an "enrichment off:
+3. No match → card renders from the ticket file alone with an "enrichment off:
    unrecognized forge" note. State files are still fully useful unenriched.
 
 Base-URL overrides for self-hosted instances:
@@ -214,7 +214,7 @@ export interface TicketSource {
   SecretStorage). Jira REST v3 `GET /issue/{key}?fields=summary,status`.
 - **State-file impact**: on Jira-tracked repos the tracking ticket key is a
   string (`PROJ-123`), not an integer — see the contract note in
-  [02-state-schema.md](02-state-schema.md). The card's ticket deep link goes to
+  [02-protocol.md](02-protocol.md). The card's ticket deep link goes to
   Jira; PRs still deep-link to Bitbucket.
 - Ticket fetches ride the same cache/backoff machinery below, with a much
   longer TTL (15 min) since ticket titles rarely change.

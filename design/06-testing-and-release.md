@@ -48,7 +48,7 @@ updates; ack command produces a correct file on disk.
 Real VS Code launched via @vscode/test-electron, attached over CDP, webview
 located through the nested-iframe fixture (port of `webview.ts` from
 git-spice-code-extension). Fixture repos are generated temp dirs seeded with
-`.autopilot/run/*.json` files covering: the six-epic simulation scenario, every
+`.status-pipe/tickets/*.json` files covering: the six-epic simulation scenario, every
 lane, every badge type, stack indicators, degraded/unknown-schema cards, the
 empty "all quiet" state. Forge enrichment served by the in-process **fake
 forge** (shamhub pattern) speaking canned GitHub-GraphQL and Bitbucket-REST so

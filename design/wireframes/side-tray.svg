@@ -49,9 +49,9 @@
     <text x="324" y="116" fill="#6e6e6e" font-size="8" text-anchor="end">47m</text>
     <text x="22" y="134" fill="#9a9a9a" font-size="9">Extracting locale strings from fleet-ui components; 61 of</text>
     <text x="22" y="146" fill="#9a9a9a" font-size="9">214 files migrated to message catalog.</text>
-    <text x="22" y="164" fill="#f48771" font-size="9">run stale — last heartbeat 47m ago (threshold 15m)</text>
-    <rect x="20" y="170" width="74" height="16" rx="3" fill="#0e639c"/>
-    <text x="57" y="181" fill="#ffffff" font-size="9" text-anchor="middle">Restart run</text>
+    <text x="22" y="164" fill="#f48771" font-size="9">worker stale — last heartbeat 47m ago (threshold 15m)</text>
+    <rect x="20" y="170" width="88" height="16" rx="3" fill="#0e639c"/>
+    <text x="64" y="181" fill="#ffffff" font-size="9" text-anchor="middle">Restart worker</text>
   </g>
 
   <!-- E1: owner question + blocker -->
@@ -67,7 +67,7 @@
     <text x="22" y="232" fill="#9a9a9a" font-size="9">Posted design question: rotation via refresh-token chain (A)</text>
     <text x="22" y="244" fill="#9a9a9a" font-size="9">or sliding window (B); parked pending owner decision.</text>
     <use href="#i-person" x="21" y="252" width="11" height="11" color="#cca700"/>
-    <text x="37" y="261" fill="#cca700" font-size="9">design question on tracking issue · 35m</text>
+    <text x="37" y="261" fill="#cca700" font-size="9">design question on tracking ticket · 35m</text>
     <text x="22" y="278" fill="#f48771" font-size="9">Needs decision: token rotation strategy A vs B</text>
     <rect x="20" y="285" width="86" height="16" rx="3" fill="#0e639c"/>
     <text x="63" y="296" fill="#ffffff" font-size="9" text-anchor="middle">Open question</text>
@@ -179,7 +179,7 @@
 
   <!-- footer -->
   <rect x="0" y="836" width="340" height="1" fill="#3c3c3c"/>
-  <text x="12" y="854" fill="#6e6e6e" font-size="9">▸ inactive folders (no .autopilot): scratch-notes, dotfiles</text>
+  <text x="12" y="854" fill="#6e6e6e" font-size="9">▸ inactive folders (no .status-pipe): scratch-notes, dotfiles</text>
 
   <!-- hover affordance notes -->
   <text x="12" y="884" fill="#5a5a5a" font-size="8" font-style="italic">hover reveals: full headline · per-check CI list · comment totals incl.</text>

@@ -36,7 +36,7 @@
     <rect x="6" y="76" width="288" height="30" rx="3" fill="#2d2d30"/>
     <rect x="6" y="76" width="3" height="30" fill="#f48771"/>
     <text x="16" y="89" fill="#cccccc">fleet-ui #95 i18n extraction</text>
-    <text x="16" y="101" fill="#6e6e6e" font-size="8">stale run · 47m</text>
+    <text x="16" y="101" fill="#6e6e6e" font-size="8">stale worker · 47m</text>
 
     <rect x="6" y="110" width="288" height="30" rx="3" fill="#2d2d30"/>
     <rect x="6" y="110" width="3" height="30" fill="#f48771"/>
@@ -70,7 +70,7 @@
   <text x="372" y="52" fill="#3794ff" font-size="13" font-weight="700">#155</text>
   <text x="412" y="52" fill="#e0e0e0" font-size="13" font-weight="700">Rate limiter</text>
   <text x="510" y="52" fill="#6e6e6e" font-size="9">review</text>
-  <text x="976" y="52" fill="#6e6e6e" font-size="9" text-anchor="end">open: ticket · epic file · state JSON</text>
+  <text x="976" y="52" fill="#6e6e6e" font-size="9" text-anchor="end">open: ticket · epic file · ticket JSON</text>
   <text x="316" y="72" fill="#9a9a9a" font-size="10">T1a+T1b implemented and green; stack ready for first review pass starting at #512.</text>
 
   <!-- waiting line + primary action -->
@@ -80,7 +80,7 @@
   <text x="906" y="92.5" fill="#cccccc" font-size="9" text-anchor="middle">Ready for another look</text>
 
   <!-- run line (work-item liveness; supervisor state lives in the agents strip) -->
-  <text x="316" y="114" fill="#6e6e6e" font-size="9">run idle · last heartbeat 14h · orchestrator pass #31 finished 12m ago · staleRunMinutes 30</text>
+  <text x="316" y="114" fill="#6e6e6e" font-size="9">worker idle · last heartbeat 14h · orchestrator pass #31 finished 12m ago · staleWorkerMinutes 30</text>
 
   <!-- PR table -->
   <text x="316" y="140" fill="#e0e0e0" font-size="10" font-weight="700">PULL REQUESTS (stack)</text>
@@ -144,7 +144,7 @@
 
     <circle cx="324" cy="466" r="4" fill="#3794ff"/>
     <text x="338" y="463" fill="#8a8a8a" font-size="8">yesterday 18:05 · planning</text>
-    <text x="338" y="475" fill="#cccccc">orchestrator claimed (fanout pass #28)</text>
+    <text x="338" y="475" fill="#cccccc">orchestrator claimed (tick #28)</text>
   </g>
   <text x="338" y="500" fill="#6e6e6e" font-size="8" font-style="italic">every entry = history[] verbatim; runId links to the workflow run when present</text>
 
@@ -154,7 +154,7 @@
   <text x="332" y="548" fill="#89d185" font-size="9">9b21d4ee pending — sent 14:02 "Replied to all 4 threads"</text>
   <text x="332" y="562" fill="#6e6e6e" font-size="9">4c11a2 consumed yesterday 20:15 · 88f0e1 superseded yesterday 19:02</text>
 
-  <text x="316" y="592" fill="#6e6e6e" font-size="8">raw state: .autopilot/run/issue-155.json (updated 02:10) · schema v1 · repo irl-llc/fleet-api matches remote</text>
+  <text x="316" y="592" fill="#6e6e6e" font-size="8">protocol: .status-pipe/tickets/155.json (updated 02:10) · schema v1 · repo irl-llc/fleet-api matches remote</text>
 
   <!-- status bar -->
   <rect x="0" y="618" width="1000" height="22" fill="#007acc"/>
