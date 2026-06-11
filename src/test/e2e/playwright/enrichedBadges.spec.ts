@@ -9,9 +9,9 @@ import { expect, test } from '@playwright/test';
 
 import { FakeForgeServer } from '../../../forge/fake/fakeForgeServer';
 import { buildFixtureWorkspace, ticketBody } from '../fixtures/protocolFixtures';
-import { minutesAgo } from './fixtures/scenarios';
+import { QUIET_TOASTS, minutesAgo } from './fixtures/scenarios';
 import { launchVSCode, type VSCodeInstance } from './fixtures/vscode';
-import { clearNotifications, openQueueEditor } from './fixtures/webview';
+import { openQueueEditor } from './fixtures/webview';
 
 test.describe('enriched badges', () => {
 	let vscode: VSCodeInstance;
@@ -96,6 +96,7 @@ test.describe('enriched badges', () => {
 				'statusPipe.forge.type': 'github',
 				'statusPipe.forge.github.apiUrl': apiUrl,
 				'statusPipe.forge.github.token': 'fixture-token',
+				...QUIET_TOASTS,
 			},
 		);
 
@@ -107,7 +108,6 @@ test.describe('enriched badges', () => {
 		await expect(frame.locator('.pr-badge', { hasText: '2/8' })).toBeVisible();
 		await expect(frame.locator('.pr-badge.changes-requested')).toBeVisible();
 
-		await clearNotifications(vscode.workbench);
 		await expect(vscode.workbench).toHaveScreenshot('enriched-badges.png', { fullPage: true });
 	});
 });

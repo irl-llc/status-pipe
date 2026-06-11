@@ -36,15 +36,6 @@ export async function openQueueEditor(workbench: Page): Promise<Frame> {
 	return frame;
 }
 
-/**
- * Dismisses all toasts (including Docker's root-user warning) so
- * screenshots don't bake transient notifications into baselines.
- */
-export async function clearNotifications(workbench: Page): Promise<void> {
-	await runCommand(workbench, 'Notifications: Clear All Notifications');
-	await workbench.waitForTimeout(300);
-}
-
 async function runCommand(workbench: Page, command: string): Promise<void> {
 	await workbench.keyboard.press('F1');
 	await workbench.locator('.quick-input-widget').waitFor({ state: 'visible', timeout: 10_000 });

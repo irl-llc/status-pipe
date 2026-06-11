@@ -7,9 +7,9 @@
 import { expect, test } from '@playwright/test';
 
 import { buildFixtureWorkspace } from '../fixtures/protocolFixtures';
-import { degradedRepo, lanesRepo } from './fixtures/scenarios';
+import { QUIET_TOASTS, degradedRepo, lanesRepo } from './fixtures/scenarios';
 import { launchVSCode, type VSCodeInstance } from './fixtures/vscode';
-import { clearNotifications, openQueueEditor, openQueueView, setSidebarWidth } from './fixtures/webview';
+import { openQueueEditor, openQueueView, setSidebarWidth } from './fixtures/webview';
 
 test.describe('queue lanes', () => {
 	let vscode: VSCodeInstance;
@@ -19,7 +19,7 @@ test.describe('queue lanes', () => {
 	});
 
 	test('editor view renders lanes, priorities, and stack indicators', async () => {
-		const workspace = buildFixtureWorkspace([lanesRepo()]);
+		const workspace = buildFixtureWorkspace([lanesRepo()], QUIET_TOASTS);
 		vscode = await launchVSCode(workspace);
 		const frame = await openQueueEditor(vscode.workbench);
 
@@ -46,28 +46,25 @@ test.describe('queue lanes', () => {
 		// The ack control is present on the owner-question card.
 		await expect(frame.locator('.text-button', { hasText: 'Ready for another look' }).first()).toBeVisible();
 
-		await clearNotifications(vscode.workbench);
 		await expect(vscode.workbench).toHaveScreenshot('lanes-editor.png', { fullPage: true });
 	});
 
 	test('tray view renders the compact triage index', async () => {
-		const workspace = buildFixtureWorkspace([lanesRepo()]);
+		const workspace = buildFixtureWorkspace([lanesRepo()], QUIET_TOASTS);
 		vscode = await launchVSCode(workspace);
 		await setSidebarWidth(vscode.workbench, 500);
 		const frame = await openQueueView(vscode.workbench);
 		await expect(frame.locator('.lane-header', { hasText: 'NEEDS YOU' })).toBeVisible();
 		await expect(frame.locator('.card').first()).toBeVisible();
-		await clearNotifications(vscode.workbench);
 		await expect(vscode.workbench).toHaveScreenshot('lanes-tray.png', { fullPage: true });
 	});
 
 	test('unknown schema renders a degraded card, never hidden', async () => {
-		const workspace = buildFixtureWorkspace([degradedRepo()]);
+		const workspace = buildFixtureWorkspace([degradedRepo()], QUIET_TOASTS);
 		vscode = await launchVSCode(workspace);
 		const frame = await openQueueEditor(vscode.workbench);
 		await expect(frame.locator('.card', { hasText: 'update status-pipe' })).toBeVisible();
 		await expect(frame.locator('.lane-header', { hasText: 'NEEDS YOU (1)' })).toBeVisible();
-		await clearNotifications(vscode.workbench);
 		await expect(vscode.workbench).toHaveScreenshot('degraded-card.png', { fullPage: true });
 	});
 });

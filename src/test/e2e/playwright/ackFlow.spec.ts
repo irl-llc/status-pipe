@@ -10,9 +10,9 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { buildFixtureWorkspace, ticketBody } from '../fixtures/protocolFixtures';
-import { minutesAgo } from './fixtures/scenarios';
+import { QUIET_TOASTS, minutesAgo } from './fixtures/scenarios';
 import { launchVSCode, type VSCodeInstance } from './fixtures/vscode';
-import { clearNotifications, openQueueEditor } from './fixtures/webview';
+import { openQueueEditor } from './fixtures/webview';
 
 test.describe('ack flow', () => {
 	let vscode: VSCodeInstance;
@@ -23,31 +23,34 @@ test.describe('ack flow', () => {
 
 	test('Ready for another look writes the ack file and shows the chip', async () => {
 		const since = minutesAgo(90);
-		const workspace = buildFixtureWorkspace([
-			{
-				name: 'fleet-api',
-				remoteUrl: 'https://github.com/acme/fleet-api.git',
-				tickets: [
-					{
-						key: '142',
-						body: ticketBody({
-							ticket: '142',
-							title: 'Rotate signing keys',
-							health: 'waiting',
-							headline: 'Asked the owner a question.',
-							waitingOn: {
-								kind: 'owner',
-								ref: 'https://github.com/acme/fleet-api/issues/142#issuecomment-1',
-								pr: null,
-								since,
-								detail: 'rotation window configurable?',
-							},
-							updatedAt: since,
-						}),
-					},
-				],
-			},
-		]);
+		const workspace = buildFixtureWorkspace(
+			[
+				{
+					name: 'fleet-api',
+					remoteUrl: 'https://github.com/acme/fleet-api.git',
+					tickets: [
+						{
+							key: '142',
+							body: ticketBody({
+								ticket: '142',
+								title: 'Rotate signing keys',
+								health: 'waiting',
+								headline: 'Asked the owner a question.',
+								waitingOn: {
+									kind: 'owner',
+									ref: 'https://github.com/acme/fleet-api/issues/142#issuecomment-1',
+									pr: null,
+									since,
+									detail: 'rotation window configurable?',
+								},
+								updatedAt: since,
+							}),
+						},
+					],
+				},
+			],
+			QUIET_TOASTS,
+		);
 		vscode = await launchVSCode(workspace);
 		const frame = await openQueueEditor(vscode.workbench);
 
@@ -67,7 +70,6 @@ test.describe('ack flow', () => {
 
 		// Chip appears in the fixed ack slot; the card leaves NEEDS YOU.
 		await expect(frame.locator('.ack-chip', { hasText: 'sent' }).first()).toBeVisible({ timeout: 15_000 });
-		await clearNotifications(vscode.workbench);
 		await expect(vscode.workbench).toHaveScreenshot('ack-sent-chip.png', { fullPage: true });
 	});
 });

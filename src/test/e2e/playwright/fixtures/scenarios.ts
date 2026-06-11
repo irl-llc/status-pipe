@@ -10,6 +10,12 @@
 
 import { FixtureRepoSpec, ticketBody } from '../../fixtures/protocolFixtures';
 
+/**
+ * Workspace settings suppressing status-pipe toasts: persistent warning
+ * toasts would otherwise be baked into the screenshot baselines.
+ */
+export const QUIET_TOASTS: Record<string, unknown> = { 'statusPipe.notifications.doNotDisturb': true };
+
 /** A recent ISO timestamp helper: minutes before "now", minute precision. */
 export function minutesAgo(minutes: number): string {
 	const ms = Date.now() - minutes * 60_000;
