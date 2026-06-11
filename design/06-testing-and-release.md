@@ -14,7 +14,7 @@ implementations; simulate the real deployment; layer approaches.
 Primary targets — all pure or dependency-injected:
 
 - **`queueModel`**: bucket assignment and priority ordering for every rule in
-  [05-ui.md](05-ui.md) (crashed-run beats blocked beats owner-question…),
+  [05-ui.md](05-ui.md) (crashed-worker beats blocked beats owner-question…),
   stack derivation from `head`/`base` matching, stale-heartbeat math with a
   injected `now`, clock-skew clamping, deterministic tie-breaks.
 - **State parsing**: tolerant reader against fixture files — valid v1 files
@@ -40,7 +40,7 @@ Primary targets — all pure or dependency-injected:
 ### 2. E2E suite (mocha via @vscode/test-cli, `src/test/e2e/suite/`)
 
 Extension activates in a real VS Code against a temp workspace; commands are
-registered; state-dir discovery finds fixture repos; file watcher delivers
+registered; protocol-dir discovery finds fixture repos; file watcher delivers
 updates; ack command produces a correct file on disk.
 
 ### 3. Playwright snapshot tests (`src/test/e2e/playwright/`)

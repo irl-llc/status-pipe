@@ -48,7 +48,8 @@ export interface RepositoryId {
   /** "owner/name" (GitHub) or "workspace/name" (Bitbucket). */
   readonly slug: string;
   prUrl(prNumber: number): string;
-  issueUrl(issueNumber: number): string;
+  // Ticket URLs are owned by the TicketSource, not the forge — see
+  // "Ticketing sources" below.
 }
 
 /** The read surface status-pipe consumes. All methods may throw ForgeError. */
@@ -140,7 +141,7 @@ Resolution order per repo (mirrors "url-based guess with explicit override"):
 2. Otherwise iterate the registry calling `matchRemoteUrl(remote)` for the
    repo's `origin` (then first remote) URL.
 3. No match → card renders from the ticket file alone with an "enrichment off:
-   unrecognized forge" note. State files are still fully useful unenriched.
+   unrecognized forge" note. Ticket files are still fully useful unenriched.
 
 Base-URL overrides for self-hosted instances:
 `statusPipe.forge.github.baseUrl`, `statusPipe.forge.github.apiUrl`,
@@ -151,20 +152,26 @@ Base-URL overrides for self-hosted instances:
 ### GitHub (`forge/github/`)
 
 - **API**: GraphQL v4 single batched query per repo per refresh — PRs by number
-  with `comments.totalCount`, `reviewThreads(first:100){ isResolved }`,
-  `reviewDecision`, `statusCheckRollup` + check runs, `closingIssuesReferences`.
-  One round-trip per repo regardless of PR count (aliased nodes), which matters
-  for rate limits with 30+ tracked PRs.
-- **Counts**: `total = comments.totalCount + sum(reviewThreads.comments)`;
+  with `comments.totalCount`,
+  `reviewThreads(first:100){ isResolved, comments { totalCount } }`,
+  `reviewDecision`, `reviewRequests` (reviewer logins — needed for the
+  review-demotion queue rule), `statusCheckRollup` + check runs, and
+  `closingIssuesReferences`; plus `viewer { login }` once per session (the
+  local identity the demotion rule compares against). One round-trip per repo
+  regardless of PR count (aliased nodes), which matters for rate limits with
+  30+ tracked PRs. Repos with more than 100 review threads on one PR are
+  undercounted; the count is then captioned `100+` rather than paginated —
+  a deliberate budget choice.
+- **Counts**: `total = comments.totalCount + Σ thread.comments.totalCount`;
   `resolvable/unresolved` from review threads; `prLevelResolvable: false`.
 - **Tasks**: capability off.
 - **Ticket links**: `closingIssuesReferences` (native); GitHub issues are the
   ticketing source.
 - **Auth** (in order): `statusPipe.forge.github.token` setting →
-  `GITHUB_TOKEN` env → `gh auth token` (if gh CLI on PATH) → VS Code's built-in
-  GitHub authentication provider (`vscode.authentication.getSession`). The
-  VS Code provider is the expected default for interactive use; `gh` keeps
-  parity with the agents' own auth.
+  `GITHUB_TOKEN` env → VS Code's built-in GitHub authentication provider
+  (`vscode.authentication.getSession`) → `gh auth token` (if gh CLI on PATH).
+  The VS Code provider is the expected interactive default and is therefore
+  tried before `gh`, which remains as parity with the agents' own auth.
 
 ### Bitbucket Cloud (`forge/bitbucket/`)
 
@@ -177,6 +184,12 @@ Base-URL overrides for self-hosted instances:
 - **Counts**: inline comments carry resolution (`resolvable = inline count`);
   PR-level comments don't (`prLevelResolvable: false` — this is the "some
   forges don't have overall-comment resolution" case the UI captions).
+- **Spike before freezing**: two Bitbucket Cloud behaviors this design leans
+  on are under-documented — ETag/304 handling across the PR endpoints (the
+  N+1 cost ceiling) and per-comment `resolved` flags (the resolvable counts).
+  Both get verified against the live API before the `CommentCounts` semantics
+  and the Bitbucket budget are frozen; the fallbacks are time-based caching
+  and `resolvable: 0` captioning respectively.
 - **Tasks**: native — `TaskCounts` from the tasks endpoint.
 - **Ticket links**: **Jira Cloud is the ticketing source** for Bitbucket Cloud
   repos (see "Ticketing sources" below). Jira keys are parsed from branch
@@ -206,13 +219,16 @@ export interface TicketSource {
 ```
 
 - **Resolution**: GitHub forge → `github-issues` automatically. Bitbucket forge
-  → `jira-cloud`, requiring `statusPipe.tickets.jira.siteUrl`
-  (`https://<site>.atlassian.net`); unset ⇒ ticket links render as plain text
-  keys (degraded, not broken).
+  → `jira-cloud`, requiring a Jira site URL (`https://<site>.atlassian.net`).
+  The site/project come from the repo's committed `.status-pipe/config.json`
+  (`tickets.jira.*`, see [07-claude-plugin.md](07-claude-plugin.md)) when
+  present — one committed truth shared with the plugin — with
+  `statusPipe.tickets.jira.siteUrl` as the user-level fallback; neither set ⇒
+  ticket links render as plain text keys (degraded, not broken).
 - **Jira auth**: Atlassian email + API token
   (`statusPipe.tickets.jira.email` + token via `JIRA_API_TOKEN` env or
   SecretStorage). Jira REST v3 `GET /issue/{key}?fields=summary,status`.
-- **State-file impact**: on Jira-tracked repos the tracking ticket key is a
+- **Ticket-file impact**: on Jira-tracked repos the tracking ticket key is a
   string (`PROJ-123`), not an integer — see the contract note in
   [02-protocol.md](02-protocol.md). The card's ticket deep link goes to
   Jira; PRs still deep-link to Bitbucket.
@@ -245,7 +261,7 @@ idle at **a few requests per minute total**, not per PR.
 - **Bitbucket**: REST is N+1 by nature, so every GET sends `If-None-Match`;
   304s don't consume the (already generous) Bitbucket quota meaningfully and
   skip response processing. 4-way concurrency cap.
-- **Change-driven fetching**: a state-file change triggers enrichment only for
+- **Change-driven fetching**: a ticket-file change triggers enrichment only for
   the PRs *referenced by the changed file* (plus any PR whose row is missing
   data). The periodic refresh covers drift on the rest.
 
@@ -253,7 +269,7 @@ idle at **a few requests per minute total**, not per PR.
 
 | Trigger | Behavior |
 |---|---|
-| State-file change burst | coalesced 5s, then change-driven fetch (only affected PRs) |
+| Ticket-file change burst | coalesced 5s, then change-driven fetch (only affected PRs) |
 | Periodic | every `refreshIntervalSeconds` (default 60s) **only while a status-pipe view is visible**; hidden views don't poll |
 | Window focus regained | refresh if cache older than the min interval |
 | Manual refresh button | bypasses min-interval and change-driven narrowing: refetches all open PRs in the clicked scope (per-view button = everything; per-repo on the repo header) — but still uses ETags and still respects an active rate-limit backoff rather than burning the remaining budget |
@@ -268,7 +284,7 @@ idle at **a few requests per minute total**, not per PR.
   in the reserved activity slot (see [05-ui.md](05-ui.md)) — never per-card
   spam, never a toast.
 - All forge calls are **enrichment** — failures degrade, never block. A card
-  whose enrichment failed renders from state-file data with a staleness tint;
+  whose enrichment failed renders from ticket-file data with a staleness tint;
   detail (cause, retry time, retry-now) lives in the activity indicator's
   tooltip/click, not in the cards.
 - `ForgeError` carries `kind: 'auth' | 'rate-limit' | 'network' | 'not-found'`;

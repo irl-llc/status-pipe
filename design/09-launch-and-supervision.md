@@ -58,13 +58,36 @@ arg vector, stdin payload), not a Claude invocation. JSON Schema ships at
 - `cwd` relative to the repo root; `env` merged over the inherited environment.
 - `mode`:
   - **`tick`** — the process performs one orchestration pass and exits;
-    the extension re-launches every `intervalMinutes`. Preferred: process exit
+    the extension re-launches `intervalMinutes` **after the previous tick
+    exits** (no overlap, ever — at most one orchestrator process per repo, the
+    invariant the ticket-file write-ownership model in
+    [02-protocol.md](02-protocol.md) depends on). Preferred: process exit
     is an unambiguous health signal (exit 0 = healthy pass), there is no
     long-lived process to leak, and the cadence is visible and adjustable.
   - **`daemon`** — long-running process (e.g. a loop that self-schedules);
     the extension restarts it if it dies.
-- `timeoutMinutes` (tick mode): a pass still running after this is killed and
-  recorded as a failure — a hung tick must not silently stop the cadence.
+- `timeoutMinutes` (tick mode): a hard wall-clock cap per tick — a pass still
+  running after this is killed and recorded as a failure. This is the single
+  timeout; a hung tick must not silently stop the cadence. (Output-silence is
+  surfaced as a liveness *display*, not a kill rule — a tick blocking on a
+  long worker is quiet and healthy.)
+
+### Tick anatomy: workers run inside the tick
+
+One pass is the *whole* pass: the orchestrator dispatches workers (subagents /
+child processes) and **waits for them** before wrapping and exiting. This is
+load-bearing for three reasons: (a) nothing outlives the tick, so the
+supervisor's process model stays honest (background children of an exited
+`claude -p` would be orphans); (b) `intervalMinutes` measured from exit can
+never overlap a still-running worker; (c) ticket files have one writing
+process tree at a time. Consequently a tick's duration is bounded by
+`timeoutMinutes` (default 45), which is expected to exceed `intervalMinutes`
+(default 10) on busy passes — the cadence is "10 minutes of quiet between
+passes", not "a pass every 10 minutes". **Worker failures are not tick
+failures**: a worker that errors is recorded in its ticket file
+(`worker.status=error`, history note) and the tick still exits 0; a nonzero
+exit is reserved for orchestrator-level fatals (auth gone, crash), which is
+what the supervisor's backoff/`failed` escalation is for.
 
 ### Trust gating (this file executes commands)
 
@@ -73,8 +96,11 @@ A committed file that causes process execution is an attack surface, so:
 - launches require VS Code **workspace trust**, and
 - the **exact content** of the launch entry must be approved once by the user:
   on first launch (and again whenever the file's hash changes) the extension
-  shows the full command line + stdin and asks for confirmation; approvals are
-  stored per content-hash in `workspaceState`.
+  shows the **complete entry — command, args, stdin, `cwd`, and `env`** — and
+  asks for confirmation; approvals are stored per content-hash in
+  `workspaceState`. Showing only the command line would let an `env` override
+  (`NODE_OPTIONS`, `PATH`) ride through review unseen; the dialog displays
+  everything the hash covers.
 - nothing ever auto-starts unless `statusPipe.launch.autoStart` is enabled
   *and* the current hash was previously approved. Defaults: launching enabled,
   auto-start off.
@@ -101,7 +127,7 @@ gives us for free:
   file, reviewable like any code).
 - **`--resume <session-id>`** exists as a recovery path for daemon-style
   sessions, but tick mode mostly removes the need: each pass reconstructs from
-  the durable state (git + forge + tracking issue), which the workflow already
+  the durable state (git + forge + tracking ticket), which the workflow already
   guarantees.
 
 Other backends (a shell script, a different CLI agent) plug in by meeting the
@@ -124,19 +150,26 @@ disabled → idle → scheduled(nextTickAt) → launching → running(pid, since
   tick"); "Open log" jumps there. A "Run in terminal" secondary action exists
   for interactive debugging.
 - **Liveness**: `lastOutputAt` from stdout activity (stream-json makes this
-  dense); a running tick with no output for `timeoutMinutes` is killed.
+  dense) feeds the fleet-strip display; the only kill rule is the
+  `timeoutMinutes` wall-clock cap. **Daemons** get a staleness check too: a
+  daemon whose repo shows no `orchestrator.json.lastPassFinishedAt` progress
+  for 2 × its expected interval is treated as wedged — killed and restarted
+  through the same backoff path (a hung daemon emits no exit and would
+  otherwise be invisible, and a dead orchestrator is the system's worst
+  failure).
 - **Backoff**: exponential (1m, 2m, 4m… cap 15m), `maxRestarts` (default 3
   consecutive failures) → `failed`.
 - **`failed` surfaces in the queue**: a synthetic card in NEEDS YOU at top
   priority ("orchestrator launcher failing — exit 1 ×3 · open log · retry"),
   consistent with the simulation's rule that a dead orchestrator outranks
   everything (it silently stops all signal).
-- Tick scheduling pauses when the window loses focus for > 30 min
-  (`statusPipe.launch.pauseWhenIdle`, default on) — no point burning agent
-  passes while the operator is away; resumes on focus with an immediate tick
-  if one was missed. Off by default? No — **on** by default; fleet operators
-  who want continuous operation turn it off. Note this is a presence
-  heuristic only; the work-aware stop is **parking**, below.
+- `statusPipe.launch.pauseWhenIdle` (default **off**) pauses tick scheduling
+  after 30 min without window focus. It is off by default because it directly
+  conflicts with the core overnight scenario — agents grinding through the
+  backlog until everything parks on the operator — and **parking** (below) is
+  the work-aware stop that makes a presence heuristic mostly redundant. Turn
+  it on for battery-constrained laptops where "I'm away" should mean "stop
+  spending", accepting that overnight runs stop too.
 - The supervisor never touches the protocol's agent-owned files — process health
   (supervisor-owned) and work-item health (`worker` block in ticket files,
   agent-owned) are deliberately separate layers; the UI shows both and labels
@@ -157,7 +190,7 @@ could dispatch. The orchestrator knows exactly this at wrap time. So the
 responsibility splits along the existing ownership line:
 
 **The orchestrator declares.** The tick wrap step writes an optional,
-additive field to `orchestrator.json` when (a) no tranche/issue is dispatchable, (b)
+additive field to `orchestrator.json` when (a) no tranche or ticket is dispatchable, (b)
 every active item is waiting on the operator (`waitingOn.kind ∈ {owner,
 review, merge}` or blocked), and (c) the inbox has no unconsumed acks:
 

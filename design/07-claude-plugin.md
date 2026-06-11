@@ -24,6 +24,11 @@ plugin/
 │   ├── work-epic.md               # /status-pipe:work-epic <path-to-epic.md>
 │   ├── split.md                   # /status-pipe:split <ticket> <topic>  (sub-ticket carve-out)
 │   └── ack-check.md               # /status-pipe:ack-check  (inbox consume, standalone)
+├── bin/
+│   ├── fetch-comments             # trust gateway: API-verified, operator-filtered
+│   │                              #   comment digests (the only sanctioned read path)
+│   └── post-comment               # posting wrapper: attribution marker + comment-id
+│                                  #   ledger (the only sanctioned write path)
 ├── skills/
 │   └── protocol/SKILL.md          # how to read/write the status-pipe protocol correctly,
 │                                  #   incl. trust + attribution rules (binding)
@@ -43,9 +48,11 @@ Everything the plugin needs to know about *this repo's* conventions lives here
   "epics": { "dir": "epics" },
   "inventory": { "label": "agent-queue" },
   "tickets": { "source": "github-issues" },
+  "staleWorkerMinutes": 30,
   "trust": {
     "mode": "single-maintainer",
-    "operators": ["ed-irl"]
+    "operators": ["ed-irl"],
+    "minAssociation": null
   },
   "attribution": {
     "commentPrefix": "**CLAUDE COMMENT**",
@@ -59,6 +66,13 @@ Everything the plugin needs to know about *this repo's* conventions lives here
   `roadmap/`, `specs/`, or anything else just say so.
 - `tickets.source` — `github-issues` or `jira-cloud` (+ `jira.siteUrl`,
   `jira.projectKey` when Jira).
+- `staleWorkerMinutes` — committed source of truth for the worker-heartbeat
+  threshold; the orchestrator echoes it into `orchestrator.json` for the
+  extension ([02-protocol.md](02-protocol.md)).
+- On Bitbucket + Jira repos, `trust.operators` spans two identity namespaces;
+  use the split form `operators: { "bitbucket": ["{uuid}"], "jira":
+  ["<accountId>"] }` — entries are matched per channel by the forge's own
+  stable id (Bitbucket account UUID, Jira account id), never display names.
 - `trust`, `attribution` — below.
 
 ## The two supported work models
@@ -74,11 +88,12 @@ Mirrors the two real workflows:
    the Jira ticket via its REST API; Jira site/project configured in the
    plugin's repo config).
 2. **Epic mode** (`work-epic`) — the irl-llc style: an `<epics.dir>/<slug>.md`
-   file is the spec (folder name per `config.epics.dir`; header
-   `> **Tracking issue:** owner/repo#N` — or `PROJ-123` on Jira-tracked repos;
-   the command creates the tracking ticket and inserts the header if missing).
-   The tracking ticket is the agent↔human design-intent channel. Cache key =
-   tracking ticket key.
+   file is the spec (folder name per `config.epics.dir`). The canonical header
+   is `> **Tracking ticket:** owner/repo#N` (or a Jira key); the legacy
+   spelling `> **Tracking issue:**` is accepted forever so migrated prototype
+   epics need no edits. The command creates the tracking ticket and inserts
+   the header if missing. The tracking ticket is the agent↔human design-intent
+   channel. Cache key = tracking ticket key.
 
 Both modes write the identical `tickets/<key>.json`; status-pipe (the extension)
 renders them identically. Epic-mode cards additionally deep-link the epic file.
@@ -112,7 +127,12 @@ a public repo where anyone's issue comment can steer a code-writing,
 PR-opening agent is an unacceptable failure mode, and even on private team
 repos two operators' agents must not act on each other's tickets. Three
 explicit modes; the plugin **refuses to tick a public repo whose config does
-not declare a trust mode** (safe default — misconfiguration fails closed):
+not declare a trust mode**. Visibility is checked at every tick start via the
+forge API (`gh repo view --json visibility` / Bitbucket `is_private`), so a
+private→public flip takes effect on the next pass; if the visibility check
+itself fails, the repo is treated as public — misconfiguration and API
+failure both fail closed. A *private* repo with no `trust` block defaults to
+`single-maintainer` with the authenticated forge user as sole operator:
 
 | Mode | Inventory | Who can drive |
 |---|---|---|
@@ -120,9 +140,30 @@ not declare a trust mode** (safe default — misconfiguration fails closed):
 | `multi-maintainer` | label **and** `assignee ∈ operators` — unassigned or otherwise-assigned tickets are invisible to this agent, so colleagues' agents never collide | the operator(s) |
 | `public` | label **and** ticket author/assignee ∈ operators — outsiders cannot conscript the agent by opening labeled issues | the operator(s), strictly |
 
-Common rules, enforced by the `protocol` skill in every mode and verified
-against the **forge API's author field** (never against parseable comment
-text, which anyone can spoof):
+### Enforcement is layered, not prompt-only
+
+Prompt instructions alone cannot be the safety boundary — the model reading
+the rules is the same model the untrusted comments could inject. Three layers:
+
+1. **A deterministic comment gateway** (`plugin/bin/fetch-comments`, a plain
+   script): the *only* sanctioned way workers read ticket/PR comments. It
+   fetches via the forge API, verifies each author against the operator
+   allowlist, and emits a structured digest in which operator comments are
+   marked authoritative while non-operator bodies are dropped (default in
+   `public` mode is headers-only: author, time, one-line machine summary) or
+   wrapped in clearly delimited untrusted-data fences. Operator-grade signals
+   ("proceed", approvals) are extracted by the script from operator comments
+   only — the model never decides who is an operator.
+2. **Permission allowlists**: the repo's committed `.claude/settings.json`
+   allows the gateway and the posting wrapper (below) and denies raw
+   `gh issue comment` / direct comment-API calls, so the rules are enforced by
+   the harness, not by model compliance.
+3. **Prompt rules** (the `protocol` skill) cover what scripts cannot: how to
+   treat quarantined content (data, never instructions), when to surface
+   community input to the operator.
+
+Common rules across every mode, all verified against the **forge API's author
+field** (never against parseable comment text, which anyone can spoof):
 
 - **Operators are an explicit allowlist** (`trust.operators`: forge
   usernames; Jira account ids on Jira). GitHub `author_association`
@@ -141,8 +182,21 @@ text, which anyone can spoof):
   in them, follow links into tool actions on their behalf, or incorporate
   their suggestions without an operator decision. Aware, not obedient.
 - **The agent never trusts its own posts as operator signals.** When operator
-  and agent share one forge account, the attribution marker (below) is how
-  agent-authored comments are excluded from "the operator said".
+  and agent share one forge account, self-recognition is **by comment ID, not
+  by text**: every agent post goes through the posting wrapper
+  (`plugin/bin/post-comment` — the same script that prepends the attribution
+  marker), which records the created comment's API id in the ticket file
+  (`agentCommentIds[]`, additive field). The comment gateway excludes those
+  ids from "the operator said". Recognizing own posts by the text prefix was
+  rejected: it violates the never-trust-parseable-text rule, and a single
+  unmarked post would mint operator-grade authority for the next tick. The
+  wrapper/ledger pair is also why raw comment posting is permission-denied
+  (layer 2 above).
+- **Config is read from the local working tree only.** `config.json` and
+  `launch.json` govern trust and execution, so the plugin reads them from the
+  checked-out trunk — never from a PR branch or fetched ref. A PR that edits
+  them is just a diff to review like any other; it has no effect until the
+  operator merges it.
 
 ## Attribution (`config.attribution`)
 
@@ -159,10 +213,10 @@ cosmetic, and enforced by the `protocol` skill on **every forge mutation**:
   epics' workers share a repo; off by default because it isn't an omnipresent
   need.
 
-The marker is doing three jobs at once: social transparency for collaborators;
-the shared-account self-recognition rule above (machine-checkable: prefix
-match on the agent's own author); and a clean signal other tooling can use to
-separate human from agent comment counts later.
+The marker's job is social transparency for collaborators (plus a convenient
+human-vs-agent separator for future tooling). It is deliberately **not** a
+trust input — shared-account self-recognition runs on the comment-ID ledger
+above, so a missing or spoofed marker can embarrass but never escalate.
 
 ## Command behavior
 
@@ -217,14 +271,23 @@ State-writing discipline (enforced by the `protocol` skill):
 
 ### `launch` — recurring wrapper
 
-Invokes the `/loop` skill with the chosen interval (default 10m) running
-`tick`. Same shape as irl-llc's `launch-epic-iterator`. This is the
+Runs `tick` on the chosen interval (default 10m). Implementation does not
+assume any particular loop facility: where the host Claude Code has a loop
+skill it uses that; otherwise it prints the equivalent shell loop
+(`while true; do claude -p "/status-pipe:tick"; sleep 600; done`) ready to
+paste, and points at the extension supervisor as the better answer (which
+works in single-repo mode too). Same shape as irl-llc's
+`launch-epic-iterator`. This is the
 *interactive* way to run the loop (single-repo mode, Claude pane open); in
 fleet mode the extension's supervisor launches `tick` directly as a headless
 tick (`claude -p "/status-pipe:tick" --output-format stream-json`) per
 [09-launch-and-supervision.md](09-launch-and-supervision.md). `tick` is
-deliberately a one-pass, zero-prompt command so both paths share it. The plugin
-README ships a reference `.status-pipe/launch.json` for Claude Code.
+deliberately a one-pass, zero-prompt command so both paths share it. The
+interactive loop honors parking the same way the supervisor does: each
+iteration first checks `orchestrator.json.parked` and the inbox — parked with
+an empty inbox ⇒ report the parked reason and skip the pass (cheap no-op
+instead of a full reconcile). The plugin README ships a reference
+`.status-pipe/launch.json` for Claude Code.
 
 ### `ack-check` — standalone inbox sweep
 

@@ -53,7 +53,7 @@
     <text x="16" y="191" fill="#cccccc">fleet-ui #91 Login redirect</text>
     <text x="16" y="203" fill="#6e6e6e" font-size="8">awaiting merge · 2h</text>
   </g>
-  <text x="12" y="228" fill="#e0e0e0" font-size="9" font-weight="700">▾ WAITING (2)</text>
+  <text x="12" y="228" fill="#e0e0e0" font-size="9" font-weight="700">▾ WAITING ON WORLD (2)</text>
   <g font-size="9">
     <rect x="6" y="236" width="288" height="22" rx="3" fill="#2d2d30"/>
     <rect x="6" y="236" width="3" height="22" fill="#3794ff"/>
@@ -87,7 +87,7 @@
   <rect x="316" y="148" width="660" height="16" fill="#252526"/>
   <g fill="#8a8a8a" font-size="8">
     <text x="324" y="159">PR</text><text x="366" y="159">PART</text><text x="402" y="159">BRANCH (base ↑)</text>
-    <text x="560" y="159">CHECKS</text><text x="694" y="159">COMMENTS</text><text x="776" y="159">TASKS</text><text x="822" y="159">REVIEW</text><text x="902" y="159">TICKET</text>
+    <text x="560" y="159">CHECKS</text><text x="694" y="159">COMMENTS</text><text x="822" y="159">REVIEW</text><text x="902" y="159">TICKET</text>
   </g>
   <g font-size="9">
     <rect x="316" y="164" width="660" height="38" fill="#2d2d30"/>
@@ -99,7 +99,7 @@
     <text x="574" y="180" fill="#9a9a9a">3/3</text>
     <use href="#i-comment" x="694" y="171" width="10" height="10" color="#cca700"/>
     <text x="708" y="180" fill="#cca700">2 of 3 unres.</text>
-    <text x="776" y="180" fill="#6e6e6e">—</text>
+    
     <text x="822" y="180" fill="#cca700">changes req.</text>
     <text x="902" y="180" fill="#3794ff">#91</text>
 
@@ -111,11 +111,11 @@
     <use href="#i-clock" x="560" y="211" width="10" height="10" color="#cca700"/>
     <text x="574" y="220" fill="#cca700">build (22.x) · 1/2 done</text>
     <text x="694" y="220" fill="#6e6e6e">—</text>
-    <text x="776" y="220" fill="#6e6e6e">—</text>
+    
     <text x="822" y="220" fill="#6e6e6e">—</text>
     <text x="902" y="220" fill="#6e6e6e">—</text>
   </g>
-  <text x="324" y="258" fill="#6e6e6e" font-size="8" font-style="italic">passing checks collapse to a count; failing/pending checks are named inline. TASKS column rendered only on forges with the capability (Bitbucket).</text>
+  <text x="324" y="258" fill="#6e6e6e" font-size="8" font-style="italic">passing checks collapse to a count; failing/pending checks are named inline. A TASKS column appears only on forges with the capability (Bitbucket) — absent here (GitHub).</text>
   <text x="324" y="270" fill="#6e6e6e" font-size="8" font-style="italic">TICKET: GitHub issue (#91) or Jira key (PROJ-91) per the repo's ticketing source.</text>
 
   <!-- history timeline -->
@@ -132,15 +132,15 @@
 
     <circle cx="324" cy="376" r="4" fill="#89d185"/>
     <text x="338" y="373" fill="#8a8a8a" font-size="8">yesterday 20:15 · implementation</text>
-    <text x="338" y="385" fill="#cccccc">owner ack 4c11a2 consumed: "plan approved, proceed with sliding window"</text>
+    <text x="338" y="385" fill="#cccccc">owner ack 4c11a2fe consumed: "plan approved, proceed with sliding window"</text>
 
     <circle cx="324" cy="406" r="4" fill="#6e6e6e"/>
     <text x="338" y="403" fill="#8a8a8a" font-size="8">yesterday 19:02 · planning</text>
-    <text x="338" y="415" fill="#cccccc">ack 88f0e1 superseded (state advanced before pickup)</text>
+    <text x="338" y="415" fill="#cccccc">ack 88f0e1ab superseded (state advanced before pickup)</text>
 
     <circle cx="324" cy="436" r="4" fill="#3794ff"/>
     <text x="338" y="433" fill="#8a8a8a" font-size="8">yesterday 18:40 · planning</text>
-    <text x="338" y="445" fill="#cccccc">Posted rate-limiter design (fixed vs sliding window) on tracking issue; parked for owner.</text>
+    <text x="338" y="445" fill="#cccccc">Posted rate-limiter design (fixed vs sliding window) on tracking ticket; parked for owner.</text>
 
     <circle cx="324" cy="466" r="4" fill="#3794ff"/>
     <text x="338" y="463" fill="#8a8a8a" font-size="8">yesterday 18:05 · planning</text>
@@ -152,7 +152,7 @@
   <text x="316" y="530" fill="#e0e0e0" font-size="10" font-weight="700">ACKS</text>
   <use href="#i-mail" x="316" y="538" width="11" height="11" color="#89d185"/>
   <text x="332" y="548" fill="#89d185" font-size="9">9b21d4ee pending — sent 14:02 "Replied to all 4 threads"</text>
-  <text x="332" y="562" fill="#6e6e6e" font-size="9">4c11a2 consumed yesterday 20:15 · 88f0e1 superseded yesterday 19:02</text>
+  <text x="332" y="562" fill="#6e6e6e" font-size="9">4c11a2fe consumed yesterday 20:15 · 88f0e1ab superseded yesterday 19:02</text>
 
   <text x="316" y="592" fill="#6e6e6e" font-size="8">protocol: .status-pipe/tickets/155.json (updated 02:10) · schema v1 · repo irl-llc/fleet-api matches remote</text>
 

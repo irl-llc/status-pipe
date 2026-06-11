@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="780" height="560" viewBox="0 0 780 560" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
   <!-- status-pipe wireframe v2: annotated card anatomy (tray density).
-       Rules: codicon glyphs only · one indicator per fact · non-default status only · detail on hover. -->
+       Rules: codicon glyphs only · one indicator per fact · non-default status only · detail on hover.
+       Illustrative card mixes GitHub and Bitbucket+Jira badges (tasks, PROJ-91) on one card; a real card shows only its own forge's capabilities. -->
   <defs>
     <symbol id="i-eye" viewBox="0 0 16 16"><g fill="none" stroke="currentColor" stroke-width="1.4"><path d="M1.5 8 C4.5 3.8 11.5 3.8 14.5 8 C11.5 12.2 4.5 12.2 1.5 8 Z"/><circle cx="8" cy="8" r="1.8"/></g></symbol>
     <symbol id="i-comment" viewBox="0 0 16 16"><path d="M2.5 3 h11 v8 h-6.5 l-2.5 2.5 v-2.5 h-2 z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
@@ -51,7 +52,7 @@
     <use href="#i-mail" x="186" y="201" width="11" height="11" color="#89d185"/>
     <text x="201" y="210" fill="#89d185" font-size="8">sent 14:02</text>
     <text x="54" y="234" fill="#6e6e6e" font-size="8" font-style="italic">card body click → expands (tray: accordion · editor: right pane)</text>
-    <text x="54" y="250" fill="#6e6e6e" font-size="8" font-style="italic">row/chip hover → secondary actions (withdraw, open state file, …)</text>
+    <text x="54" y="250" fill="#6e6e6e" font-size="8" font-style="italic">row/chip hover → secondary actions (withdraw, open ticket file, …)</text>
   </g>
 
   <!-- ===== callouts ===== -->
@@ -69,7 +70,7 @@
   <g fill="#9a9a9a" font-size="9">
     <text x="436" y="59">health accent (the only health indicator): red blocked/error · amber</text>
     <text x="436" y="70">waiting · blue running · green done — then repo badge (fleet mode only),</text>
-    <text x="436" y="81">issue # → tracking ticket, phase as dim text, relative age</text>
+    <text x="436" y="81">ticket key → tracking ticket, phase as dim text, relative age</text>
     <text x="436" y="99">headline — the agent's own sentence verbatim; 2-line clamp, full on hover</text>
     <text x="436" y="119">waiting line: kind glyph + detail + live duration (amber text, no banner)</text>
     <text x="436" y="137">blockers[] verbatim — red text is the indicator, no icon</text>
@@ -77,7 +78,7 @@
     <text x="436" y="168">PR row: only non-default badges — unresolved comments, unresolved</text>
     <text x="436" y="179">tasks (Bitbucket), draft, CI x/clock, changes-req., ticket link. Green row = bare.</text>
     <text x="436" y="190">downstream: every tracked PR whose base = this head</text>
-    <text x="436" y="210">one text-only primary action per card state · ack chip (mail glyph + time)</text>
+    <text x="436" y="210">primary action + fixed ack-control slot (button → sent chip, mail glyph + time)</text>
   </g>
 
   <!-- ===== hover inset: PR row tooltip ===== -->

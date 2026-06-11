@@ -9,7 +9,7 @@ dedicated role-play agent; kept verbatim-in-substance as the rationale record.
 
 Two workspace roots: `fleet-api` and `fleet-ui`. Six epics:
 
-| ID | Repo | Issue | State at 08:30 |
+| ID | Repo | Ticket | State at 08:30 |
 |----|------|-------|----------------|
 | E1 | fleet-api | #142 "Auth token rotation" | `phase=planning, health=blocked`; agent posted a design question on the tracking issue; `waitingOn={kind:owner, ref:<comment url>, since:07:55}` |
 | E2 | fleet-api | #155 "Rate limiter" | `phase=review`, PR #512 (T1a) + #513 (T1b) stacked; `waitingOn={kind:review, pr:512, since:yesterday 18:40}` |
@@ -22,17 +22,22 @@ Two workspace roots: `fleet-api` and `fleet-ui`. Six epics:
 
 **08:30 — open VS Code.** Activity-bar badge shows **4** (needs-me count;
 running/waiting items deliberately don't badge). Tray lanes:
-NEEDS YOU (4): E6 (crashed — red), E1 (blocked question — red), E2 (review,
+NEEDS YOU (4): E6 (crashed worker — red), E1 (blocked question — red), E2 (review,
 waiting 14h — amber), E5 (merge, 2h — amber). WAITING (2): E3, E4. QUIET (0).
 
-**08:35 — E6, the crashed agent, sorts first.** A dead run silently stalls
+**08:35 — E6, the crashed worker, sorts first.** A dead worker silently stalls
 everything downstream and nothing else recovers it. Expanded view: history
 timeline ends mid-implementation; banner "last heartbeat 47m ago (threshold
 15m)". Ed clicks **Restart worker** → the extension executes the per-repo
 user-configured resume command in the integrated terminal (the extension does
 not manage agent processes itself; orchestration ownership stays with the
-orchestrator). Within a minute the heartbeat refreshes, the watcher fires, E6
-drops to WAITING. The extension wrote nothing.
+orchestrator — *note: superseded by the supervisor design in
+[09-launch-and-supervision.md](09-launch-and-supervision.md); with a launch
+file this action is a supervisor tick-now, and the extension does manage
+orchestrator processes in fleet mode. Kept as written because it drove the
+"process health is a separate layer" split*). Within a minute the heartbeat
+refreshes, the watcher fires, E6 drops to WAITING. The extension wrote
+nothing.
 
 **08:45 — E1, the design question.** Clicking the waiting banner opens
 `waitingOn.ref` — the exact issue comment — in the browser. Ed replies ("option
@@ -41,7 +46,7 @@ look**, types a note. The extension atomically writes
 `.status-pipe/inbox/142/ack-7f3a9c2e.json`. Chip: "✓ sent · awaiting
 pickup"; card → WAITING. At ~09:00 the orchestrator pass consumes the ack
 (target matches current `waitingOn`), resumes the agent, appends `history[]`
-`"owner ack 7f3a9c consumed: answered — option B"`, deletes the file. Chip
+`"owner ack 7f3a9c2e consumed: answered — option B"`, deletes the file. Chip
 flips to "picked up 09:01", then the card is an ordinary running card.
 
 **09:15 — E2, reviewing the stack.** Card shows PR #512 (T1a, `↑ main`,
@@ -70,7 +75,7 @@ since:11:28}`. Toast: "fleet-api #155 — agent needs your input." Ed answers on
 the forge and acks. Conflict case: suppose the 11:58 orchestrator pass had
 already noticed his forge reply at 11:56 and moved on before pickup — the ack's
 `target.waitingSince` (11:28) no longer matches current `waitingOn`, so the
-orchestrator discards it as superseded, appending `"ack 9b21d4 superseded
+orchestrator discards it as superseded, appending `"ack 9b21d4ee superseded
 (state advanced before pickup)"`. UI: gray "your nudge arrived after the agent
 moved on — no action needed." No error, no double-resume.
 
@@ -89,7 +94,7 @@ empty; the badge clears; the tray shows the inbox-zero state: **"All quiet —
 
 ## Edge cases catalogued
 
-- **State file deleted mid-session** → tombstone card "state removed" ~60s,
+- **Ticket file deleted mid-session** → tombstone card "state removed" ~60s,
   then drop; orphaned inbox dirs swept after 7 days. The file is the membership
   criterion — never resurrect from forge data.
 - **Schema version above known** → degraded card (title + headline + "update

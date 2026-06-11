@@ -29,12 +29,19 @@ Enumerates workspace folders; for each, finds git repos containing
 `.status-pipe/` (the folder root plus one level of subdirectories, covering
 both single-repo folders and meta-workspaces). Reads `git config --get
 remote.origin.url` **by parsing `.git/config` directly** — no git exec, keeping
-the no-git-dependency promise. Emits `RepoContext { folder, repoRoot, protocolDir,
-remoteUrl, forgeRepo? }`. Re-runs on workspace-folder changes.
+the no-git-dependency promise. When `.git` is a *file* (worktrees, submodules)
+its `gitdir:` pointer is followed to the real config; `url.*.insteadOf`
+rewrites are explicitly out of scope (raw remote URLs are matched). Emits
+`RepoContext { folder, repoRoot, protocolDir, remoteUrl, forgeRepo? }`. Re-runs
+on workspace-folder changes.
 
 ### `protocolWatcher` / `protocolStore`
-One `vscode.FileSystemWatcher` per protocol dir covering `tickets/*.json`, `orchestrator.json`, and
-`inbox/**/*.json`. Events are
+One `vscode.FileSystemWatcher` per protocol dir on the pattern
+`.status-pipe/**` (the API takes one glob per watcher), filtered in the
+handler to: `tickets/*.json`, `orchestrator.json`, `inbox/**/*.json` — plus
+the two committed files, whose changes re-trigger their own flows
+(`launch.json` → re-approval per content hash, `config.json` → re-resolve
+ticketing/trust display hints). Events are
 coalesced (250ms) because agent passes rewrite several files in a burst.
 `protocolStore` parses with a tolerant reader: JSON parse errors (a file caught
 mid-rename) retry once after 200ms, then surface a "corrupt ticket file" badge
@@ -64,7 +71,9 @@ Strictly separate from the protocol’s agent-owned files — process health is
 supervisor-owned, work-item health is agent-owned.
 
 ### `queueModel` (pure, unit-test target #1)
-`(tickets, acks, enrichment, now) → DisplayState`. Implements the queue
+`(tickets, acks, enrichment, supervisorState, now) → DisplayState`
+(supervisorState feeds the fleet strip and the synthetic launcher-failed
+cards). Implements the queue
 semantics from [05-ui.md](05-ui.md): bucket assignment, priority ordering,
 stack-relationship derivation (base/head matching), stale-heartbeat detection,
 waiting-duration formatting. Pure function of inputs — `now` is a parameter so
@@ -106,7 +115,7 @@ tree:
 <QueueApp mode>
   <RepoSection>            // per repo: name, forge icon, orchestrator-last-ran
     <Bucket title>         // Needs you / In flight / Done
-      <IssueCard>          // accent = health; phase chip; headline; blockers
+      <TicketCard>         // accent = health; phase dim text; headline; blockers
         <WaitingBanner>    // waitingOn kind icon + detail + live duration
         <AckControl>       // button / pending chip / moved-on warning
         <PrRow>            // upstream indicator ↑, PR #, title, badges, ↓ downstream
@@ -131,14 +140,16 @@ for iconography; CSP with nonce exactly as git-spice-code-extension's
 | `statusPipe.staleWorkerMinutesDefault` | 30 | when orchestrator.json absent |
 | `statusPipe.launch.enabled` | true | master switch for the supervisor |
 | `statusPipe.launch.autoStart` | false | auto-start approved agents on workspace open |
-| `statusPipe.launch.pauseWhenIdle` | true | pause tick scheduling after 30 min without window focus |
+| `statusPipe.launch.pauseWhenIdle` | false | pause ticks after 30 min without focus (conflicts with overnight runs; see 09) |
 | `statusPipe.launch.maxRestarts` | 3 | consecutive failures before `failed` |
 | `statusPipe.resumeCommand` | — | fallback restart command when no launch file |
+| `statusPipe.quietRetentionHours` | 24 | how long done items stay visible in QUIET |
+| `statusPipe.notifications.*` | on | per-toast toggles (blocker, crash/stale, completed, orphanedCi) + `doNotDisturb` |
 
 ## Commands
 
 `statusPipe.openInEditor`, `statusPipe.refresh`, `statusPipe.signIn.github`,
-`statusPipe.signIn.bitbucket`, `statusPipe.revealStateFile`,
+`statusPipe.signIn.bitbucket`, `statusPipe.revealTicketFile`,
 `statusPipe.agents.startAll`, `statusPipe.agents.stopAll`,
 `statusPipe.agents.tickNow`, `statusPipe.agents.openLog`.
 

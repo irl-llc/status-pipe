@@ -3,7 +3,7 @@
 ## What this is
 
 status-pipe is a VS Code extension that gives a human operator a **review/response
-queue** over a fleet of autonomous coding agents. Agents (Claude Code epic/issue
+queue** over a fleet of autonomous coding agents. Agents (Claude Code epic/ticket
 loops) publish their state as JSON files in a per-repo protocol directory
 (`.status-pipe/tickets/<key>.json`). status-pipe watches those files across every
 repo in the workspace, enriches them with live forge data (GitHub or Bitbucket),
@@ -31,7 +31,7 @@ migrate to this protocol per the mapping in [10-naming.md](10-naming.md)).
    running > done.
 3. **Close the loop**: a "ready for another look" action per feedback request,
    so the operator can hand work back to the agent without touching a terminal.
-   This is the one schema extension status-pipe introduces (see
+   This is the key protocol addition status-pipe introduces (see
    [02-protocol.md](02-protocol.md#feedback-signal)).
 4. **Forge-portable**: GitHub and Bitbucket Cloud both supported through an
    internal forge abstraction (modeled on git-spice's), selected by remote-URL
