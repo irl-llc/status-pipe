@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="340" height="1000" viewBox="0 0 340 1000" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <!-- status-pipe wireframe: side tray (compact triage index). Scenario = design/08-workflow-simulation.md, 08:30 -->
+  <rect width="340" height="1000" fill="#1e1e1e"/>
+
+  <!-- ===== view header ===== -->
+  <rect x="0" y="0" width="340" height="30" fill="#252526"/>
+  <text x="12" y="19" fill="#bbbbbb" font-size="11" font-weight="700" letter-spacing="1">STATUS PIPE</text>
+  <circle cx="118" cy="15" r="9" fill="#cc3344"/>
+  <text x="118" y="18" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">4</text>
+  <text x="284" y="19" fill="#8a8a8a" font-size="12">⟳</text>
+  <text x="304" y="19" fill="#8a8a8a" font-size="12">⛭</text>
+  <text x="322" y="19" fill="#8a8a8a" font-size="12">⋯</text>
+
+  <!-- filter box -->
+  <rect x="10" y="38" width="320" height="22" rx="3" fill="#3c3c3c"/>
+  <text x="18" y="53" fill="#6e6e6e" font-size="10">filter issues, repos, branches…</text>
+
+  <!-- staleness chip (shown only when forge enrichment degraded) -->
+  <rect x="10" y="66" width="320" height="18" rx="9" fill="#3a3320"/>
+  <text x="170" y="78" fill="#cca700" font-size="9" text-anchor="middle">⚠ forge data 12m old (rate limited) — retrying 16:02</text>
+
+  <!-- ===== lane: NEEDS YOU ===== -->
+  <text x="12" y="104" fill="#e0e0e0" font-size="10" font-weight="700" letter-spacing="0.5">▾ NEEDS YOU (4)</text>
+
+  <!-- card E6: crashed run (priority 1) -->
+  <g>
+    <rect x="10" y="112" width="320" height="104" rx="4" fill="#2d2d30" stroke="#3c3c3c"/>
+    <rect x="10" y="112" width="3" height="104" rx="1.5" fill="#f48771"/>
+    <rect x="20" y="120" width="44" height="14" rx="7" fill="#4b2a52"/>
+    <text x="42" y="130" fill="#d8b4e2" font-size="8" text-anchor="middle">fleet-ui</text>
+    <text x="70" y="131" fill="#3794ff" font-size="10" font-weight="600">#95</text>
+    <text x="94" y="131" fill="#cccccc" font-size="10" font-weight="600">i18n extraction</text>
+    <rect x="212" y="120" width="78" height="14" rx="7" fill="#3c3c3c"/>
+    <text x="251" y="130" fill="#aaaaaa" font-size="8" text-anchor="middle">implementation</text>
+    <text x="324" y="130" fill="#6e6e6e" font-size="8" text-anchor="end">47m</text>
+    <text x="22" y="148" fill="#9a9a9a" font-size="9">Extracting locale strings from fleet-ui components; 61 of</text>
+    <text x="22" y="160" fill="#9a9a9a" font-size="9">214 files migrated to message catalog.</text>
+    <rect x="20" y="168" width="300" height="18" rx="3" fill="#4a2424"/>
+    <text x="26" y="180" fill="#f48771" font-size="9">⚠ run stale — last heartbeat 47m ago (threshold 15m)</text>
+    <rect x="20" y="192" width="84" height="17" rx="3" fill="#0e639c"/>
+    <text x="62" y="204" fill="#ffffff" font-size="9" text-anchor="middle">↻ Restart run</text>
+  </g>
+
+  <!-- card E1: blocked / owner question (priority 3-4) -->
+  <g>
+    <rect x="10" y="222" width="320" height="124" rx="4" fill="#2d2d30" stroke="#3c3c3c"/>
+    <rect x="10" y="222" width="3" height="124" rx="1.5" fill="#f48771"/>
+    <rect x="20" y="230" width="48" height="14" rx="7" fill="#1f3a5f"/>
+    <text x="44" y="240" fill="#9cc3ee" font-size="8" text-anchor="middle">fleet-api</text>
+    <text x="74" y="241" fill="#3794ff" font-size="10" font-weight="600">#142</text>
+    <text x="104" y="241" fill="#cccccc" font-size="10" font-weight="600">Auth token rotation</text>
+    <rect x="232" y="230" width="56" height="14" rx="7" fill="#3c3c3c"/>
+    <text x="260" y="240" fill="#aaaaaa" font-size="8" text-anchor="middle">planning</text>
+    <text x="324" y="240" fill="#6e6e6e" font-size="8" text-anchor="end">35m</text>
+    <text x="22" y="258" fill="#9a9a9a" font-size="9">Posted design question: rotation via refresh-token chain (A)</text>
+    <text x="22" y="270" fill="#9a9a9a" font-size="9">or sliding window (B); parked pending owner decision.</text>
+    <!-- waiting banner -->
+    <rect x="20" y="278" width="300" height="18" rx="3" fill="#3a3320"/>
+    <text x="26" y="290" fill="#cca700" font-size="9">❓ owner · design question on tracking issue · waiting 35m</text>
+    <!-- blockers -->
+    <text x="22" y="310" fill="#f48771" font-size="9">⛔ Needs decision: token rotation strategy A vs B</text>
+    <rect x="20" y="320" width="92" height="17" rx="3" fill="#0e639c"/>
+    <text x="66" y="332" fill="#ffffff" font-size="9" text-anchor="middle">Open question ↗</text>
+    <rect x="118" y="320" width="128" height="17" rx="3" fill="#3c3c3c"/>
+    <text x="182" y="332" fill="#cccccc" font-size="9" text-anchor="middle">✋ Ready for another look</text>
+  </g>
+
+  <!-- card E2: review requested, stacked PRs (priority 5) -->
+  <g>
+    <rect x="10" y="352" width="320" height="172" rx="4" fill="#2d2d30" stroke="#3c3c3c"/>
+    <rect x="10" y="352" width="3" height="172" rx="1.5" fill="#cca700"/>
+    <rect x="20" y="360" width="48" height="14" rx="7" fill="#1f3a5f"/>
+    <text x="44" y="370" fill="#9cc3ee" font-size="8" text-anchor="middle">fleet-api</text>
+    <text x="74" y="371" fill="#3794ff" font-size="10" font-weight="600">#155</text>
+    <text x="104" y="371" fill="#cccccc" font-size="10" font-weight="600">Rate limiter</text>
+    <rect x="240" y="360" width="48" height="14" rx="7" fill="#3c3c3c"/>
+    <text x="264" y="370" fill="#aaaaaa" font-size="8" text-anchor="middle">review</text>
+    <text x="324" y="370" fill="#6e6e6e" font-size="8" text-anchor="end">14h</text>
+    <text x="22" y="388" fill="#9a9a9a" font-size="9">T1a+T1b implemented and green; stack ready for first review</text>
+    <text x="22" y="400" fill="#9a9a9a" font-size="9">pass starting at #512.</text>
+    <rect x="20" y="408" width="300" height="18" rx="3" fill="#3a3320"/>
+    <text x="26" y="420" fill="#cca700" font-size="9">👀 review · PR #512 awaits your review · waiting 14h</text>
+    <!-- PR row 1 with stack indicators -->
+    <text x="30" y="438" fill="#6e6e6e" font-size="8">↑ main</text>
+    <rect x="20" y="442" width="300" height="20" rx="3" fill="#252526"/>
+    <text x="26" y="456" fill="#3794ff" font-size="9" font-weight="600">#512</text>
+    <rect x="52" y="446" width="24" height="12" rx="6" fill="#1f3a5f"/>
+    <text x="64" y="455" fill="#9cc3ee" font-size="7" text-anchor="middle">T1a</text>
+    <text x="82" y="455" fill="#8a8a8a" font-size="8">rate-limit-core</text>
+    <text x="206" y="456" fill="#89d185" font-size="9">✓ CI</text>
+    <text x="232" y="456" fill="#aaaaaa" font-size="8">💬 5 · 2/3</text>
+    <text x="288" y="456" fill="#3794ff" font-size="8">→ #91</text>
+    <text x="30" y="474" fill="#6e6e6e" font-size="8">↓ T1b #513</text>
+    <!-- PR row 2 -->
+    <text x="30" y="488" fill="#6e6e6e" font-size="8">↑ T1a #512</text>
+    <rect x="20" y="492" width="300" height="20" rx="3" fill="#252526"/>
+    <text x="26" y="506" fill="#3794ff" font-size="9" font-weight="600">#513</text>
+    <rect x="52" y="496" width="24" height="12" rx="6" fill="#1f3a5f"/>
+    <text x="64" y="505" fill="#9cc3ee" font-size="7" text-anchor="middle">T1b</text>
+    <rect x="80" y="496" width="30" height="12" rx="6" fill="#3c3c3c"/>
+    <text x="95" y="505" fill="#8a8a8a" font-size="7" text-anchor="middle">draft</text>
+    <text x="114" y="506" fill="#8a8a8a" font-size="8">rate-limit-redis</text>
+    <text x="226" y="506" fill="#cca700" font-size="9">● CI</text>
+    <text x="252" y="506" fill="#aaaaaa" font-size="8">💬 0</text>
+    <!-- no downstream -->
+  </g>
+
+  <!-- card E5: awaiting merge (priority 6) -->
+  <g>
+    <rect x="10" y="530" width="320" height="96" rx="4" fill="#2d2d30" stroke="#3c3c3c"/>
+    <rect x="10" y="530" width="3" height="96" rx="1.5" fill="#cca700"/>
+    <rect x="20" y="538" width="44" height="14" rx="7" fill="#4b2a52"/>
+    <text x="42" y="548" fill="#d8b4e2" font-size="8" text-anchor="middle">fleet-ui</text>
+    <text x="70" y="549" fill="#3794ff" font-size="10" font-weight="600">#91</text>
+    <text x="94" y="549" fill="#cccccc" font-size="10" font-weight="600">Login redirect</text>
+    <rect x="216" y="538" width="78" height="14" rx="7" fill="#3c3c3c"/>
+    <text x="255" y="548" fill="#aaaaaa" font-size="8" text-anchor="middle">awaiting-merge</text>
+    <text x="324" y="548" fill="#6e6e6e" font-size="8" text-anchor="end">2h</text>
+    <rect x="20" y="556" width="300" height="18" rx="3" fill="#3a3320"/>
+    <text x="26" y="568" fill="#cca700" font-size="9">🔀 merge · #198 approved + green, branch protection · 2h</text>
+    <text x="30" y="586" fill="#6e6e6e" font-size="8">↑ main</text>
+    <rect x="20" y="590" width="300" height="20" rx="3" fill="#252526"/>
+    <text x="26" y="604" fill="#3794ff" font-size="9" font-weight="600">#198</text>
+    <text x="54" y="604" fill="#8a8a8a" font-size="8">login-redirect-fix</text>
+    <text x="196" y="604" fill="#89d185" font-size="9">✓ CI</text>
+    <text x="224" y="604" fill="#89d185" font-size="8">✓ approved</text>
+    <text x="290" y="604" fill="#aaaaaa" font-size="8">💬 2</text>
+  </g>
+
+  <!-- ===== lane: WAITING ===== -->
+  <text x="12" y="650" fill="#e0e0e0" font-size="10" font-weight="700" letter-spacing="0.5">▾ WAITING ON WORLD (2)</text>
+
+  <!-- card E3: agent running -->
+  <g>
+    <rect x="10" y="658" width="320" height="74" rx="4" fill="#2d2d30" stroke="#3c3c3c"/>
+    <rect x="10" y="658" width="3" height="74" rx="1.5" fill="#3794ff"/>
+    <rect x="20" y="666" width="48" height="14" rx="7" fill="#1f3a5f"/>
+    <text x="44" y="676" fill="#9cc3ee" font-size="8" text-anchor="middle">fleet-api</text>
+    <text x="74" y="677" fill="#3794ff" font-size="10" font-weight="600">#161</text>
+    <text x="104" y="677" fill="#cccccc" font-size="10" font-weight="600">Audit log export</text>
+    <rect x="212" y="666" width="78" height="14" rx="7" fill="#3c3c3c"/>
+    <text x="251" y="676" fill="#aaaaaa" font-size="8" text-anchor="middle">implementation</text>
+    <text x="324" y="676" fill="#6e6e6e" font-size="8" text-anchor="end">40s</text>
+    <text x="22" y="694" fill="#9a9a9a" font-size="9">Writing exporter batch tests; 14 of 18 cases passing locally.</text>
+    <text x="22" y="712" fill="#3794ff" font-size="9">⟳ agent running · heartbeat 40s ago</text>
+    <text x="200" y="712" fill="#cca700" font-size="9">● CI pending</text>
+  </g>
+
+  <!-- card E4: agent fixing failing CI -->
+  <g>
+    <rect x="10" y="738" width="320" height="74" rx="4" fill="#2d2d30" stroke="#3c3c3c"/>
+    <rect x="10" y="738" width="3" height="74" rx="1.5" fill="#3794ff"/>
+    <rect x="20" y="746" width="44" height="14" rx="7" fill="#4b2a52"/>
+    <text x="42" y="756" fill="#d8b4e2" font-size="8" text-anchor="middle">fleet-ui</text>
+    <text x="70" y="757" fill="#3794ff" font-size="10" font-weight="600">#88</text>
+    <text x="94" y="757" fill="#cccccc" font-size="10" font-weight="600">Theme tokens</text>
+    <rect x="240" y="746" width="44" height="14" rx="7" fill="#3c3c3c"/>
+    <text x="262" y="756" fill="#aaaaaa" font-size="8" text-anchor="middle">fixing</text>
+    <text x="324" y="756" fill="#6e6e6e" font-size="8" text-anchor="end">6m</text>
+    <text x="22" y="774" fill="#9a9a9a" font-size="9">Snapshot diffs on #203 traced to stale token map; re-render</text>
+    <text x="22" y="786" fill="#9a9a9a" font-size="9">in progress.</text>
+    <text x="22" y="804" fill="#f48771" font-size="9">✗ CI failing on #203</text>
+    <text x="140" y="804" fill="#3794ff" font-size="9">⟳ agent fixing · heartbeat 1m ago</text>
+  </g>
+
+  <!-- ===== lane: QUIET (collapsed) ===== -->
+  <text x="12" y="838" fill="#8a8a8a" font-size="10" font-weight="700" letter-spacing="0.5">▸ QUIET (1)</text>
+
+  <!-- ===== empty-state variant, shown for reference ===== -->
+  <rect x="10" y="856" width="320" height="64" rx="4" fill="#252526" stroke="#3c3c3c" stroke-dasharray="4 3"/>
+  <text x="170" y="882" fill="#6e6e6e" font-size="9" text-anchor="middle" font-style="italic">[empty NEEDS YOU state renders instead as:]</text>
+  <text x="170" y="902" fill="#89d185" font-size="11" text-anchor="middle" font-weight="600">All quiet — 3 agents running, 2 done today.</text>
+
+  <!-- inactive roots footer -->
+  <rect x="0" y="936" width="340" height="1" fill="#3c3c3c"/>
+  <text x="12" y="956" fill="#6e6e6e" font-size="9">▸ inactive folders (no .autopilot): scratch-notes, dotfiles</text>
+  <text x="12" y="980" fill="#6e6e6e" font-size="8">orchestrator last ran: fleet-api 12m ago · fleet-ui 9m ago</text>
+</svg>

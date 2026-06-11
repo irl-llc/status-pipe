@@ -1,0 +1,10 @@
+node_modules/
+dist/
+out/
+*.vsix
+.vscode-test/
+test-results/
+playwright-report/
+.DS_Store
+.autopilot/run/
+.autopilot/inbox/

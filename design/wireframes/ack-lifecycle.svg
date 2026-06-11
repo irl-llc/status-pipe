@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="480" viewBox="0 0 920 480" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <!-- status-pipe wireframe: ack ("ready for another look") lifecycle -->
+  <rect width="920" height="480" fill="#1e1e1e"/>
+  <text x="20" y="30" fill="#e0e0e0" font-size="13" font-weight="700">Ack lifecycle — .autopilot/inbox/issue-&lt;N&gt;/ack-&lt;id&gt;.json</text>
+  <text x="20" y="48" fill="#8a8a8a" font-size="9">extension creates (atomic temp+rename, idempotent id = sha256(issue+waitingKind+waitingSince)[0:8]) · agent loop consumes (history[] entry, then unlink)</text>
+
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8a8a8a"/>
+    </marker>
+  </defs>
+
+  <!-- state: actionable -->
+  <rect x="40" y="90" width="190" height="74" rx="6" fill="#2d2d30" stroke="#3c3c3c"/>
+  <text x="135" y="110" fill="#e0e0e0" font-size="10" font-weight="700" text-anchor="middle">ACTIONABLE</text>
+  <text x="135" y="126" fill="#8a8a8a" font-size="8" text-anchor="middle">waitingOn ∈ {owner,review,comment,merge}</text>
+  <text x="135" y="138" fill="#8a8a8a" font-size="8" text-anchor="middle">or blockers[] · no ack file</text>
+  <rect x="68" y="144" width="134" height="14" rx="3" fill="#3c3c3c"/>
+  <text x="135" y="154" fill="#cccccc" font-size="8" text-anchor="middle">✋ Ready for another look</text>
+
+  <!-- state: pending -->
+  <rect x="330" y="90" width="190" height="74" rx="6" fill="#2d2d30" stroke="#0e639c"/>
+  <text x="425" y="110" fill="#e0e0e0" font-size="10" font-weight="700" text-anchor="middle">PENDING</text>
+  <text x="425" y="126" fill="#8a8a8a" font-size="8" text-anchor="middle">file exists · no matching ackId in history[]</text>
+  <text x="425" y="138" fill="#8a8a8a" font-size="8" text-anchor="middle">card moves NEEDS YOU → WAITING</text>
+  <rect x="360" y="144" width="130" height="14" rx="7" fill="#1f3a2a"/>
+  <text x="425" y="154" fill="#89d185" font-size="8" text-anchor="middle">✓ sent 14:02 · awaiting pickup</text>
+
+  <!-- state: picked up -->
+  <rect x="640" y="60" width="200" height="64" rx="6" fill="#2d2d30" stroke="#89d185"/>
+  <text x="740" y="80" fill="#89d185" font-size="10" font-weight="700" text-anchor="middle">PICKED UP</text>
+  <text x="740" y="96" fill="#8a8a8a" font-size="8" text-anchor="middle">file gone · history[] has "ack &lt;id&gt; consumed"</text>
+  <text x="740" y="108" fill="#8a8a8a" font-size="8" text-anchor="middle">chip "picked up 14:31", fades; agent resumes</text>
+
+  <!-- state: superseded -->
+  <rect x="640" y="150" width="200" height="64" rx="6" fill="#2d2d30" stroke="#6e6e6e"/>
+  <text x="740" y="170" fill="#aaaaaa" font-size="10" font-weight="700" text-anchor="middle">SUPERSEDED</text>
+  <text x="740" y="186" fill="#8a8a8a" font-size="8" text-anchor="middle">file gone · history[] has "ack &lt;id&gt; superseded"</text>
+  <text x="740" y="198" fill="#8a8a8a" font-size="8" text-anchor="middle">gray note: "agent had already moved on"</text>
+
+  <!-- state: stale -->
+  <rect x="330" y="240" width="190" height="74" rx="6" fill="#2d2d30" stroke="#f48771"/>
+  <text x="425" y="260" fill="#f48771" font-size="10" font-weight="700" text-anchor="middle">STALE</text>
+  <text x="425" y="276" fill="#8a8a8a" font-size="8" text-anchor="middle">file still exists after 2 × staleRunMinutes</text>
+  <text x="425" y="288" fill="#8a8a8a" font-size="8" text-anchor="middle">orchestrator itself is the problem</text>
+  <text x="425" y="304" fill="#f48771" font-size="8" text-anchor="middle">card re-enters NEEDS YOU (priority 2) + badge</text>
+
+  <!-- transitions -->
+  <g stroke="#8a8a8a" fill="none" marker-end="url(#arrow)">
+    <line x1="230" y1="127" x2="326" y2="127"/>
+    <line x1="520" y1="110" x2="636" y2="92"/>
+    <line x1="520" y1="144" x2="636" y2="176"/>
+    <line x1="425" y1="164" x2="425" y2="236"/>
+    <path d="M 330 290 C 120 290 100 220 132 168"/>
+    <path d="M 425 314 L 425 340 C 425 366 480 370 636 370"/>
+  </g>
+  <g fill="#9a9a9a" font-size="8">
+    <text x="238" y="112">user clicks (re-click = no-op,</text>
+    <text x="238" y="122">same id already on disk)</text>
+    <text x="528" y="84">pass start: target matches</text>
+    <text x="528" y="94">current waitingOn → consume</text>
+    <text x="524" y="170">target mismatch:</text>
+    <text x="524" y="180">agent already advanced</text>
+    <text x="432" y="206">no pass within 2× staleRunMinutes</text>
+    <text x="120" y="212">user withdraws (unlink)</text>
+    <text x="434" y="346">user restarts orchestrator (Restart run)</text>
+  </g>
+
+  <!-- consumed box -->
+  <rect x="640" y="340" width="200" height="60" rx="6" fill="#252526" stroke="#3c3c3c" stroke-dasharray="4 3"/>
+  <text x="740" y="362" fill="#8a8a8a" font-size="9" text-anchor="middle">next fanout pass consumes</text>
+  <text x="740" y="376" fill="#8a8a8a" font-size="9" text-anchor="middle">normally → PICKED UP</text>
+
+  <!-- contract note -->
+  <rect x="40" y="424" width="800" height="38" rx="4" fill="#252526" stroke="#3c3c3c"/>
+  <text x="52" y="440" fill="#9a9a9a" font-size="9">Agent-side contract (the only change asked of agent loops): at pass start, scan inbox → match target against current waitingOn →</text>
+  <text x="52" y="453" fill="#9a9a9a" font-size="9">record "consumed"/"superseded" with the ackId in history[] → delete the file. Evidence lives in history[]; the file is just the wire.</text>
+</svg>
