@@ -17,27 +17,46 @@ Primary targets — all pure or dependency-injected:
   [05-ui.md](05-ui.md) (crashed-worker beats blocked beats owner-question…),
   stack derivation from `head`/`base` matching, stale-heartbeat math with a
   injected `now`, clock-skew clamping, deterministic tie-breaks.
-- **State parsing**: tolerant reader against fixture files — valid v1 files
-  (real examples captured from irl-llc), corrupt JSON, unknown schemaVersion,
-  missing optional fields.
+- **State parsing**: tolerant reader against inline fixtures — fully
+  populated and minimal valid v1 files, corrupt JSON, unknown schemaVersion,
+  unknown ack kinds, missing optional fields.
+- **Schema contract**: every fixture the tests feed in, and everything the
+  extension writes (buildAck), validates against `schemas/` via ajv — and
+  the degraded unknown-schemaVersion fixture must FAIL. One contract, two
+  consumers (extension + plugin), enforced in CI.
 - **Ack writer**: idempotent `ackId` derivation, atomic write behavior (temp
   file then rename), withdraw semantics.
-- **Forge mapping layers**: recorded GitHub GraphQL and Bitbucket REST response
-  fixtures → `PullRequestInfo`/`ChecksInfo`/`CommentCounts`, including the
-  capability differences (tasks present/absent, `prLevelResolvable` captioning,
+- **Forge mapping layers**: GitHub GraphQL and Bitbucket REST fixtures
+  rendered by the fake forge's own renderers (round-trip through the real
+  mapping code) plus hand-written edge nodes →
+  `PullRequestInfo`/`ChecksInfo`/`CommentCounts`, including the capability
+  differences (tasks present/absent, `prLevelResolvable` captioning,
   Bitbucket status aggregation rules).
+- **Forge HTTP layer**: the real `GithubForge`/`BitbucketForge` over real
+  HTTP against the in-process fake forge — the GitHub one-batched-request
+  invariant, Bitbucket If-None-Match/304 ETag caching, `next`-link
+  pagination, 404-as-deleted, and the 4-way RequestPool high-water mark.
 - **Enrichment cache policy**: terminal-state freeze, change-driven fetch
   narrowing, rate-budget interval stretching and backoff math (injected clock
   and fake transport recording request counts — assertions are "N requests for
   this scenario", the rate-limit budget being a tested invariant).
-- **Agent supervisor**: tick/daemon state machine against a fake launch target
-  (a small script that exits 0 / exits 1 / hangs / streams NDJSON) — schedule,
-  timeout-kill, backoff, failed escalation, trust-hash gating logic.
-- **Worktree recursion guard**: discovery against fixture repos containing
-  linked worktrees (`.git` pointer files, `.claude/worktrees/<slug>` layouts) —
-  worktrees classified, never supervised, protocol dir resolved to the
-  primary; a worktree opened as the sole workspace folder renders the
-  primary's queue monitor-only.
+- **Agent supervisor**: tick/daemon state machine against an in-memory
+  FakeSpawner (exit 0 / exit 1 / hang / spawn failure / double-fired and
+  stale exit events) — schedule, timeout-kill, backoff, failed escalation,
+  daemon parking, pendingWake semantics, trust-hash gating logic.
+- **Worktree recursion guard**: discovery against real-filesystem fixtures
+  containing linked worktrees (`.git` gitdir-pointer files) — worktrees
+  classified, never supervised, protocol dir resolved to the primary; a
+  worktree opened as the sole workspace folder renders the primary's queue
+  monitor-only. (Worktrees nested under hidden dirs like
+  `.claude/worktrees/` are never scanned at all — invisible is stricter
+  than classified.)
+- **Plugin bin scripts** (the trust gateway + posting wrapper): the real
+  scripts spawned against real temp git repos with linked worktrees and a
+  fake `gh` on PATH — operator marking, untrusted fencing, public-mode
+  withholding, fail-closed refusals, agent self-comment exclusion,
+  attribution, the agentCommentIds ledger, and the worktree
+  config-anchoring attacks.
 - **Webview components**: jsdom + @testing-library/react for card states (ack
   chip state machine, badge rendering, lane headers) — the
   git-spice-code-extension `reactTestHelper` pattern.
@@ -45,17 +64,23 @@ Primary targets — all pure or dependency-injected:
 ### 2. E2E suite (mocha via @vscode/test-cli, `src/test/e2e/suite/`)
 
 Extension activates in a real VS Code against a temp workspace; commands are
-registered; protocol-dir discovery finds fixture repos; file watcher delivers
-updates; ack command produces a correct file on disk.
+registered; protocol-dir discovery and the reveal command resolve fixture
+repos. The stronger end-to-end assertions — rendered queue state from
+ticket files on disk, and the ack file written with the protocol-correct
+id — live in the Playwright layer below, which drives the actual webview.
 
 ### 3. Playwright snapshot tests (`src/test/e2e/playwright/`)
 
 Real VS Code launched via @vscode/test-electron, attached over CDP, webview
 located through the nested-iframe fixture (port of `webview.ts` from
 git-spice-code-extension). Fixture repos are generated temp dirs seeded with
-`.status-pipe/tickets/*.json` files covering: the six-epic simulation scenario, every
-lane, every badge type, stack indicators, degraded/unknown-schema cards, the
-empty "all quiet" state. Forge enrichment served by the in-process **fake
+`.status-pipe/tickets/*.json` files covering: a six-ticket single-repo
+adaptation of the design/08 simulation, every lane and priority rule, stack
+indicators, degraded/unknown-schema cards, the empty "all quiet" state, and
+the enriched badges most load-bearing for triage (failing/pending CI,
+comment counts, changes-requested). The remaining badge variants (approved,
+tasks, capped counts, deleted-on-forge) are covered by the jsdom component
+suite rather than snapshots. Forge enrichment served by the in-process **fake
 forge** (shamhub pattern) speaking canned GitHub-GraphQL and Bitbucket-REST so
 snapshots include enriched badges deterministically.
 
@@ -64,7 +89,9 @@ Snapshot discipline (proven in git-spice-code-extension):
 - CI Linux/amd64 render is the baseline oracle; local arm64 is not byte-identical
 - Docker compose harness (`docker-compose.test.yml`, Playwright Jammy image,
   xvfb) for local verify/regen: `npm run test:e2e:playwright:docker[:update]`
-- PNG baselines in git-lfs
+- PNG baselines as plain git binaries (~600 KB total; LFS was tried and
+  removed 2026-06-11 — pointer files made the screenshots unreviewable in
+  diffs and the README gallery)
 - `workers: 1`, animations disabled, fonts awaited, `maxDiffPixelRatio: 0.005`
 - CI `workflow_dispatch` input `update_snapshots`: regenerates baselines in CI
   and uploads them as artifacts for download-and-commit

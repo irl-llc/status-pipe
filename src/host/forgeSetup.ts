@@ -61,7 +61,8 @@ export async function connectRepo(
 	if (!token) return null;
 	// A Bitbucket username/email switches authHeader to Basic (app
 	// passwords / Atlassian API tokens); without it the token rides Bearer.
-	const username = resolved.forge.id === 'bitbucket' ? cfg.get<string>('forge.bitbucket.username') || undefined : undefined;
+	const username =
+		resolved.forge.id === 'bitbucket' ? cfg.get<string>('forge.bitbucket.username') || undefined : undefined;
 	const repository = resolved.forge.openRepository(resolved.id, { token, username });
 	return { forge: resolved.forge, id: resolved.id, repository };
 }

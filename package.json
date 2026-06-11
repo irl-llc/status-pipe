@@ -45,7 +45,7 @@
 				"statusPipe.protocolDir": {
 					"type": "string",
 					"default": ".status-pipe",
-					"description": "Name of the protocol state directory at each repo root."
+					"description": "Name of the protocol state directory at each repo root. Automatic activation watches for the default name only; with a custom name, activate the extension by opening the Status Pipe view once."
 				},
 				"statusPipe.staleWorkerMinutesDefault": {
 					"type": "number",

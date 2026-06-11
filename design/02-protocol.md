@@ -26,7 +26,7 @@ migrating those repos is in [10-naming.md](10-naming.md).
     │   └── PROJ-123.json
     └── inbox/                   # gitignored: operator → orchestrator signals
         └── 853/
-            └── ack-7f3a9c2e.json
+            └── ack-bcd313df.json
 ```
 
 ```gitignore
@@ -167,7 +167,7 @@ ticket's `history[]`. Rationale:
   "schemaVersion": 1,
   "kind": "ready-for-look",
   "ticket": "142",
-  "ackId": "7f3a9c2e",
+  "ackId": "bcd313df",
   "target": {
     "waitingKind": "owner",
     "waitingSince": "2026-06-11T07:55:22Z",
@@ -182,7 +182,7 @@ ticket's `history[]`. Rationale:
 ```
 
 - `ackId` = first 8 hex chars of `sha256(ticket + waitingKind + waitingSince)`.
-  Always 8 chars, everywhere — history notes name it verbatim (`"ack 7f3a9c2e
+  Always 8 chars, everywhere — history notes name it verbatim (`"ack bcd313df
   consumed"`) and the chip state machine matches the exact 8-char id, so
   truncation is a protocol violation, not a style choice. **Naturally
   idempotent**: re-clicking the button for the same outstanding request
@@ -208,10 +208,10 @@ ticket's `history[]`. Rationale:
 2. **Orchestrator consumes** at tick start: scan `inbox/*/`. If the ack's
    `target` matches the current `waitingOn` → treat as fresh operator input
    (highest-priority context), append `history[]` `{at, phase, note: "owner
-   ack 7f3a9c2e consumed: <note>", runId}`, then delete the file.
+   ack bcd313df consumed: <note>", runId}`, then delete the file.
 3. **Supersession**: target doesn't match current `waitingOn` (the
    orchestrator already saw the operator's forge activity and advanced) →
-   delete the file, append `"ack 7f3a9c2e superseded (state advanced before
+   delete the file, append `"ack bcd313df superseded (state advanced before
    pickup)"`. No error, no double-resume.
 4. **UI state machine** (chip on the card):
    - *pending* — file exists, no matching `ackId` in `history[]`
@@ -225,6 +225,11 @@ ticket's `history[]`. Rationale:
      unconfirmed" note, never as an error; it resolves on the next history
      update or the operator re-acks (same idempotent id if the request is
      unchanged).
+   - *moved on* — the file still exists but the ticket's outstanding
+     request no longer matches the ack's `target` (a new `waitingOn`
+     arrived before the orchestrator consumed the old ack). Rendered as a
+     gray leftover with withdraw offered; the orchestrator will supersede
+     it on its next pass.
    - *stale* — the file still exists although **an orchestrator pass completed
      after the ack was created** (a tick ran and didn't consume it), or — when
      no pass has run at all — after 2 × the expected tick interval
@@ -240,7 +245,8 @@ ticket's `history[]`. Rationale:
    the chip shows "picked up before withdrawal" instead of pretending the
    withdrawal won.
 6. Orphaned inbox directories (ticket file deleted) older than 7 days are
-   swept by the extension.
+   swept by the extension; an *empty* orphaned directory holds no signal and
+   is swept immediately regardless of age.
 
 ### Contract required of orchestrators
 

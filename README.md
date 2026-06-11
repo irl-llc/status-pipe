@@ -91,8 +91,8 @@ code --install-extension status-pipe-*.vsix
 ```
 
 (Or in VS Code: Extensions view → `…` menu → **Install from VSIX…** and pick
-the file.) The packaged extension activates when any workspace folder
-contains a `.status-pipe/` directory. To use the companion Claude Code
+the file.) The packaged extension activates when a `.status-pipe/` directory
+exists anywhere under a workspace folder. To use the companion Claude Code
 plugin from source, see [plugin/README.md](plugin/README.md).
 
 ## Development

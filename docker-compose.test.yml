@@ -3,7 +3,7 @@
 # test sessions run headless in this container — never on the host
 # desktop, where the spawned Electron windows steal focus and mess up
 # desktop state. The same container runs on macOS dev and ubuntu-latest
-# CI so the PNG snapshots checked into LFS are byte-identical.
+# CI so the PNG snapshot baselines checked into git are byte-identical.
 #
 # Usage (locally):
 #   npm run test:e2e:docker                     # @vscode/test-cli suite, headless

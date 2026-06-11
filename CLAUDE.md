@@ -27,7 +27,8 @@
 ## Conventions
 
 - eslint runs with `--max-warnings=0`: functions ≤20 lines, complexity ≤10,
-  max-depth 2, max-params 4 (test files exempt from the size rules only).
+  max-depth 2, max-params 4 (test files and .tsx components are exempt
+  from the size rules only).
 - Prettier: tabs, single quotes, width 120. Run `npm run lint` and
   `npm run format:check` before committing.
 - Every user-facing change needs a changie fragment in

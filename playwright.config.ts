@@ -9,8 +9,8 @@ import { defineConfig } from '@playwright/test';
  * (mcr.microsoft.com/playwright:v1.60.0-jammy) on both CI and local
  * dev — see docker-compose.test.yml and `npm run
  * test:e2e:playwright:docker`. Running snapshot tests natively on
- * macOS will produce a one-time diff that doesn't match the LFS
- * baseline; that's expected. Use the Docker entrypoint to update
+ * macOS will produce a one-time diff that doesn't match the
+ * checked-in Linux baseline; that's expected. Use the Docker entrypoint to update
  * snapshots.
  */
 export default defineConfig({

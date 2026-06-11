@@ -21,8 +21,8 @@ spawned VS Code window steals focus and disturbs your desktop session.
 
 Visual snapshots are rendered inside a Linux Docker container
 (`mcr.microsoft.com/playwright:v1.60.0-jammy`) so the PNG baselines —
-git-lfs-tracked under `src/test/e2e/playwright/*-snapshots/` — are
-byte-identical between local runs and CI:
+plain git binaries under `src/test/e2e/playwright/*-snapshots/`, embedded
+in the README gallery — are byte-identical between local runs and CI:
 
 ```bash
 npm run test:e2e:playwright:docker          # verify against baselines
