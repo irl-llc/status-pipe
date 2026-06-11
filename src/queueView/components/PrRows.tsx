@@ -22,12 +22,22 @@ export function PrRows({ card }: { card: CardDisplay }): JSX.Element | null {
 			))}
 			{closed.length > 0 && !showMerged && (
 				<div className="merged-collapse" onClick={() => setShowMerged(true)}>
-					{closed.length} merged
+					{collapseLabel(closed)}
 				</div>
 			)}
 			{showMerged && closed.map((pr) => <PrBlock key={pr.number} pr={pr} card={card} dim />)}
 		</div>
 	);
+}
+
+/** Closed-unmerged PRs are not "merged" — count the two states honestly. */
+function collapseLabel(rows: PrRowDisplay[]): string {
+	const merged = rows.filter((r) => r.state === 'merged').length;
+	const closed = rows.length - merged;
+	const parts: string[] = [];
+	if (merged > 0) parts.push(`${merged} merged`);
+	if (closed > 0) parts.push(`${closed} closed`);
+	return parts.join(', ');
 }
 
 function PrBlock({ pr, card, dim }: { pr: PrRowDisplay; card: CardDisplay; dim?: boolean }): JSX.Element {

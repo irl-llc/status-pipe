@@ -251,14 +251,21 @@ function ageKey(card: CardDisplay): number {
 	return card.lane === 'quiet' ? -ms : ms;
 }
 
+// Codepoint comparison, not localeCompare: tie-breaks must be identical on
+// every machine regardless of locale (design/05 demands full determinism).
+function byCodepoint(a: string, b: string): number {
+	if (a < b) return -1;
+	return a > b ? 1 : 0;
+}
+
 function sortCards(cards: CardDisplay[]): CardDisplay[] {
 	return [...cards].sort(
 		(a, b) =>
 			LANE_ORDER[a.lane] - LANE_ORDER[b.lane] ||
 			a.priorityRank - b.priorityRank ||
 			ageKey(a) - ageKey(b) ||
-			a.repoName.localeCompare(b.repoName) ||
-			(a.ticket ?? '').localeCompare(b.ticket ?? ''),
+			byCodepoint(a.repoName, b.repoName) ||
+			byCodepoint(a.ticket ?? '', b.ticket ?? ''),
 	);
 }
 

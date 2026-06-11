@@ -31,9 +31,7 @@ export function LaneSection(props: LaneSectionProps): JSX.Element | null {
 					{title} ({cards.length})
 				</span>
 			</div>
-			{!collapsed && cards.length === 0 && lane === 'needs-you' && (
-				<div className="lane-empty">{emptyNeedsYouLine(state)}</div>
-			)}
+			{!collapsed && lane === 'needs-you' && <LaneNotice cards={cards} state={state} />}
 			{!collapsed &&
 				cards.map((card) => (
 					<TicketCard
@@ -46,6 +44,27 @@ export function LaneSection(props: LaneSectionProps): JSX.Element | null {
 				))}
 		</div>
 	);
+}
+
+/** Empty needs-you → the product sentence; non-empty + parked → its inverse. */
+function LaneNotice({ cards, state }: { cards: CardDisplay[]; state: DisplayState }): JSX.Element | null {
+	if (cards.length === 0) return <div className="lane-empty">{emptyNeedsYouLine(state)}</div>;
+	const parked = parkedLine(state);
+	return parked ? <div className="lane-empty">{parked}</div> : null;
+}
+
+/**
+ * The product sentence's inverse (design/05): needs-you non-empty with
+ * nothing in flight and agents parked — "Parked — 4 items need you,
+ * nothing in flight."
+ */
+function parkedLine(state: DisplayState): string | null {
+	const parked = state.agents.some((a) => a.state === 'parked');
+	const active = state.agents.some((a) => a.state === 'running' || a.state === 'launching');
+	if (!parked || active || state.counts.waiting > 0) return null;
+	const n = state.counts.needsYou;
+	const items = n === 1 ? '1 item needs' : `${n} items need`;
+	return `Parked — ${items} you, nothing in flight.`;
 }
 
 /** "All quiet — 3 agents running, 2 done today." — the product sentence. */

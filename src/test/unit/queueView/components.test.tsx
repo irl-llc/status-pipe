@@ -349,6 +349,28 @@ describe('queueView/components', () => {
 			assert.ok(result.getByText('All quiet — 2 agents running, 2 done today.'));
 		});
 
+		it('renders the parked line when needs-you is non-empty, agents parked, nothing in flight', () => {
+			const cards = Array.from({ length: 4 }, (_, i) => makeCard({ id: `/repo::T-${i}`, ticket: `T-${i}` }));
+			const state = makeState({
+				agents: [makeAgent({ state: 'parked' })],
+				counts: { needsYou: 4, waiting: 0, quiet: 0 },
+			});
+			const { result } = renderLane(cards, state);
+			assert.ok(result.getByText('Parked — 4 items need you, nothing in flight.'));
+		});
+
+		it('suppresses the parked line while anything is still in flight', () => {
+			const parked = makeAgent({ state: 'parked' });
+			const running = makeAgent({ agentId: 'b', state: 'running' });
+			const inFlight = makeState({ agents: [parked, running], counts: { needsYou: 1, waiting: 0, quiet: 0 } });
+			const waiting = makeState({ agents: [parked], counts: { needsYou: 1, waiting: 2, quiet: 0 } });
+			for (const state of [inFlight, waiting]) {
+				const { result } = renderLane([makeCard()], state);
+				assert.equal(result.queryByText(/^Parked —/), null);
+				cleanup();
+			}
+		});
+
 		it('renders nothing for an empty non-needs-you lane', () => {
 			const { result } = renderWithPost(
 				<LaneSection
@@ -465,6 +487,38 @@ describe('queueView/components', () => {
 			cleanup();
 			const done = renderPr(makePr({ tasks: { unresolved: 0, total: 3 } }));
 			assert.equal(done.result.container.querySelectorAll('.pr-badge').length, 0);
+		});
+	});
+
+	describe('merged-collapse line', () => {
+		it('counts merged and closed-unmerged PRs separately', () => {
+			const card = makeCard({
+				prs: [
+					makePr({ number: 1, state: 'merged' }),
+					makePr({ number: 2, state: 'closed' }),
+					makePr({ number: 3, state: 'merged' }),
+				],
+			});
+			const { result } = renderWithPost(<PrRows card={card} />);
+			assert.ok(result.getByText('2 merged, 1 closed'));
+		});
+	});
+
+	describe('card status icons (one indicator per fact)', () => {
+		it('shows pass-filled on done cards and warning on crashed cards', () => {
+			const done = renderCard(makeCard({ health: 'done', lane: 'quiet' }));
+			assert.ok(done.result.container.querySelector('.card-status-icon.codicon-pass-filled'));
+			cleanup();
+			const crashed = renderCard(makeCard({ reason: 'worker-crashed' }));
+			assert.ok(crashed.result.container.querySelector('.card-status-icon.codicon-warning'));
+			cleanup();
+			const plain = renderCard(makeCard());
+			assert.equal(plain.result.container.querySelector('.card-status-icon'), null);
+		});
+
+		it('renders the circle-slash glyph on blocker lines', () => {
+			const { result } = renderCard(makeCard({ blockers: ['need creds'] }));
+			assert.ok(result.container.querySelector('.blocker-line .codicon-circle-slash'));
 		});
 	});
 

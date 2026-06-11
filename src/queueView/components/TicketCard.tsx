@@ -45,6 +45,7 @@ export function TicketCard({ card, state, selected, onSelect }: TicketCardProps)
 			<WaitingLine card={card} />
 			{card.blockers.map((blocker, i) => (
 				<div key={i} className="blocker-line">
+					<span className="codicon codicon-circle-slash" />
 					{blocker}
 				</div>
 			))}
@@ -57,11 +58,24 @@ export function TicketCard({ card, state, selected, onSelect }: TicketCardProps)
 	);
 }
 
+/**
+ * Status glyph for facts no other indicator carries (design/05 icon table):
+ * warning for crashed/failed/degraded, pass-filled for done. Waiting kinds
+ * and ack states keep their own icons — one indicator per fact.
+ */
+function headerIcon(card: CardDisplay): string | null {
+	if (card.health === 'done') return 'pass-filled';
+	if (card.degraded || card.reason === 'worker-crashed' || card.reason === 'launcher-failed') return 'warning';
+	return null;
+}
+
 function CardHeader({ card, state }: { card: CardDisplay; state: DisplayState }): JSX.Element {
 	const post = usePost();
 	const filterToRepo = useRepoFilter();
+	const icon = headerIcon(card);
 	return (
 		<div className="card-header">
+			{icon && <span className={`codicon codicon-${icon} card-status-icon`} />}
 			{state.multiRepo && (
 				<span
 					className="repo-badge"
