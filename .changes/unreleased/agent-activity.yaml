@@ -1,0 +1,2 @@
+kind: Added
+body: 'The launch-config strip now shows what a running agent is doing right now — the current tool and target (e.g. "running · Edit: protocol/parse.ts") or its last message — parsed live from the launcher''s stream-json output. Each run is also bracketed with start/end markers in the agent log so the raw output stays browsable across restarts.'

@@ -341,4 +341,32 @@ describe('supervisor/agentRunner', () => {
 		assert.equal(snap.state, 'backoff');
 		assert.ok(h.logs.some((l) => l.includes('spawn failed: ENOENT')));
 	});
+
+	describe('stream-json activity + run markers', () => {
+		const assistant = (name: string, input: Record<string, unknown>): string =>
+			`${JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', name, input }] } })}\n`;
+
+		it('parses launcher output into live activity and brackets each run in the log', () => {
+			const h = makeRunner();
+			h.runner.start();
+			assert.ok(h.logs.some((l) => l.includes('run started')));
+			h.spawner.outputLast(assistant('Bash', { command: 'npm test' }));
+			const snap = h.runner.snapshot();
+			assert.equal(snap.activity.currentTool, 'Bash');
+			assert.equal(snap.activity.currentToolDetail, 'npm test');
+			assert.equal(snap.activity.toolCalls, 1);
+			h.spawner.exitLast(0);
+			assert.ok(h.logs.some((l) => l.includes('run ended')));
+		});
+
+		it('resets activity at the start of the next run', async () => {
+			const h = makeRunner();
+			h.runner.start();
+			h.spawner.outputLast(assistant('Edit', { file_path: '/work/a.ts' }));
+			assert.equal(h.runner.snapshot().activity.toolCalls, 1);
+			h.spawner.exitLast(0); // clean tick → schedules next
+			await h.clock.advance(10 * 60_000); // next tick launches
+			assert.equal(h.runner.snapshot().activity.toolCalls, 0); // fresh run, cleared
+		});
+	});
 });

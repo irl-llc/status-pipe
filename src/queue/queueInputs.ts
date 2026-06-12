@@ -5,6 +5,7 @@
  */
 
 import { ChecksInfo, ForgeCapabilities, PullRequestInfo, TicketRef } from '../forge/types';
+import { AgentActivity } from '../output/claudeStream';
 import { AckFile, ConfigFile, LaunchFile, OrchestratorFile, ParseResult, TicketFile } from '../protocol/types';
 import { ActivityDisplay, AgentRunState } from './displayTypes';
 
@@ -64,6 +65,8 @@ export interface AgentProcessState {
 	consecutiveFailures: number;
 	lastExitCode: number | null;
 	detail: string | null;
+	/** Parsed from the launcher's stream-json stdout; empty (phase null) when none. */
+	activity: AgentActivity;
 }
 
 export interface QueueModelInput {

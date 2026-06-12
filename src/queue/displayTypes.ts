@@ -6,6 +6,7 @@
  */
 
 import { CheckStatus, ForgeCapabilities } from '../forge/types';
+import { AgentActivity } from '../output/claudeStream';
 import {
 	Health,
 	HistoryEntry,
@@ -162,6 +163,8 @@ export interface AgentDisplay {
 	lastOutputAt: number | null;
 	consecutiveFailures: number;
 	detail: string | null;
+	/** Live status parsed from the launcher's stream-json output. */
+	activity: AgentActivity;
 }
 
 export interface RepoDisplay {

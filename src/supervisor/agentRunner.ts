@@ -9,6 +9,7 @@
  * vscode-free: process spawning, clock, and timers are injected.
  */
 
+import { ClaudeActivityReducer } from '../output/claudeStream';
 import { LaunchAgent, ParkedState } from '../protocol/types';
 import { AgentRunState } from '../queue/displayTypes';
 import { AgentProcessState } from '../queue/queueInputs';
@@ -82,8 +83,12 @@ export class AgentRunner {
 			consecutiveFailures: this.consecutiveFailures,
 			lastExitCode: this.lastExitCode,
 			detail: this.detail,
+			activity: this.reducer.snapshot(),
 		};
 	}
+
+	/** Folds the launcher's stream-json stdout into a live AgentActivity. */
+	private readonly reducer = new ClaudeActivityReducer();
 
 	private displayState(): AgentRunState {
 		if (this.state === 'scheduled' && this.deps.isParked()) return 'parked';
@@ -190,6 +195,10 @@ export class AgentRunner {
 		this.setState('launching');
 		this.detail = null;
 		this.timedOut = false;
+		// New run: clear last run's parsed activity and mark the raw log so
+		// the OutputChannel stays browsable across restarts.
+		this.reducer.reset();
+		this.deps.log(`\n══════ run started ${new Date(this.deps.now()).toISOString()} ══════\n`);
 		const seq = ++this.spawnSeq;
 		try {
 			const handle = this.deps.spawn(this.spawnRequest(), {
@@ -236,6 +245,7 @@ export class AgentRunner {
 
 	private onOutput(chunk: string): void {
 		this.lastOutputAt = this.deps.now();
+		this.reducer.pushChunk(chunk);
 		this.deps.log(chunk);
 		this.deps.onStateChange();
 	}
@@ -253,6 +263,7 @@ export class AgentRunner {
 		this.lastExitCode = code;
 		const uptimeMs = this.runningSince !== null ? this.deps.now() - this.runningSince : 0;
 		this.runningSince = null;
+		this.deps.log(`══════ run ended (exit ${code ?? 'signal'}, ${Math.round(uptimeMs / 1000)}s) ══════\n`);
 		this.routeExit(code, uptimeMs);
 	}
 
