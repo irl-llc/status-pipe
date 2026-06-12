@@ -152,6 +152,7 @@ export interface ConfigFile {
 	schemaVersion: number;
 	epicsDir: string;
 	inventoryLabel: string;
+	inventoryAssignees: string[];
 	ticketSource: 'github-issues' | 'jira-cloud' | null;
 	jiraSiteUrl: string | null;
 	jiraProjectKey: string | null;

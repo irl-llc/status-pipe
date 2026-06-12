@@ -83,6 +83,16 @@ Two sources, per config:
 - `public`: keep only tickets whose **author or assignee ∈ trust.operators**
   — outsiders cannot conscript the agent by opening labeled issues.
 
+**Then scope by assignee** (routing, orthogonal to trust): if
+`config.inventory.assignees` is present and non-empty (array of usernames, or
+the per-channel object form — flatten its values), keep only tickets with an
+assignee in that set, **in addition to** the trust filter above. This is how a
+shared repo routes work — assign a ticket to a listed identity to hand it to
+the agent, assign it elsewhere (or leave it unassigned) to keep it human.
+Absent/empty ⇒ no assignee scoping (today's behavior). Ticket mode only; epics
+are selected by file, so epic tracking tickets are never dropped by this
+filter.
+
 The candidate universe = epics' tracking tickets + filtered labeled tickets,
 deduplicated by ticket key (an epic's tracking ticket is the epic, not a
 second work item).

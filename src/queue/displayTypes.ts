@@ -179,6 +179,8 @@ export interface RepoDisplay {
 	ticketCount: number;
 	/** The label open issues must carry to enter the agent's inventory. */
 	inventoryLabel: string;
+	/** When non-empty, only issues assigned to one of these identities are inventoried. */
+	inventoryAssignees: string[];
 	/** Deep link to the forge's issues page, or null when no forge is connected. */
 	issuesUrl: string | null;
 }

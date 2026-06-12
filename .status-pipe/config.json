@@ -1,7 +1,8 @@
 {
 	"schemaVersion": 1,
 	"inventory": {
-		"label": "agent-queue"
+		"label": "agent-queue",
+		"assignees": ["ekohlwey", "ed-irl", "ed-irl-codebot"]
 	},
 	"tickets": {
 		"source": "github-issues"

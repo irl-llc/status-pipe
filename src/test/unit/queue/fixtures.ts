@@ -113,6 +113,7 @@ export function makeConfig(overrides: Partial<ConfigFile> = {}): ConfigFile {
 		schemaVersion: 1,
 		epicsDir: 'epics',
 		inventoryLabel: 'agent-queue',
+		inventoryAssignees: [],
 		ticketSource: null,
 		jiraSiteUrl: null,
 		jiraProjectKey: null,

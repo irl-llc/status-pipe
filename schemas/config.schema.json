@@ -27,6 +27,24 @@
 					"type": "string",
 					"default": "agent-queue",
 					"description": "Forge label / JQL label selecting tickets for the agent's inventory"
+				},
+				"assignees": {
+					"description": "Optional routing filter, orthogonal to trust: when present, inventory keeps only tickets assigned to one of these identities (intersected with any trust-mode assignee filter). Absent ⇒ no assignee scoping. Routing only — being listed here never grants authority to drive the agent (that is trust.operators).",
+					"oneOf": [
+						{
+							"type": "array",
+							"items": { "type": "string" },
+							"description": "Forge usernames (single identity namespace)"
+						},
+						{
+							"type": "object",
+							"description": "Split form for Bitbucket+Jira repos: per-channel stable ids (Bitbucket account UUID, Jira account id), never display names",
+							"additionalProperties": {
+								"type": "array",
+								"items": { "type": "string" }
+							}
+						}
+					]
 				}
 			}
 		},

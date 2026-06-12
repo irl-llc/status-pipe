@@ -4,7 +4,7 @@
  * line.
  */
 
-import { useState, type JSX } from 'react';
+import { Fragment, useState, type JSX } from 'react';
 
 import { CardDisplay, DisplayState, Lane } from '../../queue/displayTypes';
 import { usePost } from './QueueApp';
@@ -89,16 +89,36 @@ function ConfigurePrompt(): JSX.Element {
  * always because no open issues carry the inventory label, so the
  * orchestrator parks. Tell the operator how to feed it.
  */
+/** "and assigned to one of `a`, `b`" — rendered only when assignee scoping is configured. */
+function AssigneeClause({ assignees }: { assignees: string[] }): JSX.Element | null {
+	if (assignees.length === 0) return null;
+	return (
+		<>
+			{' '}
+			and assigned to one of{' '}
+			{assignees.map((a, i) => (
+				<Fragment key={a}>
+					{i > 0 && ', '}
+					<code>{a}</code>
+				</Fragment>
+			))}
+		</>
+	);
+}
+
 function EmptyInventoryPrompt({ state }: { state: DisplayState }): JSX.Element {
 	const post = usePost();
 	const repo = state.repos.length === 1 ? state.repos[0] : null;
 	const label = repo?.inventoryLabel ?? 'agent-queue';
+	const assignees = repo?.inventoryAssignees ?? [];
 	return (
 		<div className="lane-empty configure-prompt">
 			<div className="configure-title">No tracked work.</div>
 			<div className="dim">
-				status-pipe dispatches open issues labeled <code>{label}</code> (and epics). Label some issues to give the agent
-				a backlog{repo ? '' : ' in each repo'}.
+				status-pipe dispatches open issues labeled <code>{label}</code>
+				<AssigneeClause assignees={assignees} /> (and epics). Label
+				{assignees.length > 0 ? ' and assign' : ''} some issues to give the agent a backlog
+				{repo ? '' : ' in each repo'}.
 			</div>
 			{repo?.issuesUrl && (
 				<button className="text-button" onClick={() => post({ type: 'openExternal', url: repo.issuesUrl! })}>

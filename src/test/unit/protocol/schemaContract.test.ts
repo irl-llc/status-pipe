@@ -106,7 +106,7 @@ describe('protocol/schema contract (schemas/ vs fixtures and writers)', () => {
 			{
 				schemaVersion: 1,
 				epics: { dir: 'epics' },
-				inventory: { label: 'agent-queue' },
+				inventory: { label: 'agent-queue', assignees: ['ekohlwey', 'ed-irl', 'ed-irl-codebot'] },
 				tickets: { source: 'github-issues' },
 				staleWorkerMinutes: 30,
 				trust: { mode: 'multi-maintainer', operators: ['ed'], minAssociation: null },
