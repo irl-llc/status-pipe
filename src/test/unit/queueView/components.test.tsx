@@ -477,6 +477,16 @@ describe('queueView/components', () => {
 			const { result } = renderWithPost(<AgentsStrip state={state} />);
 			assert.ok(result.getByText(/^running 2m/));
 		});
+
+		it('shows Run alone (no Tick now) for an installed-but-stopped config — no double play button', () => {
+			// Regression: a stopped+installed config used to render Run (play)
+			// AND Tick now (run), two near-identical triangles.
+			const state = makeState({ agents: [makeAgent({ installed: true, state: 'stopped', runningSince: null })] });
+			const { result } = renderWithPost(<AgentsStrip state={state} />);
+			assert.ok(result.getByTitle('Run'));
+			assert.equal(result.queryByTitle('Tick now'), null);
+			assert.ok(result.getByTitle('Open log')); // installed → still has a log
+		});
 	});
 
 	describe('configure prompt (unconfigured workspace)', () => {

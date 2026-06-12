@@ -82,8 +82,14 @@ function AgentActions({ agent }: { agent: AgentDisplay }): JSX.Element {
 	const post = usePost();
 	const control = (action: 'start' | 'stop' | 'tickNow' | 'openLog' | 'retry'): void =>
 		post({ type: 'agentControl', repoRoot: agent.repoRoot, agentId: agent.agentId, action });
+	// Tick-now forces an immediate pass on a loop the supervisor is already
+	// driving between ticks. It's meaningless when stopped (Run does an
+	// immediate pass) or mid-pass (running/launching) — and showing it next
+	// to Run rendered two near-identical play triangles.
 	const canTickNow =
-		agent.installed && agent.mode === 'tick' && agent.state !== 'running' && agent.state !== 'launching';
+		agent.installed &&
+		agent.mode === 'tick' &&
+		(agent.state === 'scheduled' || agent.state === 'backoff' || agent.state === 'parked');
 	return (
 		<span className="agent-actions">
 			{agent.state === 'failed' ? (
