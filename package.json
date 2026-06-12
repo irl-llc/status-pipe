@@ -2,7 +2,7 @@
 	"name": "status-pipe",
 	"displayName": "Status Pipe",
 	"description": "Review/response queue over fleets of autonomous coding agents. Monitors status-pipe protocol state files, enriches them with forge data (GitHub, Bitbucket), and supervises agent loops.",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"publisher": "IRLAILLC",
 	"icon": "icon.png",
 	"license": "GPL-3.0-or-later",
