@@ -489,7 +489,7 @@ describe('queueView/components', () => {
 		});
 	});
 
-	describe('configure prompt (unconfigured workspace)', () => {
+	describe('empty-state prompts', () => {
 		function renderNeedsYou(state: DisplayState): Rendered {
 			return renderWithPost(
 				<LaneSection
@@ -503,7 +503,23 @@ describe('queueView/components', () => {
 			);
 		}
 
-		it('replaces the all-quiet line with a configure prompt when nothing is set up', () => {
+		function repoDisplay(overrides: Partial<DisplayState['repos'][number]> = {}): DisplayState['repos'][number] {
+			return {
+				repoRoot: '/repo',
+				name: 'repo',
+				forgeId: 'github',
+				capabilities: null,
+				lastPassFinishedAt: null,
+				parked: null,
+				monitorOnlyNote: null,
+				ticketCount: 0,
+				inventoryLabel: 'agent-queue',
+				issuesUrl: 'https://github.com/acme/repo/issues',
+				...overrides,
+			};
+		}
+
+		it('shows the configure prompt when nothing is set up (no cards, no launch config)', () => {
 			const { result, messages } = renderNeedsYou(makeState({ cards: [], agents: [] }));
 			assert.ok(result.getByText('No automation configured.'));
 			assert.equal(result.queryByText(/^All quiet/), null);
@@ -512,10 +528,32 @@ describe('queueView/components', () => {
 			assert.equal(messages[0].type, 'openExternal');
 		});
 
-		it('shows the all-quiet line (not the prompt) once a launch config exists', () => {
-			const { result } = renderNeedsYou(makeState({ cards: [], agents: [makeAgent({ state: 'stopped' })] }));
+		it('shows the empty-inventory prompt with the label + issues link when configured but no work', () => {
+			const state = makeState({ cards: [], agents: [makeAgent({ state: 'stopped' })], repos: [repoDisplay()] });
+			const { result, messages } = renderNeedsYou(state);
+			assert.ok(result.getByText('No tracked work.'));
+			assert.ok(result.getByText('agent-queue')); // the inventory label
+			assert.equal(result.queryByText(/^All quiet/), null);
+			fireEvent.click(result.getByText('Open issues'));
+			assert.deepEqual(messages, [{ type: 'openExternal', url: 'https://github.com/acme/repo/issues' }]);
+		});
+
+		it('omits the issues link in the empty-inventory prompt when no forge is connected', () => {
+			const state = makeState({
+				cards: [],
+				agents: [makeAgent({ state: 'stopped' })],
+				repos: [repoDisplay({ issuesUrl: null })],
+			});
+			const { result } = renderNeedsYou(state);
+			assert.ok(result.getByText('No tracked work.'));
+			assert.equal(result.queryByText('Open issues'), null);
+		});
+
+		it('shows the all-quiet line (not a prompt) when needs-you is empty but other lanes have cards', () => {
+			const state = makeState({ cards: [makeCard({ lane: 'quiet' })], agents: [makeAgent({ state: 'stopped' })] });
+			const { result } = renderNeedsYou(state);
 			assert.ok(result.getByText(/^All quiet/));
-			assert.equal(result.queryByText('No automation configured.'), null);
+			assert.equal(result.queryByText('No tracked work.'), null);
 		});
 	});
 

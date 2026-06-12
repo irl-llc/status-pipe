@@ -56,15 +56,15 @@ export function LaneSection(props: LaneSectionProps): JSX.Element | null {
  */
 function LaneNotice({ cards, state }: { cards: CardDisplay[]; state: DisplayState }): JSX.Element | null {
 	if (cards.length === 0) {
-		return isUnconfigured(state) ? <ConfigurePrompt /> : <div className="lane-empty">{emptyNeedsYouLine(state)}</div>;
+		if (state.cards.length === 0) {
+			// Nothing tracked anywhere: no launch config → onboard; has a
+			// launch config but no work → tell them how to feed the backlog.
+			return state.agents.length === 0 ? <ConfigurePrompt /> : <EmptyInventoryPrompt state={state} />;
+		}
+		return <div className="lane-empty">{emptyNeedsYouLine(state)}</div>;
 	}
 	const parked = parkedLine(state);
 	return parked ? <div className="lane-empty">{parked}</div> : null;
-}
-
-/** No status files and no launch configs anywhere — a brand-new workspace. */
-function isUnconfigured(state: DisplayState): boolean {
-	return state.cards.length === 0 && state.agents.length === 0;
 }
 
 /** Onboarding for an unconfigured workspace (design/09): point at the docs. */
@@ -80,6 +80,31 @@ function ConfigurePrompt(): JSX.Element {
 			<button className="text-button" onClick={() => post({ type: 'openExternal', url: LAUNCH_DOCS_URL })}>
 				How to configure a launch file
 			</button>
+		</div>
+	);
+}
+
+/**
+ * Configured (a launch config exists) but the backlog is empty — almost
+ * always because no open issues carry the inventory label, so the
+ * orchestrator parks. Tell the operator how to feed it.
+ */
+function EmptyInventoryPrompt({ state }: { state: DisplayState }): JSX.Element {
+	const post = usePost();
+	const repo = state.repos.length === 1 ? state.repos[0] : null;
+	const label = repo?.inventoryLabel ?? 'agent-queue';
+	return (
+		<div className="lane-empty configure-prompt">
+			<div className="configure-title">No tracked work.</div>
+			<div className="dim">
+				status-pipe dispatches open issues labeled <code>{label}</code> (and epics). Label some issues to give the agent
+				a backlog{repo ? '' : ' in each repo'}.
+			</div>
+			{repo?.issuesUrl && (
+				<button className="text-button" onClick={() => post({ type: 'openExternal', url: repo.issuesUrl! })}>
+					Open issues
+				</button>
+			)}
 		</div>
 	);
 }

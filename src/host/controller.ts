@@ -287,6 +287,7 @@ export class StatusPipeController implements vscode.Disposable {
 			forgeId: repo.connection?.forge.id ?? null,
 			capabilities: repo.connection?.forge.capabilities ?? null,
 			monitorOnly: repo.context.role === 'worktree',
+			issuesUrl: repo.connection ? `${repo.connection.forge.baseUrl}/${repo.connection.id.slug}/issues` : null,
 			orchestrator: state.orchestrator,
 			config: state.config,
 			launch: state.launch,

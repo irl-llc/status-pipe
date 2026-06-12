@@ -177,6 +177,10 @@ export interface RepoDisplay {
 	/** Set when only a worktree of this repo is open — supervision disabled. */
 	monitorOnlyNote: string | null;
 	ticketCount: number;
+	/** The label open issues must carry to enter the agent's inventory. */
+	inventoryLabel: string;
+	/** Deep link to the forge's issues page, or null when no forge is connected. */
+	issuesUrl: string | null;
 }
 
 export type ActivityState = 'idle' | 'refreshing' | 'degraded';
