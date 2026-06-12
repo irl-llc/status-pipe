@@ -1,0 +1,13 @@
+{
+	"schemaVersion": 1,
+	"inventory": {
+		"label": "agent-queue"
+	},
+	"tickets": {
+		"source": "github-issues"
+	},
+	"trust": {
+		"mode": "single-maintainer",
+		"operators": ["ed-irl", "ekohlwey"]
+	}
+}

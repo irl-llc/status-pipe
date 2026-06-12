@@ -1,0 +1,25 @@
+{
+	"schemaVersion": 1,
+	"agents": [
+		{
+			"id": "tick",
+			"title": "status-pipe agent loop",
+			"command": "claude",
+			"args": [
+				"-p",
+				"/status-pipe:tick --max-concurrent 3",
+				"--output-format",
+				"stream-json",
+				"--verbose",
+				"--permission-mode",
+				"acceptEdits"
+			],
+			"stdin": "",
+			"cwd": ".",
+			"env": {},
+			"mode": "tick",
+			"intervalMinutes": 10,
+			"timeoutMinutes": 45
+		}
+	]
+}
