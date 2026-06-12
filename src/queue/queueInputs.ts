@@ -44,6 +44,8 @@ export interface RepoState {
 	capabilities: ForgeCapabilities | null;
 	/** Set when only a worktree of this repo is open (supervision disabled). */
 	monitorOnly: boolean;
+	/** The forge's issues page (`<base>/<slug>/issues`), for the empty-inventory prompt. */
+	issuesUrl: string | null;
 	orchestrator: OrchestratorFile | null;
 	config: ConfigFile | null;
 	launch: LaunchFile | null;

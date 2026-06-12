@@ -288,6 +288,8 @@ function repoDisplay(repo: RepoState): RepoDisplay {
 		parked: repo.orchestrator?.parked ?? null,
 		monitorOnlyNote: repo.monitorOnly ? `worktree of ${repo.name} — supervision disabled` : null,
 		ticketCount: repo.tickets.length,
+		inventoryLabel: repo.config?.inventoryLabel ?? 'agent-queue',
+		issuesUrl: repo.issuesUrl,
 	};
 }
 

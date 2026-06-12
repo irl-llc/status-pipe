@@ -79,6 +79,7 @@ export function makeRepo(overrides: Partial<RepoState> = {}): RepoState {
 		forgeId: 'github',
 		capabilities: null,
 		monitorOnly: false,
+		issuesUrl: null,
 		orchestrator: null,
 		config: null,
 		launch: null,

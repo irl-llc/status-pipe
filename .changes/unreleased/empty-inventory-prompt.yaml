@@ -1,0 +1,2 @@
+kind: Added
+body: 'When a repo has a launch config but no tracked work, the queue now shows a prompt explaining that status-pipe dispatches open issues carrying the inventory label (default `agent-queue`), with a link to the forge issues page — instead of a bare "all quiet". This is the common first-run state where the orchestrator parks because no issues are labeled.'
