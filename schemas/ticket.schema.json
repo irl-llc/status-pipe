@@ -1,6 +1,6 @@
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
-	"$id": "https://github.com/ed-irl/status-pipe/schemas/ticket.schema.json",
+	"$id": "https://github.com/irl-llc/status-pipe/schemas/ticket.schema.json",
 	"title": "status-pipe ticket state file",
 	"description": "One file per tracked ticket at .status-pipe/tickets/<key>.json. Owned by the agent side (orchestrator/worker); the extension only reads it.",
 	"type": "object",

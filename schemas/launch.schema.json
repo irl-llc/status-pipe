@@ -1,6 +1,6 @@
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
-	"$id": "https://github.com/ed-irl/status-pipe/schemas/launch.schema.json",
+	"$id": "https://github.com/irl-llc/status-pipe/schemas/launch.schema.json",
 	"title": "status-pipe launch file",
 	"description": "Committed at .status-pipe/launch.json: how to launch this repo's agent loop. Backend-agnostic process contract. Execution is trust-gated: workspace trust plus per-content-hash approval of the complete entry (command, args, stdin, cwd, env). Never launched from a linked worktree.",
 	"type": "object",

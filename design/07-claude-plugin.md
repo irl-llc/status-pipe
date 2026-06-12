@@ -51,12 +51,12 @@ Everything the plugin needs to know about *this repo's* conventions lives here
   "staleWorkerMinutes": 30,
   "trust": {
     "mode": "single-maintainer",
-    "operators": ["ed-irl"],
+    "operators": ["octocat"],
     "minAssociation": null
   },
   "attribution": {
     "commentPrefix": "**CLAUDE COMMENT**",
-    "prBanner": "This PR was authored by a coding agent (status-pipe worker) on behalf of @ed-irl.",
+    "prBanner": "This PR was authored by a coding agent (status-pipe worker) on behalf of @octocat.",
     "includeAgentId": false
   }
 }

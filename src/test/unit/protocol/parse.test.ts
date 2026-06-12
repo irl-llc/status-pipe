@@ -34,17 +34,17 @@ function failure<T>(result: ParseResult<T>): { reason: 'corrupt' | 'unknown-sche
 /** A fully-populated v1 ticket per the field table in design/02-protocol.md. */
 const FULL_TICKET: TicketFile = {
 	schemaVersion: 1,
-	repo: 'ed-irl/status-pipe',
+	repo: 'acme/status-pipe',
 	ticket: '853',
 	title: 'Queue model derivation',
 	slug: 'queue-model',
-	url: 'https://github.com/ed-irl/status-pipe/issues/853',
+	url: 'https://github.com/acme/status-pipe/issues/853',
 	phase: 'review',
 	health: 'waiting',
 	headline: 'Opened PR #855 and requested review.',
 	waitingOn: {
 		kind: 'review',
-		ref: 'https://github.com/ed-irl/status-pipe/pull/855',
+		ref: 'https://github.com/acme/status-pipe/pull/855',
 		pr: 855,
 		since: '2026-06-11T07:55:22Z',
 		detail: 'review requested from ed',
@@ -52,7 +52,7 @@ const FULL_TICKET: TicketFile = {
 	prs: [
 		{
 			number: 855,
-			url: 'https://github.com/ed-irl/status-pipe/pull/855',
+			url: 'https://github.com/acme/status-pipe/pull/855',
 			head: 'feat/queue-1a',
 			base: 'main',
 			draft: false,
@@ -65,7 +65,7 @@ const FULL_TICKET: TicketFile = {
 	subTickets: [
 		{
 			key: '854',
-			url: 'https://github.com/ed-irl/status-pipe/issues/854',
+			url: 'https://github.com/acme/status-pipe/issues/854',
 			topic: 'retention window',
 			status: 'open',
 		},
@@ -197,7 +197,7 @@ describe('protocol/parse', () => {
 		it('parses a fully-populated orchestrator file', () => {
 			const raw = JSON.stringify({
 				schemaVersion: 1,
-				repo: 'ed-irl/status-pipe',
+				repo: 'acme/status-pipe',
 				passCount: 31,
 				lastPassStartedAt: '2026-06-12T03:38:10Z',
 				lastPassFinishedAt: '2026-06-12T03:40:00Z',
@@ -211,7 +211,7 @@ describe('protocol/parse', () => {
 			});
 			assert.deepStrictEqual(ok(parseOrchestratorFile(raw)), {
 				schemaVersion: 1,
-				repo: 'ed-irl/status-pipe',
+				repo: 'acme/status-pipe',
 				passCount: 31,
 				lastPassStartedAt: '2026-06-12T03:38:10Z',
 				lastPassFinishedAt: '2026-06-12T03:40:00Z',
