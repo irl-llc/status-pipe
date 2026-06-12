@@ -1,8 +1,7 @@
 {
 	"name": "status-pipe",
 	"owner": {
-		"name": "IRL AI LLC",
-		"email": "ed@irl.llc"
+		"name": "IRL AI LLC"
 	},
 	"plugins": [
 		{

@@ -31,7 +31,7 @@ export function hoursAgo(hours: number): string {
 export function makeTicket(overrides: Partial<TicketFile> = {}): TicketFile {
 	return {
 		schemaVersion: 1,
-		repo: 'ed-irl/app',
+		repo: 'acme/app',
 		ticket: '853',
 		title: 'Ticket 853',
 		slug: null,
@@ -185,7 +185,7 @@ export function ackFor(ticket: TicketFile, createdAt: string, onDisk = true): Kn
 
 export function makePrInfo(overrides: Partial<PullRequestInfo> & Pick<PullRequestInfo, 'number'>): PullRequestInfo {
 	return {
-		url: `https://github.com/ed-irl/app/pull/${overrides.number}`,
+		url: `https://github.com/acme/app/pull/${overrides.number}`,
 		state: 'open',
 		draft: false,
 		title: `PR ${overrides.number}`,

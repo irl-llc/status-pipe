@@ -1,6 +1,6 @@
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
-	"$id": "https://github.com/ed-irl/status-pipe/schemas/ack.schema.json",
+	"$id": "https://github.com/irl-llc/status-pipe/schemas/ack.schema.json",
 	"title": "status-pipe ack inbox file",
 	"description": "Operator → orchestrator signal at .status-pipe/inbox/<ticket>/ack-<ackId>.json. Created atomically by the extension; consumed (deleted) by the orchestrator after recording the ackId in the ticket's history[].",
 	"type": "object",

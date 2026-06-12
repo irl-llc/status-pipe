@@ -128,5 +128,5 @@ Changie + scheduled auto-release + reusable publish — the
 4. **`releaseOutput.ts`**: pure, unit-tested formatter for the
    `$GITHUB_OUTPUT` lines gating the chained publish job.
 
-Repo: `https://github.com/ed-irl/status-pipe`. Publisher: `IRLAILLC`.
+Repo: `https://github.com/irl-llc/status-pipe`. Publisher: `IRLAILLC`.
 Required secrets: `VSCE_PAT`, `OVSX_PAT`.

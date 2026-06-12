@@ -83,7 +83,7 @@ The extension is not on the marketplace yet; build and install the `.vsix`
 yourself:
 
 ```sh
-git clone https://github.com/ed-irl/status-pipe.git
+git clone https://github.com/irl-llc/status-pipe.git
 cd status-pipe
 npm install
 npm run package:vsix     # produces status-pipe-<version>.vsix
@@ -108,4 +108,4 @@ npm run test:e2e:playwright:docker   # visual snapshots (Linux baseline)
 Releases are automated: changie fragments per PR → scheduled auto-release →
 marketplace publish. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Repository: https://github.com/ed-irl/status-pipe · Publisher: `IRLAILLC`
+Repository: https://github.com/irl-llc/status-pipe · Publisher: `IRLAILLC`

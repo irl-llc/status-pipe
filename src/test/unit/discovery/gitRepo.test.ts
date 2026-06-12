@@ -18,7 +18,7 @@ const PRIMARY_CONFIG = [
 	'[remote "upstream"]',
 	'\turl = https://example.com/upstream/app.git',
 	'[remote "origin"]',
-	'\turl = git@github.com:ed-irl/app.git',
+	'\turl = git@github.com:acme/app.git',
 	'',
 ].join('\n');
 
@@ -55,7 +55,7 @@ describe('discovery/gitRepo', () => {
 				root: primary,
 				role: 'primary',
 				primaryRoot: primary,
-				remoteUrl: 'git@github.com:ed-irl/app.git',
+				remoteUrl: 'git@github.com:acme/app.git',
 			});
 		});
 
@@ -65,7 +65,7 @@ describe('discovery/gitRepo', () => {
 				root: wt,
 				role: 'worktree',
 				primaryRoot: primary,
-				remoteUrl: 'git@github.com:ed-irl/app.git',
+				remoteUrl: 'git@github.com:acme/app.git',
 			});
 		});
 
@@ -84,7 +84,7 @@ describe('discovery/gitRepo', () => {
 
 	describe('parseRemoteUrl', () => {
 		it('prefers origin over other remotes regardless of order', () => {
-			assert.strictEqual(parseRemoteUrl(PRIMARY_CONFIG), 'git@github.com:ed-irl/app.git');
+			assert.strictEqual(parseRemoteUrl(PRIMARY_CONFIG), 'git@github.com:acme/app.git');
 		});
 
 		it('falls back to the first remote when origin is absent', () => {
