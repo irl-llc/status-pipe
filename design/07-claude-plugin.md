@@ -46,7 +46,7 @@ Everything the plugin needs to know about *this repo's* conventions lives here
 {
   "schemaVersion": 1,
   "epics": { "dir": "epics" },
-  "inventory": { "label": "agent-queue" },
+  "inventory": { "label": "agent-queue", "assignees": ["octocat", "octocat-bot"] },
   "tickets": { "source": "github-issues" },
   "staleWorkerMinutes": 30,
   "trust": {
@@ -64,6 +64,14 @@ Everything the plugin needs to know about *this repo's* conventions lives here
 
 - `epics.dir` — the epic folder name (default `epics`); repos that call it
   `roadmap/`, `specs/`, or anything else just say so.
+- `inventory.label` — the forge label selecting the agent's backlog
+  (default `agent-queue`).
+- `inventory.assignees` (optional) — a routing filter: when set, inventory
+  keeps only tickets assigned to a listed identity. Lets a team share one repo
+  — assign a ticket to a listed identity to hand it to the agent, assign it
+  elsewhere (or leave it unassigned) to keep it human. Routing, **not** trust
+  (see the trust section); array of usernames, or the per-channel object form
+  on Bitbucket+Jira.
 - `tickets.source` — `github-issues` or `jira-cloud` (+ `jira.siteUrl`,
   `jira.projectKey` when Jira).
 - `staleWorkerMinutes` — committed source of truth for the worker-heartbeat
@@ -139,6 +147,15 @@ failure both fail closed. A *private* repo with no `trust` block defaults to
 | `single-maintainer` | scan by label — every ticket is the operator's | the operator |
 | `multi-maintainer` | label **and** `assignee ∈ operators` — unassigned or otherwise-assigned tickets are invisible to this agent, so colleagues' agents never collide | the operator(s) |
 | `public` | label **and** ticket author/assignee ∈ operators — outsiders cannot conscript the agent by opening labeled issues | the operator(s), strictly |
+
+**Assignee scoping is routing, not trust.** `config.inventory.assignees` (above)
+narrows *which eligible tickets this agent works*; the trust mode governs *who
+may drive the agent*. They compose — the assignee filter intersects with
+whatever the trust mode already requires — but they are independent axes:
+being a listed assignee never grants authority to steer the agent (that is
+`trust.operators`), and an operator's ticket is still skipped if it isn't
+assigned to a listed identity. One orchestrator runs per repo; the assignee is
+simply the agent-vs-human routing switch on each ticket.
 
 ### Enforcement is layered, not prompt-only
 
@@ -231,7 +248,9 @@ above, so a missing or spoofed marker can embarrass but never escalate.
 1. **Inventory**: epics under `<config.epics.dir>/*.md` (epic mode) and/or
    open tickets matching `config.inventory.label` (default `agent-queue`,
    ticket mode), **filtered per the trust mode** (assignee/author ∈ operators
-   where required). Create missing tracking tickets.
+   where required) **and then scoped by `config.inventory.assignees`** when
+   set (keep only tickets assigned to a listed identity — routing, ticket mode
+   only). Create missing tracking tickets.
 2. **Consume the ack inbox** (`.status-pipe/inbox/*/ack-*.json`): match
    `target` against current `waitingOn` per
    [02-protocol.md](02-protocol.md#feedback-signal); consumed acks

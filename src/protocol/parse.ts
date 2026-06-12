@@ -312,23 +312,33 @@ function trustModeFromJson(json: Json): ConfigFile['trustMode'] {
 	return mode === 'single-maintainer' || mode === 'multi-maintainer' || mode === 'public' ? mode : null;
 }
 
+/** Flatten inventory.assignees: array form, or the per-channel object form. */
+function inventoryAssigneesFromJson(inventory: Json | null): string[] {
+	const assignees = inventory?.assignees;
+	if (Array.isArray(assignees)) return strArray(assignees);
+	const byChannel = obj(assignees);
+	return byChannel ? Object.values(byChannel).flatMap(strArray) : [];
+}
+
+function configValueFromJson(json: Json): ConfigFile {
+	const tickets = obj(json.tickets) ?? {};
+	const jira = obj(tickets.jira) ?? {};
+	const inventory = obj(json.inventory);
+	return {
+		schemaVersion: 1,
+		epicsDir: str(obj(json.epics)?.dir) ?? 'epics',
+		inventoryLabel: str(inventory?.label) ?? 'agent-queue',
+		inventoryAssignees: inventoryAssigneesFromJson(inventory),
+		ticketSource: ticketSourceFromJson(tickets),
+		jiraSiteUrl: str(jira.siteUrl),
+		jiraProjectKey: str(jira.projectKey),
+		staleWorkerMinutes: num(json.staleWorkerMinutes),
+		trustMode: trustModeFromJson(json),
+	};
+}
+
 export function parseConfigFile(raw: string): ParseResult<ConfigFile> {
 	const versioned = parseVersioned(raw);
 	if (!versioned.ok) return versioned;
-	const json = versioned.value;
-	const tickets = obj(json.tickets) ?? {};
-	const jira = obj(tickets.jira) ?? {};
-	return {
-		ok: true,
-		value: {
-			schemaVersion: 1,
-			epicsDir: str(obj(json.epics)?.dir) ?? 'epics',
-			inventoryLabel: str(obj(json.inventory)?.label) ?? 'agent-queue',
-			ticketSource: ticketSourceFromJson(tickets),
-			jiraSiteUrl: str(jira.siteUrl),
-			jiraProjectKey: str(jira.projectKey),
-			staleWorkerMinutes: num(json.staleWorkerMinutes),
-			trustMode: trustModeFromJson(json),
-		},
-	};
+	return { ok: true, value: configValueFromJson(versioned.value) };
 }

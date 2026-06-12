@@ -387,6 +387,7 @@ describe('protocol/parse', () => {
 				schemaVersion: 1,
 				epicsDir: 'epics',
 				inventoryLabel: 'agent-queue',
+				inventoryAssignees: [],
 				ticketSource: null,
 				jiraSiteUrl: null,
 				jiraProjectKey: null,
@@ -399,7 +400,7 @@ describe('protocol/parse', () => {
 			const raw = JSON.stringify({
 				schemaVersion: 1,
 				epics: { dir: 'plans' },
-				inventory: { label: 'queue' },
+				inventory: { label: 'queue', assignees: ['ekohlwey', 'ed-irl'] },
 				tickets: { source: 'jira-cloud', jira: { siteUrl: 'https://irl.atlassian.net', projectKey: 'PROJ' } },
 				staleWorkerMinutes: 45,
 				trust: { mode: 'single-maintainer' },
@@ -408,12 +409,26 @@ describe('protocol/parse', () => {
 				schemaVersion: 1,
 				epicsDir: 'plans',
 				inventoryLabel: 'queue',
+				inventoryAssignees: ['ekohlwey', 'ed-irl'],
 				ticketSource: 'jira-cloud',
 				jiraSiteUrl: 'https://irl.atlassian.net',
 				jiraProjectKey: 'PROJ',
 				staleWorkerMinutes: 45,
 				trustMode: 'single-maintainer',
 			});
+		});
+
+		it('flattens the per-channel object form of inventory.assignees', () => {
+			const raw = JSON.stringify({
+				schemaVersion: 1,
+				inventory: { label: 'queue', assignees: { bitbucket: ['{uuid}'], jira: ['acct-1', 'acct-2'] } },
+			});
+			assert.deepStrictEqual(ok(parseConfigFile(raw)).inventoryAssignees, ['{uuid}', 'acct-1', 'acct-2']);
+		});
+
+		it('treats a malformed inventory.assignees as no scoping', () => {
+			const raw = JSON.stringify({ schemaVersion: 1, inventory: { assignees: 'ekohlwey' } });
+			assert.deepStrictEqual(ok(parseConfigFile(raw)).inventoryAssignees, []);
 		});
 
 		it('nulls unknown ticket sources and trust modes', () => {

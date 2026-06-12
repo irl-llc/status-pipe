@@ -1,0 +1,2 @@
+kind: Added
+body: 'A repo''s `.status-pipe/config.json` can now set `inventory.assignees` — a routing filter that scopes the agent''s backlog to tickets assigned to one of the listed identities (array of usernames, or the per-channel object form on Bitbucket+Jira). This lets a team share one repo: assign a ticket to a listed identity to hand it to the agent, assign it elsewhere (or leave it unassigned) to keep it human. It is independent of the trust model (routing, not authority), and the empty-inventory prompt names the required assignees when scoping is active.'

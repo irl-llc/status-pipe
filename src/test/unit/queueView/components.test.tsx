@@ -514,6 +514,7 @@ describe('queueView/components', () => {
 				monitorOnlyNote: null,
 				ticketCount: 0,
 				inventoryLabel: 'agent-queue',
+				inventoryAssignees: [],
 				issuesUrl: 'https://github.com/acme/repo/issues',
 				...overrides,
 			};
@@ -536,6 +537,24 @@ describe('queueView/components', () => {
 			assert.equal(result.queryByText(/^All quiet/), null);
 			fireEvent.click(result.getByText('Open issues'));
 			assert.deepEqual(messages, [{ type: 'openExternal', url: 'https://github.com/acme/repo/issues' }]);
+		});
+
+		it('names the inventory assignees in the empty-inventory prompt when scoping is set', () => {
+			const state = makeState({
+				cards: [],
+				agents: [makeAgent({ state: 'stopped' })],
+				repos: [repoDisplay({ inventoryAssignees: ['ekohlwey', 'ed-irl'] })],
+			});
+			const { result } = renderNeedsYou(state);
+			assert.ok(result.getByText(/assigned to one of/));
+			assert.ok(result.getByText('ekohlwey'));
+			assert.ok(result.getByText('ed-irl'));
+		});
+
+		it('omits the assignee clause when no assignee scoping is configured', () => {
+			const state = makeState({ cards: [], agents: [makeAgent({ state: 'stopped' })], repos: [repoDisplay()] });
+			const { result } = renderNeedsYou(state);
+			assert.equal(result.queryByText(/assigned to one of/), null);
 		});
 
 		it('omits the issues link in the empty-inventory prompt when no forge is connected', () => {

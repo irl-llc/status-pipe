@@ -289,6 +289,7 @@ function repoDisplay(repo: RepoState): RepoDisplay {
 		monitorOnlyNote: repo.monitorOnly ? `worktree of ${repo.name} — supervision disabled` : null,
 		ticketCount: repo.tickets.length,
 		inventoryLabel: repo.config?.inventoryLabel ?? 'agent-queue',
+		inventoryAssignees: repo.config?.inventoryAssignees ?? [],
 		issuesUrl: repo.issuesUrl,
 	};
 }

@@ -149,6 +149,14 @@ Modes (`config.trust.mode`): `single-maintainer`, `multi-maintainer`,
 multi-maintainer ⇒ label **and** assignee ∈ operators; public ⇒ label **and**
 ticket author/assignee ∈ operators.
 
+**`config.inventory.assignees` is routing, not trust.** When set (array of
+usernames, or the per-channel object form), it further narrows inventory to
+tickets assigned to a listed identity — intersected with the trust filter
+above, independent of the mode. It decides *which eligible tickets this agent
+works*, never *who may drive the agent*: a listed assignee who is not a
+`trust.operators` entry still has zero authority over the agent. Absent ⇒ no
+assignee scoping.
+
 - **Fail closed.** Check repo visibility at every tick start
   (GitHub `GET /repos/{owner}/{repo}` `.private` / Bitbucket `is_private`). Visibility
   check fails ⇒ treat the repo as public. Public (or treated-as-public) repo
