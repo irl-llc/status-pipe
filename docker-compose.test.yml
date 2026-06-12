@@ -21,6 +21,11 @@
 
 services:
   playwright:
+    # Pin amd64 so the PNG baselines are byte-identical to the ubuntu-latest
+    # CI render even when the host is an arm64 Mac (Docker emulates amd64).
+    # Without this, local `:update` produces arm64-Linux renders that drift
+    # against the amd64 CI oracle.
+    platform: linux/amd64
     build:
       context: .
       dockerfile: Dockerfile
@@ -51,6 +56,7 @@ services:
         fi
 
   e2e:
+    platform: linux/amd64 # match the amd64 CI render (see playwright service)
     build:
       context: .
       dockerfile: Dockerfile
