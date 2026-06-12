@@ -1,6 +1,6 @@
 {
 	"$schema": "http://json-schema.org/draft-07/schema#",
-	"$id": "https://github.com/ed-irl/status-pipe/schemas/orchestrator.schema.json",
+	"$id": "https://github.com/irl-llc/status-pipe/schemas/orchestrator.schema.json",
 	"title": "status-pipe orchestrator pass metadata",
 	"description": "Gitignored at .status-pipe/orchestrator.json. Written by the orchestrator at tick wrap; read by the extension for repo-header display, stale-worker threshold, and parking.",
 	"type": "object",

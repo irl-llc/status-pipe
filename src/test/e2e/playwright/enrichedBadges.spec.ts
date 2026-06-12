@@ -25,7 +25,7 @@ test.describe('enriched badges', () => {
 	test('cards show CI, comment, and review badges from the fake forge', async () => {
 		server = new FakeForgeServer({
 			slug: 'acme/fleet-api',
-			viewerLogin: 'ed-irl',
+			viewerLogin: 'octocat',
 			prs: [
 				{
 					number: 512,
@@ -42,7 +42,7 @@ test.describe('enriched badges', () => {
 						{ resolved: false, comments: 1 },
 					],
 					reviewDecision: 'CHANGES_REQUESTED',
-					reviewRequests: ['ed-irl'],
+					reviewRequests: ['octocat'],
 					checks: [
 						{ name: 'build', status: 'passing' },
 						{ name: 'e2e', status: 'failing', url: 'https://ci.example/run/9' },

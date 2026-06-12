@@ -15,7 +15,7 @@ unreleasedDir: unreleased
 headerPath: header.tpl.md
 changelogPath: CHANGELOG.md
 versionExt: md
-versionFormat: '## [{{.Version}}](https://github.com/ed-irl/status-pipe/releases/tag/v{{.Version}}) - {{.Time.Format "2006-01-02"}}'
+versionFormat: '## [{{.Version}}](https://github.com/irl-llc/status-pipe/releases/tag/v{{.Version}}) - {{.Time.Format "2006-01-02"}}'
 kindFormat: '### {{.Kind}}'
 changeFormat: '- {{.Body}}'
 kinds:

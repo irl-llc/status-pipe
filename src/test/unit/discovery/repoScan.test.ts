@@ -21,7 +21,7 @@ const PROTOCOL_DIR_NAME = '.status-pipe';
 
 async function makePrimaryRepo(root: string, withProtocolDir: boolean): Promise<void> {
 	await fs.mkdir(path.join(root, '.git'), { recursive: true });
-	const config = `[remote "origin"]\n\turl = git@github.com:ed-irl/${path.basename(root)}.git\n`;
+	const config = `[remote "origin"]\n\turl = git@github.com:acme/${path.basename(root)}.git\n`;
 	await fs.writeFile(path.join(root, '.git', 'config'), config, 'utf8');
 	if (withProtocolDir) {
 		await fs.mkdir(path.join(root, PROTOCOL_DIR_NAME), { recursive: true });
@@ -56,7 +56,7 @@ describe('discovery/repoScan', () => {
 				folder,
 				repoRoot: folder,
 				protocolDir: path.join(folder, PROTOCOL_DIR_NAME),
-				remoteUrl: 'git@github.com:ed-irl/root-repo.git',
+				remoteUrl: 'git@github.com:acme/root-repo.git',
 				role: 'primary',
 				worktreeRoot: null,
 			},
@@ -97,7 +97,7 @@ describe('discovery/repoScan', () => {
 				folder,
 				repoRoot: primary,
 				protocolDir: path.join(primary, PROTOCOL_DIR_NAME),
-				remoteUrl: 'git@github.com:ed-irl/wt-primary.git',
+				remoteUrl: 'git@github.com:acme/wt-primary.git',
 				role: 'worktree',
 				worktreeRoot: worktree,
 			},

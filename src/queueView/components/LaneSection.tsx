@@ -11,7 +11,7 @@ import { usePost } from './QueueApp';
 import { TicketCard } from './TicketCard';
 
 /** Launch & supervision reference (design/09). */
-const LAUNCH_DOCS_URL = 'https://github.com/ed-irl/status-pipe/blob/main/design/09-launch-and-supervision.md';
+const LAUNCH_DOCS_URL = 'https://github.com/irl-llc/status-pipe/blob/main/design/09-launch-and-supervision.md';
 
 export interface LaneSectionProps {
 	lane: Lane;
