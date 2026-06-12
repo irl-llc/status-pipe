@@ -12,6 +12,7 @@ import { cleanup, fireEvent, render, RenderResult } from '@testing-library/react
 import type { ReactElement } from 'react';
 
 import { WebviewMessage } from '../../../host/webviewTypes';
+import { emptyActivity } from '../../../output/claudeStream';
 import {
 	AckChipState,
 	AgentDisplay,
@@ -90,6 +91,7 @@ function makeAgent(overrides: Partial<AgentDisplay> = {}): AgentDisplay {
 		lastOutputAt: null,
 		consecutiveFailures: 0,
 		detail: null,
+		activity: emptyActivity(),
 		...overrides,
 	};
 }
@@ -456,6 +458,24 @@ describe('queueView/components', () => {
 			assert.ok(result.getByTitle('Stop')); // scheduled is "active" → Stop
 			assert.ok(result.getByTitle('Tick now'));
 			assert.ok(result.getByTitle('Open log'));
+		});
+
+		it('shows the current tool and target in a running agent meta (from stream-json)', () => {
+			const activity = {
+				...emptyActivity(),
+				phase: 'working' as const,
+				currentTool: 'Edit',
+				currentToolDetail: 'protocol/parse.ts',
+			};
+			const state = makeState({ agents: [makeAgent({ state: 'running', activity })] });
+			const { result } = renderWithPost(<AgentsStrip state={state} />);
+			assert.ok(result.getByText('running · Edit: protocol/parse.ts'));
+		});
+
+		it('falls back to uptime for a running agent with no parsed activity', () => {
+			const state = makeState({ agents: [makeAgent({ state: 'running', runningSince: GENERATED_AT - 120_000 })] });
+			const { result } = renderWithPost(<AgentsStrip state={state} />);
+			assert.ok(result.getByText(/^running 2m/));
 		});
 	});
 

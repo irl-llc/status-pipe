@@ -8,6 +8,7 @@
 
 import { useState, type JSX } from 'react';
 
+import { AgentActivity } from '../../output/claudeStream';
 import { AgentDisplay, DisplayState } from '../../queue/displayTypes';
 import { formatDuration } from '../format';
 import { AGENT_STATE_ICON } from '../icons';
@@ -113,11 +114,30 @@ function scheduledMeta(agent: AgentDisplay, now: number): string {
 const META: Partial<Record<AgentDisplay['state'], (a: AgentDisplay, now: number) => string>> = {
 	scheduled: scheduledMeta,
 	backoff: scheduledMeta,
-	running: (a, now) => (a.runningSince !== null ? `running ${formatDuration(now - a.runningSince)}` : 'running'),
+	running: runningMeta,
 	failed: (a) => a.detail ?? `failed ×${a.consecutiveFailures}`,
 	parked: (a) => a.detail ?? 'parked — all work waiting on you',
 	stopped: (a) => (a.installed ? 'stopped' : stoppedConfigMeta(a)),
 };
+
+/** A running agent shows what it's doing right now (from its output), else uptime. */
+function runningMeta(agent: AgentDisplay, now: number): string {
+	const activity = activitySummary(agent.activity);
+	if (activity) return `running · ${activity}`;
+	return agent.runningSince !== null ? `running ${formatDuration(now - agent.runningSince)}` : 'running';
+}
+
+/** The current tool + target, or the last thing the agent said. */
+export function activitySummary(activity: AgentActivity): string | null {
+	if (activity.currentTool) {
+		return activity.currentToolDetail ? `${activity.currentTool}: ${activity.currentToolDetail}` : activity.currentTool;
+	}
+	return activity.lastText ? clip(activity.lastText, 60) : null;
+}
+
+function clip(text: string, max: number): string {
+	return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
 
 function agentMeta(agent: AgentDisplay, now: number): string {
 	return META[agent.state]?.(agent, now) ?? agent.detail ?? agent.state;

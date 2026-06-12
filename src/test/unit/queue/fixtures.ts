@@ -6,6 +6,7 @@
  */
 
 import { PullRequestInfo } from '../../../forge/types';
+import { emptyActivity } from '../../../output/claudeStream';
 import { buildAck } from '../../../protocol/ackId';
 import { ConfigFile, LaunchFile, OrchestratorFile, TicketFile, TicketPr } from '../../../protocol/types';
 import {
@@ -153,6 +154,7 @@ export function makeAgent(overrides: Partial<AgentProcessState> = {}): AgentProc
 		consecutiveFailures: 0,
 		lastExitCode: null,
 		detail: null,
+		activity: emptyActivity(),
 		...overrides,
 	};
 }

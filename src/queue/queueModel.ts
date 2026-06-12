@@ -4,6 +4,7 @@
  * Unit-test target #1 — no I/O, no clocks, no vscode.
  */
 
+import { emptyActivity } from '../output/claudeStream';
 import { LaunchAgent, TicketFile } from '../protocol/types';
 import { AckContext, deriveAckControl, hasFreshPendingAck, hasStaleAck } from './ackState';
 import {
@@ -309,7 +310,7 @@ function repoLaunchers(repo: RepoState, allLive: AgentProcessState[]): AgentDisp
 
 type RuntimeFields = Pick<
 	AgentDisplay,
-	'installed' | 'state' | 'nextTickAt' | 'runningSince' | 'lastOutputAt' | 'consecutiveFailures' | 'detail'
+	'installed' | 'state' | 'nextTickAt' | 'runningSince' | 'lastOutputAt' | 'consecutiveFailures' | 'detail' | 'activity'
 >;
 
 /** Runtime fields from the live runner, or the stopped/not-installed defaults. */
@@ -323,10 +324,11 @@ function runtimeFields(live: AgentProcessState | null): RuntimeFields {
 			lastOutputAt: null,
 			consecutiveFailures: 0,
 			detail: null,
+			activity: emptyActivity(),
 		};
 	}
-	const { state, nextTickAt, runningSince, lastOutputAt, consecutiveFailures, detail } = live;
-	return { installed: true, state, nextTickAt, runningSince, lastOutputAt, consecutiveFailures, detail };
+	const { state, nextTickAt, runningSince, lastOutputAt, consecutiveFailures, detail, activity } = live;
+	return { installed: true, state, nextTickAt, runningSince, lastOutputAt, consecutiveFailures, detail, activity };
 }
 
 function launcherDisplay(repo: RepoState, declared: LaunchAgent, live: AgentProcessState | null): AgentDisplay {
