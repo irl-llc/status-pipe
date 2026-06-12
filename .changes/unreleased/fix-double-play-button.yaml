@@ -1,0 +1,2 @@
+kind: Fixed
+body: 'A stopped launch config no longer shows two near-identical play buttons. Tick-now is offered only while the supervisor is between passes (scheduled/backoff/parked), since Run already does an immediate pass on a stopped agent.'
