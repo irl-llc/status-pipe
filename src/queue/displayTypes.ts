@@ -140,12 +140,22 @@ export type AgentRunState =
 	| 'failed'
 	| 'parked';
 
+/**
+ * One row per declared launch configuration (.status-pipe/launch.json),
+ * joined with live supervisor state. A config the supervisor has never
+ * installed (e.g. not yet approved) still gets a row — `installed: false`,
+ * `state: 'stopped'` — so the strip can offer a Run button for it.
+ */
 export interface AgentDisplay {
 	repoRoot: string;
 	repoName: string;
 	agentId: string;
 	title: string;
 	mode: 'tick' | 'daemon';
+	/** Tick cadence in minutes; null for daemon mode or orphaned runners. */
+	intervalMinutes: number | null;
+	/** True once the supervisor holds a runner for this config (approved). */
+	installed: boolean;
 	state: AgentRunState;
 	nextTickAt: number | null;
 	runningSince: number | null;

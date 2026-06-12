@@ -178,6 +178,52 @@ export function degradedRepo(): FixtureRepoSpec {
 	};
 }
 
+/**
+ * A repo whose launch.json declares two configs (one tick, one daemon).
+ * Neither is approved in the test, so both render as declared-but-stopped
+ * rows with Run buttons — the launch-config strip's default state.
+ */
+export function launchConfigsRepo(): FixtureRepoSpec {
+	return {
+		name: 'fleet-api',
+		remoteUrl: 'https://github.com/acme/fleet-api.git',
+		orchestrator: { schemaVersion: 1, repo: 'acme/fleet-api', passCount: 3, lastPassFinishedAt: minutesAgo(12) },
+		launch: {
+			schemaVersion: 1,
+			agents: [
+				{
+					id: 'orchestrator',
+					title: 'Orchestrator',
+					command: 'claude',
+					args: ['-p'],
+					mode: 'tick',
+					intervalMinutes: 10,
+				},
+				{ id: 'watcher', title: 'CI watcher', command: 'claude', args: ['-p'], mode: 'daemon' },
+			],
+		},
+		tickets: [
+			{
+				key: '142',
+				body: ticketBody({
+					ticket: '142',
+					title: 'Rotate signing keys',
+					health: 'waiting',
+					phase: 'review',
+					headline: 'PR is up and ready for review.',
+					waitingOn: { kind: 'review', ref: null, pr: 512, since: minutesAgo(40), detail: 'PR #512 awaiting review' },
+					updatedAt: minutesAgo(40),
+				}),
+			},
+		],
+	};
+}
+
+/** A discovered repo with no tickets, no orchestrator, and no launch.json. */
+export function unconfiguredRepo(): FixtureRepoSpec {
+	return { name: 'fresh-repo', remoteUrl: 'https://github.com/acme/fresh-repo.git', tickets: [] };
+}
+
 export function quietRepo(): FixtureRepoSpec {
 	return {
 		name: 'fleet-api',

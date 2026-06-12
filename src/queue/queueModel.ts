@@ -4,7 +4,7 @@
  * Unit-test target #1 — no I/O, no clocks, no vscode.
  */
 
-import { TicketFile } from '../protocol/types';
+import { LaunchAgent, TicketFile } from '../protocol/types';
 import { AckContext, deriveAckControl, hasFreshPendingAck, hasStaleAck } from './ackState';
 import {
 	AgentDisplay,
@@ -31,7 +31,7 @@ export function buildDisplayState(input: QueueModelInput): DisplayState {
 		generatedAt: input.now,
 		multiRepo: input.repos.length > 1,
 		repos: input.repos.map(repoDisplay),
-		agents: input.agents.map((a) => agentDisplay(a, input.repos)),
+		agents: input.repos.flatMap((repo) => repoLaunchers(repo, input.agents)),
 		cards,
 		counts: countLanes(cards),
 		activity: input.activity,
@@ -290,18 +290,65 @@ function repoDisplay(repo: RepoState): RepoDisplay {
 	};
 }
 
-function agentDisplay(agent: AgentProcessState, repos: RepoState[]): AgentDisplay {
+/**
+ * One launcher row per declared launch config, joined with live supervisor
+ * state; plus any live runner whose config was removed from launch.json
+ * (kept until it stops so a running agent never silently vanishes).
+ */
+function repoLaunchers(repo: RepoState, allLive: AgentProcessState[]): AgentDisplay[] {
+	// A worktree opened without its primary is monitor-only — supervision is
+	// disabled, so offering Run/Stop controls there would be a lie.
+	if (repo.monitorOnly) return [];
+	const live = allLive.filter((a) => a.repoRoot === repo.repoRoot);
+	const declared = repo.launch?.agents ?? [];
+	const declaredIds = new Set(declared.map((d) => d.id));
+	const fromDeclared = declared.map((d) => launcherDisplay(repo, d, live.find((a) => a.agentId === d.id) ?? null));
+	const orphans = live.filter((a) => !declaredIds.has(a.agentId)).map((a) => orphanLauncher(repo, a));
+	return [...fromDeclared, ...orphans];
+}
+
+type RuntimeFields = Pick<
+	AgentDisplay,
+	'installed' | 'state' | 'nextTickAt' | 'runningSince' | 'lastOutputAt' | 'consecutiveFailures' | 'detail'
+>;
+
+/** Runtime fields from the live runner, or the stopped/not-installed defaults. */
+function runtimeFields(live: AgentProcessState | null): RuntimeFields {
+	if (!live) {
+		return {
+			installed: false,
+			state: 'stopped',
+			nextTickAt: null,
+			runningSince: null,
+			lastOutputAt: null,
+			consecutiveFailures: 0,
+			detail: null,
+		};
+	}
+	const { state, nextTickAt, runningSince, lastOutputAt, consecutiveFailures, detail } = live;
+	return { installed: true, state, nextTickAt, runningSince, lastOutputAt, consecutiveFailures, detail };
+}
+
+function launcherDisplay(repo: RepoState, declared: LaunchAgent, live: AgentProcessState | null): AgentDisplay {
 	return {
-		repoRoot: agent.repoRoot,
-		repoName: repos.find((r) => r.repoRoot === agent.repoRoot)?.name ?? agent.repoRoot,
-		agentId: agent.agentId,
-		title: agent.title,
-		mode: agent.mode,
-		state: agent.state,
-		nextTickAt: agent.nextTickAt,
-		runningSince: agent.runningSince,
-		lastOutputAt: agent.lastOutputAt,
-		consecutiveFailures: agent.consecutiveFailures,
-		detail: agent.detail,
+		repoRoot: repo.repoRoot,
+		repoName: repo.name,
+		agentId: declared.id,
+		title: declared.title,
+		mode: declared.mode,
+		intervalMinutes: declared.mode === 'tick' ? declared.intervalMinutes : null,
+		...runtimeFields(live),
+	};
+}
+
+function orphanLauncher(repo: RepoState, live: AgentProcessState): AgentDisplay {
+	return {
+		repoRoot: repo.repoRoot,
+		repoName: repo.name,
+		agentId: live.agentId,
+		title: live.title,
+		mode: live.mode,
+		intervalMinutes: null,
+		...runtimeFields(live),
 	};
 }

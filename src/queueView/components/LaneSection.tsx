@@ -7,7 +7,11 @@
 import { useState, type JSX } from 'react';
 
 import { CardDisplay, DisplayState, Lane } from '../../queue/displayTypes';
+import { usePost } from './QueueApp';
 import { TicketCard } from './TicketCard';
+
+/** Launch & supervision reference (design/09). */
+const LAUNCH_DOCS_URL = 'https://github.com/ed-irl/status-pipe/blob/main/design/09-launch-and-supervision.md';
 
 export interface LaneSectionProps {
 	lane: Lane;
@@ -46,11 +50,38 @@ export function LaneSection(props: LaneSectionProps): JSX.Element | null {
 	);
 }
 
-/** Empty needs-you → the product sentence; non-empty + parked → its inverse. */
+/**
+ * Empty needs-you → the configure prompt when nothing is set up at all,
+ * otherwise the product sentence; non-empty + parked → its inverse.
+ */
 function LaneNotice({ cards, state }: { cards: CardDisplay[]; state: DisplayState }): JSX.Element | null {
-	if (cards.length === 0) return <div className="lane-empty">{emptyNeedsYouLine(state)}</div>;
+	if (cards.length === 0) {
+		return isUnconfigured(state) ? <ConfigurePrompt /> : <div className="lane-empty">{emptyNeedsYouLine(state)}</div>;
+	}
 	const parked = parkedLine(state);
 	return parked ? <div className="lane-empty">{parked}</div> : null;
+}
+
+/** No status files and no launch configs anywhere — a brand-new workspace. */
+function isUnconfigured(state: DisplayState): boolean {
+	return state.cards.length === 0 && state.agents.length === 0;
+}
+
+/** Onboarding for an unconfigured workspace (design/09): point at the docs. */
+function ConfigurePrompt(): JSX.Element {
+	const post = usePost();
+	return (
+		<div className="lane-empty configure-prompt">
+			<div className="configure-title">No automation configured.</div>
+			<div className="dim">
+				Add a <code>.status-pipe/launch.json</code> so Status Pipe can launch and supervise this repo&apos;s agent loop
+				— or just commit ticket state files to monitor an existing loop.
+			</div>
+			<button className="text-button" onClick={() => post({ type: 'openExternal', url: LAUNCH_DOCS_URL })}>
+				How to configure a launch file
+			</button>
+		</div>
+	);
 }
 
 /**

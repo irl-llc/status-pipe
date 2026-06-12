@@ -82,6 +82,8 @@ function makeAgent(overrides: Partial<AgentDisplay> = {}): AgentDisplay {
 		agentId: 'orc',
 		title: 'Orchestrator',
 		mode: 'tick',
+		intervalMinutes: 10,
+		installed: true,
 		state: 'running',
 		nextTickAt: null,
 		runningSince: GENERATED_AT - 60_000,
@@ -386,8 +388,8 @@ describe('queueView/components', () => {
 		});
 	});
 
-	describe('AgentsStrip', () => {
-		it('renders nothing without agents', () => {
+	describe('AgentsStrip (launch configs)', () => {
+		it('renders nothing without launch configs', () => {
 			const { result } = renderWithPost(<AgentsStrip state={makeState()} />);
 			assert.equal(result.container.innerHTML, '');
 		});
@@ -401,24 +403,24 @@ describe('queueView/components', () => {
 				],
 			});
 			const { result } = renderWithPost(<AgentsStrip state={state} />);
-			assert.ok(result.getByText('agents: 1 running · 2 scheduled (5m)'));
+			assert.ok(result.getByText('3 launch configs: 1 running · 2 scheduled (5m)'));
 		});
 
-		it('describes a parked agent with the product phrase', () => {
+		it('describes a parked config with the product phrase', () => {
 			const state = makeState({ agents: [makeAgent({ state: 'parked' })] });
 			const { result } = renderWithPost(<AgentsStrip state={state} />);
-			assert.ok(result.getByText('agent: 1 parked — all work waiting on you'));
+			assert.ok(result.getByText('1 launch config: 1 parked — all work waiting on you'));
 		});
 
-		it('expands to one row per agent with state icon and actions', () => {
+		it('renders one row per config, expanded by default, with the right primary control', () => {
 			const state = makeState({
 				agents: [
-					makeAgent(),
-					makeAgent({ agentId: 'b', state: 'failed', consecutiveFailures: 3, detail: 'exit 1 ×3' }),
+					makeAgent({ title: 'Orchestrator' }),
+					makeAgent({ agentId: 'b', title: 'Daemon B', state: 'failed', consecutiveFailures: 3, detail: 'exit 1 ×3' }),
 				],
 			});
 			const { result, messages } = renderWithPost(<AgentsStrip state={state} />);
-			fireEvent.click(result.container.querySelector('.summary')!);
+			// Expanded by default — no click needed to see the rows or controls.
 			assert.equal(result.container.querySelectorAll('.agent-row').length, 2);
 			assert.ok(result.container.querySelector('.codicon-pulse')); // running
 			assert.ok(result.container.querySelector('.codicon-warning')); // failed
@@ -430,6 +432,60 @@ describe('queueView/components', () => {
 				{ type: 'agentControl', repoRoot: '/repo', agentId: 'orc', action: 'stop' },
 				{ type: 'agentControl', repoRoot: '/repo', agentId: 'b', action: 'retry' },
 			]);
+		});
+
+		it('offers Run (not Tick/Log) for a declared-but-not-installed config and shows its cadence', () => {
+			const state = makeState({
+				agents: [makeAgent({ installed: false, state: 'stopped', runningSince: null, intervalMinutes: 15 })],
+			});
+			const { result, messages } = renderWithPost(<AgentsStrip state={state} />);
+			assert.ok(result.getByText('every 15m · not started'));
+			assert.equal(result.queryByTitle('Tick now'), null); // not installed → no immediate tick
+			assert.equal(result.queryByTitle('Open log'), null); // no channel yet
+			fireEvent.click(result.getByTitle('Run'));
+			assert.deepEqual(messages, [{ type: 'agentControl', repoRoot: '/repo', agentId: 'orc', action: 'start' }]);
+		});
+
+		it('offers Tick now and Open log for an installed but idle config', () => {
+			const state = makeState({
+				agents: [
+					makeAgent({ installed: true, state: 'scheduled', runningSince: null, nextTickAt: GENERATED_AT + 60_000 }),
+				],
+			});
+			const { result } = renderWithPost(<AgentsStrip state={state} />);
+			assert.ok(result.getByTitle('Stop')); // scheduled is "active" → Stop
+			assert.ok(result.getByTitle('Tick now'));
+			assert.ok(result.getByTitle('Open log'));
+		});
+	});
+
+	describe('configure prompt (unconfigured workspace)', () => {
+		function renderNeedsYou(state: DisplayState): Rendered {
+			return renderWithPost(
+				<LaneSection
+					lane="needs-you"
+					title="NEEDS YOU"
+					cards={[]}
+					state={state}
+					selectedId={null}
+					onSelect={() => undefined}
+				/>,
+			);
+		}
+
+		it('replaces the all-quiet line with a configure prompt when nothing is set up', () => {
+			const { result, messages } = renderNeedsYou(makeState({ cards: [], agents: [] }));
+			assert.ok(result.getByText('No automation configured.'));
+			assert.equal(result.queryByText(/^All quiet/), null);
+			fireEvent.click(result.getByText('How to configure a launch file'));
+			assert.equal(messages.length, 1);
+			assert.equal(messages[0].type, 'openExternal');
+		});
+
+		it('shows the all-quiet line (not the prompt) once a launch config exists', () => {
+			const { result } = renderNeedsYou(makeState({ cards: [], agents: [makeAgent({ state: 'stopped' })] }));
+			assert.ok(result.getByText(/^All quiet/));
+			assert.equal(result.queryByText('No automation configured.'), null);
 		});
 	});
 

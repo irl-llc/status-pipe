@@ -1,0 +1,2 @@
+kind: Added
+body: 'Launch-config strip at the top of the queue: every declared `.status-pipe/launch.json` config gets a status row and a Run/Stop control (Tick now, Open log, Retry where they apply), including configs that have not been started yet. An unconfigured workspace (no status files, no launch config) now shows a prompt with a link to the launch-file docs.'

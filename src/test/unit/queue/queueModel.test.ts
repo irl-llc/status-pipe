@@ -7,11 +7,12 @@
 
 import * as assert from 'assert';
 
-import { TicketFile, WaitingOn, WorkerState } from '../../../protocol/types';
+import { LaunchFile, TicketFile, WaitingOn, WorkerState } from '../../../protocol/types';
 import { CardDisplay } from '../../../queue/displayTypes';
 import { RepoEnrichment, RepoState } from '../../../queue/queueInputs';
 import { buildDisplayState } from '../../../queue/queueModel';
 import {
+	NOW,
 	ackFor,
 	corruptEntry,
 	hoursAgo,
@@ -559,6 +560,56 @@ describe('queue/queueModel buildDisplayState', () => {
 			const state = buildDisplayState(makeInput([makeRepo({ monitorOnly: true })]));
 			assert.strictEqual(state.repos[0].monitorOnlyNote, 'worktree of app — supervision disabled');
 			assert.strictEqual(buildDisplayState(makeInput([makeRepo()])).repos[0].monitorOnlyNote, null);
+		});
+	});
+
+	describe('launch config rows', () => {
+		it('surfaces a declared config with no runner as a stopped, not-installed row', () => {
+			// launch.json declares it, but the supervisor never installed it
+			// (e.g. not yet approved) — no matching AgentProcessState.
+			const repo = makeRepo({ launch: makeLaunch(15) });
+			const state = buildDisplayState(makeInput([repo], []));
+			assert.strictEqual(state.agents.length, 1);
+			const row = state.agents[0];
+			assert.strictEqual(row.agentId, 'orchestrator');
+			assert.strictEqual(row.state, 'stopped');
+			assert.strictEqual(row.installed, false);
+			assert.strictEqual(row.intervalMinutes, 15);
+		});
+
+		it('joins a declared config with its live runner state (installed)', () => {
+			const repo = makeRepo({ launch: makeLaunch(10) });
+			const live = makeAgent({ state: 'running', runningSince: NOW - 60_000 });
+			const row = buildDisplayState(makeInput([repo], [live])).agents[0];
+			assert.strictEqual(row.installed, true);
+			assert.strictEqual(row.state, 'running');
+			assert.strictEqual(row.runningSince, NOW - 60_000);
+			assert.strictEqual(row.intervalMinutes, 10); // from the declared config, not the runner
+		});
+
+		it('keeps a live runner whose config was removed from launch.json (orphan), marked installed', () => {
+			// No launch file, but a runner still exists — never silently drop it.
+			const repo = makeRepo({ launch: null });
+			const live = makeAgent({ state: 'running' });
+			const rows = buildDisplayState(makeInput([repo], [live])).agents;
+			assert.strictEqual(rows.length, 1);
+			assert.strictEqual(rows[0].installed, true);
+			assert.strictEqual(rows[0].intervalMinutes, null);
+		});
+
+		it('shows no launcher rows for a monitor-only worktree (supervision disabled)', () => {
+			const repo = makeRepo({ monitorOnly: true, launch: makeLaunch(10) });
+			assert.deepStrictEqual(buildDisplayState(makeInput([repo], [])).agents, []);
+		});
+
+		it('reports null intervalMinutes for a declared daemon config', () => {
+			const launch: LaunchFile = {
+				schemaVersion: 1,
+				agents: [{ ...makeLaunch().agents[0], id: 'd', mode: 'daemon' }],
+			};
+			const row = buildDisplayState(makeInput([makeRepo({ launch })], [])).agents[0];
+			assert.strictEqual(row.mode, 'daemon');
+			assert.strictEqual(row.intervalMinutes, null);
 		});
 	});
 });
