@@ -56,6 +56,15 @@ arg vector, stdin payload), not a Claude invocation. JSON Schema ships at
   empty) is written to the child's stdin then closed — supports backends that
   take their prompt on stdin rather than argv.
 - `cwd` relative to the repo root; `env` merged over the inherited environment.
+- **`%home%` substitution**: the token `%home%` in `command`, `args`, `cwd`, and
+  `env` values expands to the user's home directory at spawn time, so a
+  committed file need not bake in a machine-specific absolute path (e.g.
+  `"GH_CONFIG_DIR": "%home%/.config/claude-gh"`). It is the *only* substitution
+  and is deliberately **not** shell-style `${...}` — a bare `%home%` can't be
+  mistaken for shell expansion, so no one expects `${VAR}`, `${VAR:-default}`, or
+  command substitution. Resolution happens **after** trust approval, which
+  hashes the raw committed form (below), so an approval stays valid across
+  machines.
 - `mode`:
   - **`tick`** — the process performs one orchestration pass and exits;
     the extension re-launches `intervalMinutes` **after the previous tick
