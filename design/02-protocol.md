@@ -6,6 +6,13 @@ between agents and the extension. Naming and roles per
 with one exception: ack files in `inbox/`, which the extension (the operator)
 writes and the orchestrator consumes.
 
+This is genuinely the *sole* agent↔extension coupling. Live forge data (CI,
+review state) is not part of it: the extension obtains that by delegating to a
+configured enrichment command ([03-forge.md](03-forge.md)), an
+extension↔forge concern that neither the agent nor this protocol mediates. The
+agent writes files; the extension reads files and, separately, runs a command.
+Neither side embeds the other's forge or tools.
+
 The protocol is the direct descendant of the `.autopilot` convention shared by
 the `irl-llc` and `git-spice-code-extension` prototypes; the rename mapping for
 migrating those repos is in [10-naming.md](10-naming.md).
