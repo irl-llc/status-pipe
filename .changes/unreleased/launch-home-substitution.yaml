@@ -1,0 +1,2 @@
+kind: Added
+body: 'Launch configs (`.status-pipe/launch.json`) now expand the token `%home%` to the user''s home directory in `command`, `args`, `cwd`, and `env` values, so a committed file need not hard-code a machine-specific absolute path (e.g. `"GH_CONFIG_DIR": "%home%/.config/claude-gh"`). It is the only substitution and is deliberately not shell-style `${...}`, so it can''t be mistaken for shell expansion. Resolution happens at spawn time, after trust approval (which hashes the committed `%home%` form), so approvals stay valid across machines.'

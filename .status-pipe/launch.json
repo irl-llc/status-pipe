@@ -16,7 +16,14 @@
 			],
 			"stdin": "",
 			"cwd": ".",
-			"env": {},
+			"env": {
+				"GH_CONFIG_DIR": "%home%/.config/claude-gh",
+				"GIT_CONFIG_COUNT": "2",
+				"GIT_CONFIG_KEY_0": "credential.https://github.com.helper",
+				"GIT_CONFIG_VALUE_0": "",
+				"GIT_CONFIG_KEY_1": "credential.https://github.com.helper",
+				"GIT_CONFIG_VALUE_1": "!gh auth git-credential"
+			},
 			"mode": "tick",
 			"intervalMinutes": 10,
 			"timeoutMinutes": 45

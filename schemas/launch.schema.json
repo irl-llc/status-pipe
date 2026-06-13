@@ -2,7 +2,7 @@
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"$id": "https://github.com/irl-llc/status-pipe/schemas/launch.schema.json",
 	"title": "status-pipe launch file",
-	"description": "Committed at .status-pipe/launch.json: how to launch this repo's agent loop. Backend-agnostic process contract. Execution is trust-gated: workspace trust plus per-content-hash approval of the complete entry (command, args, stdin, cwd, env). Never launched from a linked worktree.",
+	"description": "Committed at .status-pipe/launch.json: how to launch this repo's agent loop. Backend-agnostic process contract. The token %home% in command/args/cwd/env values expands to the user's home directory at spawn time (the only substitution — deliberately not shell-style ${...}), so a committed file need not hard-code an absolute path. Execution is trust-gated: workspace trust plus per-content-hash approval of the complete entry (command, args, stdin, cwd, env), hashed in its committed %home% form. Never launched from a linked worktree.",
 	"type": "object",
 	"required": ["schemaVersion", "agents"],
 	"additionalProperties": true,
@@ -42,7 +42,7 @@
 						"type": "object",
 						"additionalProperties": { "type": "string" },
 						"default": {},
-						"description": "Merged over the inherited environment"
+						"description": "Merged over the inherited environment. Values support %home% (the user's home directory)."
 					},
 					"mode": {
 						"enum": ["tick", "daemon"],
