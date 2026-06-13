@@ -9,8 +9,9 @@ typed message bus between them. Two webpack bundles from one TypeScript project.
 │                                                                                    │
 │  repoDiscovery ──► protocolStore ◄── protocolWatcher (fs watch .status-pipe/**)      │
 │      │                 │                                                           │
-│      │                 ├──◄ forgeEnricher (debounced; ForgeRepository per repo)    │
-│      │                 │        └── forge registry: github | bitbucket | fake      │
+│      │                 ├──◄ forgeEnricher (debounced; spawns the enrich command)   │
+│      │                 │        └── enrich command: bundled default | configured   │
+│      │                 │            (owns forge dialect + auth; Workspace-Trust gated)│
 │      │                 ▼                                                           │
 │      │           queueModel (pure: ticket files + enrichment → DisplayState)        │
 │      │                 │                                                           │
@@ -56,7 +57,8 @@ One `vscode.FileSystemWatcher` per protocol dir on the pattern
 handler to: `tickets/*.json`, `orchestrator.json`, `inbox/**/*.json` — plus
 the two committed files, whose changes re-trigger their own flows
 (`launch.json` → re-approval per content hash, `config.json` → re-resolve
-ticketing/trust display hints). Events are
+ticketing/trust display hints **and the `forge.enrich` command**, the latter
+re-gated by Workspace Trust). Events are
 coalesced (250ms) because agent passes rewrite several files in a burst.
 `protocolStore` parses with a tolerant reader: JSON parse errors (a file caught
 mid-rename) retry once after 200ms, then surface a "corrupt ticket file" badge
@@ -65,16 +67,22 @@ card. Holds the canonical map `repoRoot → { orchestratorMeta, tickets: Map<str
 TicketState>, acks: Map<string, AckFile[]> }`.
 
 ### `forgeEnricher`
-Per repo: collects all PR numbers across that repo's ticket files, batch-calls
-`ForgeRepository.getPullRequests` / `getChecks` / `getLinkedTickets`, caches
-results with timestamps. Triggers: ticket-file change (debounced 5s,
-change-driven — only the PRs the changed file references), visible view +
-stale cache (>60s), focus regained, manual refresh. The full cache/budget
-design (persisted `workspaceState` cache, terminal-state freeze, ETags, rate
-budgeting and backoff) is in [03-forge.md](03-forge.md). Enrichment results
-merge into the store as an overlay — the ticket file is never mutated, and a
-card can always render without the overlay. Enricher activity/degradation is
-published to the views' reserved activity slot, never as per-card errors.
+Per repo: collects the PR numbers and ticket keys across that repo's ticket
+files, **spawns the configured enrichment command** with that working set on
+stdin, and parses the enrichment document from stdout
+([03-forge.md](03-forge.md)). It resolves which command to run (committed
+`config.json forge.enrich` → `statusPipe.forge.enrichCommand` → bundled
+default), and **gates any operator-supplied command behind VS Code Workspace
+Trust** — untrusted workspace ⇒ bundled default or file-only, never an
+operator's command. The extension holds no forge token; auth is entirely the
+command's. Triggers: ticket-file change (debounced 5s, change-driven — only the
+PRs the changed file references), visible view + stale cache (>60s), focus
+regained, manual refresh. The extension owns *cadence and caching* (persisted
+`workspaceState` overlay, terminal-state freeze, min-interval); the command owns
+*how it fetches* (batching, ETags, rate budgeting). Results merge into the store
+as an overlay — the ticket file is never mutated, and a card always renders
+without it. Command activity/degradation is published to the views' reserved
+activity slot, never as per-card errors.
 
 ### `agentSupervisor` (fleet mode; see [09-launch-and-supervision.md](09-launch-and-supervision.md))
 Reads `.status-pipe/launch.json` per repo (trust-gated by content hash), runs the
@@ -146,11 +154,8 @@ for iconography; CSP with nonce exactly as git-spice-code-extension's
 
 | setting | default | notes |
 |---|---|---|
-| `statusPipe.forge.type` | `auto` | `auto\|github\|bitbucket`, resource-scoped |
-| `statusPipe.forge.github.baseUrl/apiUrl/token` | github.com | token falls back to env/gh/VS Code auth |
-| `statusPipe.forge.bitbucket.baseUrl/apiUrl/token` | bitbucket.org | token falls back to env/SecretStorage |
-| `statusPipe.tickets.jira.siteUrl/email` | — | Jira Cloud ticketing for Bitbucket repos; token via env/SecretStorage |
-| `statusPipe.forge.refreshIntervalSeconds` | 60 | enrichment min interval |
+| `statusPipe.forge.enrichCommand` | — | machine-level override of the enrichment command (argv); committed `config.json forge.enrich` takes precedence; empty ⇒ bundled default. Forge type, base URLs, and auth are options of the *command*, not the extension. Operator-supplied commands run only in a trusted workspace. |
+| `statusPipe.forge.refreshIntervalSeconds` | 60 | enrichment min interval (how often the command is invoked) |
 | `statusPipe.protocolDir` | `.status-pipe` | escape hatch for future conventions |
 | `statusPipe.staleWorkerMinutesDefault` | 30 | when orchestrator.json absent |
 | `statusPipe.launch.enabled` | true | master switch for the supervisor |
@@ -163,10 +168,11 @@ for iconography; CSP with nonce exactly as git-spice-code-extension's
 
 ## Commands
 
-`statusPipe.openInEditor`, `statusPipe.refresh`, `statusPipe.signIn.github`,
-`statusPipe.signIn.bitbucket`, `statusPipe.revealTicketFile`,
+`statusPipe.openInEditor`, `statusPipe.refresh`, `statusPipe.revealTicketFile`,
 `statusPipe.agents.startAll`, `statusPipe.agents.stopAll`,
-`statusPipe.agents.tickNow`, `statusPipe.agents.openLog`.
+`statusPipe.agents.tickNow`, `statusPipe.agents.openLog`. (No `signIn`
+commands — the extension never authenticates to a forge; credentials belong to
+the enrichment command, e.g. `gh auth login`.)
 
 ## Build tooling
 

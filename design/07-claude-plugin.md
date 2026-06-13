@@ -1,16 +1,30 @@
 # Claude Code Plugin: `status-pipe`
 
-The second deliverable: a Claude Code plugin providing a **baseline,
-repo-agnostic agent workflow** that emits the protocol from
-[02-protocol.md](02-protocol.md) — usable in any repo as an alternative
-to the bespoke `autopilot` command sets living in `irl-llc` and
-`git-spice-code-extension` today. The extension is useless without something
+The second deliverable: a Claude Code plugin that emits the protocol from
+[02-protocol.md](02-protocol.md). The extension is useless without something
 writing the files; this plugin is the reference writer.
 
+**It is one opinionated implementation, not a universal one.** It assumes a
+specific toolchain — **`gh`** (GitHub forge I/O), **`git`**, and
+**git-spice** (stacked branches) — and the GitHub/Jira ticketing conventions
+below. Calling it "repo-agnostic" was a leak: the *protocol* is what is
+universal; this plugin is how *one* toolchain writes it. Other toolchains
+(`glab`, graphite, plain branches, a Jira-first shop) are **other plugins**,
+not configuration knobs bolted onto this one — the marketplace can host several,
+and over-parameterizing a single plugin into a conditional swamp is the failure
+mode we are avoiding (surfaces over implementations).
+
+**Shared substrate across variants.** Two things are forge/tool-interaction
+*primitives* and should be reused by every variant rather than re-implemented:
+the `protocol` skill (how to read/write `.status-pipe/` correctly) and the
+`bin/` wrappers (the sanctioned forge read/write commands). A variant differs
+in its *workflow* commands and its *tool* choices, not in how it writes the
+protocol. Factoring these as a shared base is what keeps "many small plugins"
+from becoming copy-paste sprawl.
+
 It lives in this repo under `plugin/` (a Claude Code plugin marketplace can
-point at the repo; it can be split out later — surfaces over implementations:
-the plugin's command names and file contract are the stable surface, its
-location is not).
+point at the repo; it can be split out later — the plugin's command names and
+file contract are the stable surface, its location is not).
 
 ## Structure
 
@@ -234,6 +248,45 @@ The marker's job is social transparency for collaborators (plus a convenient
 human-vs-agent separator for future tooling). It is deliberately **not** a
 trust input — shared-account self-recognition runs on the comment-ID ledger
 above, so a missing or spoofed marker can embarrass but never escalate.
+
+## Forge I/O and identity — delegate to the tool
+
+The plugin's forge reads/writes go through the `bin/` wrappers, and those
+wrappers **delegate to the toolchain rather than reimplementing it.** In this
+GitHub variant that means `gh`: the wrappers shell `gh`/`gh api` and inherit
+`gh`'s resolved identity. They do **not** carry their own
+env→`git credential fill`→`gh` credential ladder.
+
+This is deliberate, and it is the writer-side mirror of the extension's
+delegation ([03-forge.md](03-forge.md)). The reimplemented ladder is exactly
+what once posted agent comments under the operator's personal account: a
+keychain / git-credential-manager token answered `git credential fill` *before*
+`gh`'s deliberately-selected account was consulted, so a bot identity chosen via
+`GH_CONFIG_DIR` was silently shadowed. Delegating to `gh` makes the operator's
+`gh` configuration (account, `GH_CONFIG_DIR`) the **single source of truth** for
+who the agent is on the forge — no second credential plane to drift.
+
+### The comment/commit identity seam is intentional
+
+status-pipe (this plugin) owns exactly one identity surface — **comments** —
+and attributes them to whatever the comment tool (`gh`) is authenticated as,
+typically a **bot** account. Everything that touches the *code* is owned by
+`git` and git-spice, not status-pipe:
+
+| Surface | Determined by | Default identity |
+|---|---|---|
+| Comment author | the `gh` account the wrapper posts with | the **bot** |
+| Commit author | `git config user.email` in the worktree | the **operator** |
+| PR "opened by" | the credential git-spice pushes with | the **operator** |
+
+This split is a feature, not an accident to "fix": comments are clearly the
+agent's, while merged code stays attributable to the human who reviewed and
+approved it. It is configured at the **tool layer** (which `gh` account; which
+git `user.email`) — **not** as a new protocol field; the protocol carries no
+identity surface. A variant that wants full-bot attribution can set the
+worker's `GIT_AUTHOR_EMAIL`/`GIT_COMMITTER_EMAIL` to the bot explicitly; that is
+a per-variant choice, off by default. (`config.attribution` remains
+social-transparency-only and is never an identity or trust input.)
 
 ## Command behavior
 
