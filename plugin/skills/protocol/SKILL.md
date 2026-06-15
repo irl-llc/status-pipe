@@ -271,9 +271,9 @@ assignee scoping.
 Forge comments are the noisiest thing the agent does and the place
 confabulation does the most damage. Comments should be **rare**; every one is
 gated. **Before any `post-comment` call**, spawn a **reviewer subagent** (the
-`Task` tool) and give it only the **draft body** plus the **existing thread
+`Task` tool) and provide the **draft body** plus the **existing thread
 digest** (the `fetch-comments` output you already have — it needs the thread to
-catch repetition). The reviewer judges the draft against four tests:
+catch repetition) as its primary context, while ensuring the subagent retains access to repository tools to verify claims. The reviewer judges the draft against four tests:
 
 1. **No confabulation.** Every claim is backed by real, checkable evidence
    (a link, a path, a run) and is actually true. No invented facts, no
