@@ -1,0 +1,2 @@
+kind: Changed
+body: 'Brevity is now a protocol rule for every operator-facing output (headline, history notes, the pass report, forge comments): state the shortest thing that fully conveys the information, prefer a link over a paragraph about it, and when a pass changed nothing material say exactly that in one line instead of narrating the reconciliation. This directly targets the long, low-content pass reports workers were producing.'

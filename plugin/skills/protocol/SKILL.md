@@ -85,6 +85,13 @@ Schema: `ticket.schema.json`, `schemaVersion: 1`. The filename stem equals the
   operator-readable — "what just happened", not a log line. Example:
   "T2 PR opened; CI running, answering review bot." Bad: "done", a stack
   trace, three sentences.
+- **Brevity is a protocol rule, not a style note.** Every operator-facing
+  output (headline, history notes, the pass report, and any forge comment)
+  states the shortest thing that fully conveys the information. If a pass
+  changed nothing material, say exactly that in one line — do not narrate the
+  reconciliation, do not restate the plan, do not pad. Prefer a link over a
+  paragraph describing what's behind the link. Length is earned by content,
+  never by formatting or recap.
 - **`history[]` is append-only.** Append `{at, phase, note, runId}` on every
   meaningful action (phase change, PR opened, ack consumed, error). Never
   rewrite or delete entries. Notes name ack ids verbatim
