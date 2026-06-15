@@ -5,8 +5,10 @@
  */
 
 import { ChildProcess, spawn } from 'child_process';
+import { homedir } from 'os';
 
 import { ProcessEvents, Spawner } from '../supervisor/agentRunner';
+import { resolveLaunchTemplates } from '../supervisor/launchTemplate';
 
 /**
  * Node may emit both 'error' and 'exit' for one process; the runner
@@ -24,9 +26,10 @@ function wireExitOnce(child: ChildProcess, events: ProcessEvents): void {
 }
 
 export const nodeSpawner: Spawner = (request, events) => {
-	const child = spawn(request.command, request.args, {
-		cwd: request.cwd,
-		env: { ...process.env, ...request.env },
+	const req = resolveLaunchTemplates(request, homedir());
+	const child = spawn(req.command, req.args, {
+		cwd: req.cwd,
+		env: { ...process.env, ...req.env },
 		stdio: ['pipe', 'pipe', 'pipe'],
 	});
 	child.stdout.on('data', (chunk: Buffer) => events.onOutput(chunk.toString('utf8')));
@@ -35,7 +38,7 @@ export const nodeSpawner: Spawner = (request, events) => {
 	// A dead child surfaces via 'error'/'exit'; an unhandled EPIPE on stdin
 	// would otherwise crash the extension host.
 	child.stdin?.on('error', () => undefined);
-	if (request.stdin) child.stdin?.write(request.stdin);
+	if (req.stdin) child.stdin?.write(req.stdin);
 	child.stdin?.end();
 	return { kill: () => child.kill('SIGTERM') };
 };
