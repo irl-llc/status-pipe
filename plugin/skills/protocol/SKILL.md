@@ -163,6 +163,29 @@ Schema: `ticket.schema.json`, `schemaVersion: 1`. The filename stem equals the
   "this needs a CI job" and do **not** propose a CI-based snapshot-regen
   workflow — that is self-generated orthogonal work, which you file for
   operator approval rather than implement on your own.
+- **Orthogonal work — file it, don't implement it.** A pass often surfaces real
+  work outside the current ticket's scope: a separate bug, a missing feature, a
+  refactor, an infra or workflow gap. Do **not** implement it and do **not**
+  quietly widen scope to cover it.
+  - **Search first.** Look for an existing ticket
+    (`gh issue list --search`, JQL) before filing — never mint a duplicate. If
+    one exists, cross-reference it and move on.
+  - **File it, cross-referenced.** Otherwise open a new ticket (label
+    `config.inventory.label`), titled for the work, body linking back
+    ("surfaced while working #<key>"); leave one pointer comment on the current
+    ticket and record the new key in `notes`/`history`. A genuinely new work
+    item is a **new inventory ticket**, not an epic sub-ticket — sub-tickets
+    (§8) are discussion channels carved out of one epic, not separate work.
+  - **Then keep going.** File-and-continue: stay on your actual ticket. Only end
+    the pass with `waitingOn.kind="owner"` if the current ticket **genuinely
+    cannot proceed** without the orthogonal work — then it is a capability wall
+    above, with the new ticket as the blocker `ref`.
+  - **Design proposals need operator approval — through the ticketing system.**
+    You may *propose* a design (write it into the new ticket, set
+    `waitingOn.kind="owner"`), but you may **not** implement a self-generated
+    design without an operator's approval. Approval is an API-verified operator
+    comment or ack (§6) — never your own say-so, never inferred from silence.
+    Do not go whole-hog building a feature you invented.
 
 ## 5. The ack inbox and ackId derivation
 
