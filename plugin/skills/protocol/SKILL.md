@@ -103,6 +103,15 @@ Schema: `ticket.schema.json`, `schemaVersion: 1`. The filename stem equals the
     dead-end.
   - **`notes`**: a free scratchpad for the mental model worth carrying
     (key files, gotchas) that doesn't fit `plan`/`deadEnds`. Rewritten freely.
+- **No-progress signal (`stalledPasses`).** At wrap, if the pass made **no
+  material progress** — no `phase` change AND no new commit, PR, or comment —
+  increment `stalledPasses`; reset it to 0 on any pass that advanced. When it
+  reaches **2**, the work is silently spinning: set `health="error"` and add a
+  `blockers[]` entry (`"<n> passes with no progress — needs operator"`) so it
+  surfaces in NEEDS YOU. A busy-but-stuck worker emits output and heartbeats
+  and exits cleanly, so without this it looks healthy; this is the signal that
+  makes the stall visible. (Pair it with a `deadEnds[]` entry when you know
+  *why* it stalled — capability wall above.)
 - **`waitingOn`** must carry a **deep-linkable `ref`** whenever one exists —
   the exact comment/run/PR URL is the extension's highest-value click. `kind ∈
   {build, review, comment, owner, merge}`; `since` = when the wait began (do

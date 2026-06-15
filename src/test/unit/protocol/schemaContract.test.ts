@@ -78,6 +78,20 @@ describe('protocol/schema contract (schemas/ vs fixtures and writers)', () => {
 		);
 	});
 
+	it('validates a ticket with the no-progress signal (stalledPasses)', () => {
+		assertValid(ticketSchema, ticketBody({ stalledPasses: 2 }), 'ticketBody with stalledPasses');
+		assert.equal(
+			ticketSchema(ticketBody({ stalledPasses: -1 })),
+			false,
+			'a negative stalledPasses must fail validation (minimum: 0)',
+		);
+		assert.equal(
+			ticketSchema(ticketBody({ stalledPasses: 1.5 })),
+			false,
+			'a fractional stalledPasses must fail validation (type: integer)',
+		);
+	});
+
 	it('validates the unit fixture ticket (the parsed shape serializes to a valid file)', () => {
 		assertValid(ticketSchema, JSON.parse(JSON.stringify(makeTicket())), 'makeTicket()');
 	});
