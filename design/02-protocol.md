@@ -77,11 +77,25 @@ extension interprets them:
 | `waitingOn` | null or `{kind, ref, pr, since, detail}` | `kind ∈ {build, review, comment, owner, merge}`. owner/review/merge/comment ⇒ NEEDS YOU; build ⇒ WAITING. `ref` should deep-link the exact comment/run. `since` renders as a live duration. |
 | `prs[]` | `{number, url, head, base, draft, state, ci, part}` | One PR row each; `head`/`base` drive the stack indicators (below). `ci ∈ {unknown, pending, passing, failing}` is the worker's cached view — superseded by live forge checks when enrichment succeeds. |
 | `blockers[]` | string[] | Red text, verbatim; non-empty forces NEEDS YOU regardless of `health`. |
+| `plan` | optional string | Agent working memory: the current plan, carried across passes (rewritten as it evolves). Not rendered today; surfaced in the raw-JSON peek. |
+| `deadEnds[]` | optional `{at, tried, failedBecause, doNotRetryWithout}` | Agent working memory: append-only log of approaches that failed, so a later pass does not repeat them. Not rendered today; raw-JSON peek only. |
+| `notes` | optional string | Agent working memory: free-form scratchpad carried across passes. Not rendered. |
 | `subTickets[]` | optional `{key, url, topic, status}` | Discussion channels carved out of an epic's tracking ticket ([07-claude-plugin.md](07-claude-plugin.md)); listed in the expanded card. Not work items — the epic stays one card. |
 | `agentCommentIds[]` | optional string[] | API ids of comments the agent itself posted (written by the plugin's posting wrapper); the trust gateway excludes them from operator-signal detection on shared accounts ([07-claude-plugin.md](07-claude-plugin.md)). Not rendered. |
 | `history[]` | `{at, phase, note, runId}` | Append-only log; the expanded card's timeline. `runId` is a deliberately generic run reference (CI run, workflow run). Ack consumption/supersession is recorded here. |
 | `worker` | `{status: idle\|running\|error, taskId, startedAt, heartbeatAt}` | Worker liveness. `running` with `heartbeatAt` older than `staleWorkerMinutes` ⇒ stale-worker escalation (NEEDS YOU, top priority). `taskId` is diagnostic only — surfaced in the raw-JSON peek, not rendered. |
 | `updatedAt` | ISO-8601 | Relative timestamp; fair-scheduling sort key within lanes. |
+
+### Agent working memory (`plan`, `deadEnds[]`, `notes`)
+
+Workers run as fresh, memory-less passes (`claude -p`); the durable state above
+is all that survives between them. `plan`/`deadEnds[]`/`notes` are the worker's
+*own* carry-over — distinct from `headline`/`history[]`, which are the
+operator-facing record. A pass writes them so the next pass resumes from a known
+plan and a known set of dead-ends instead of re-deriving from zero (the
+re-derivation that produces confabulation and repeated impossible attempts).
+They are agent-owned and not rendered as card UI today (raw-JSON peek only); the
+extension must tolerate their presence and absence equally.
 
 ### Stack relationships (derived, not stored)
 

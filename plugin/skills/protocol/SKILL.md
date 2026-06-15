@@ -89,6 +89,20 @@ Schema: `ticket.schema.json`, `schemaVersion: 1`. The filename stem equals the
   meaningful action (phase change, PR opened, ack consumed, error). Never
   rewrite or delete entries. Notes name ack ids verbatim
   (`"owner ack 7f3a9c2e consumed: <note>"`).
+- **Working memory (`plan`, `deadEnds[]`, `notes`) — your carry-over between
+  passes.** A worker pass has no session memory; these fields are how the next
+  pass picks up where you left off instead of re-deriving everything (and
+  confabulating to fill the gaps). They are *yours*, distinct from the
+  operator-facing `headline`/`history[]`.
+  - **`plan`**: the current plan in a few lines. **Rewritten** as it evolves —
+    not append-only. Keep it true; a stale plan is worse than none.
+  - **`deadEnds[]`**: **append-only** `{at, tried, failedBecause,
+    doNotRetryWithout}`. Record every approach that failed so no later pass
+    repeats it. `doNotRetryWithout` names what would have to change first
+    (e.g. "operator supplies the release credential"); `null` = a hard
+    dead-end.
+  - **`notes`**: a free scratchpad for the mental model worth carrying
+    (key files, gotchas) that doesn't fit `plan`/`deadEnds`. Rewritten freely.
 - **`waitingOn`** must carry a **deep-linkable `ref`** whenever one exists —
   the exact comment/run/PR URL is the extension's highest-value click. `kind ∈
   {build, review, comment, owner, merge}`; `since` = when the wait began (do
