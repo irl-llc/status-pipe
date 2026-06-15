@@ -46,7 +46,9 @@ one-line lifecycle summaries.
      (`fields.parent = {key: "<parent-key>"}` via REST), same title shape.
 
 3. **One pointer comment on the parent** replaces the in-flight discussion —
-   via the posting wrapper only:
+   via the posting wrapper only, and only after it passes the comment gate
+   (protocol skill §7a — run the adversarial reviewer subagent on the draft;
+   a pointer comment is short, so this is quick):
 
    ```bash
    ${CLAUDE_PLUGIN_ROOT}/bin/post-comment --repo-root "$(git rev-parse --show-toplevel)" \

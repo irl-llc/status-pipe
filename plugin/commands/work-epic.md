@@ -18,8 +18,9 @@ section applies verbatim here** — common-dir anchoring
 (`PROTO="$(git rev-parse --git-common-dir)/../.status-pipe"`), atomic
 rewrites at every phase transition, heartbeats, deep-linkable `waitingOn.ref`
 then END the pass, append-only `history[]`, comments only through
-`fetch-comments`/`post-comment`, attribution on every forge mutation, never
-merge/approve/deploy. The cache key is the **tracking ticket key**: the state
+`fetch-comments`/`post-comment` and only after passing the comment gate
+(protocol skill §7a — adversarial reviewer subagent on the draft), attribution
+on every forge mutation, never merge/approve/deploy. The cache key is the **tracking ticket key**: the state
 file is `$PROTO/tickets/<tracking-key>.json`.
 
 ## Epic-specific orientation (before the phase machine)
