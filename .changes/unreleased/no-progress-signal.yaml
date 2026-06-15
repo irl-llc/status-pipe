@@ -1,0 +1,2 @@
+kind: Added
+body: 'Ticket state files gain a `stalledPasses` counter so a silently spinning worker becomes visible. A worker increments it when a pass ends with no material progress (no phase change and no new commit/PR/comment), resets it on any advancing pass, and at the threshold sets `health="error"` plus a "no progress — needs operator" blocker. A busy-but-stuck worker still emits output, heartbeats, and exits cleanly — so without this it looked healthy; now it surfaces in NEEDS YOU.'

@@ -138,6 +138,11 @@ Final atomic rewrite: accurate `phase`/`health`/`headline`/`waitingOn`/
 (working memory, protocol skill §4 — so the next pass resumes instead of
 re-deriving), history note for the pass, `worker = {status: "idle",
 taskId: null, startedAt: <unchanged>, heartbeatAt: now}`, `updatedAt: now`.
+**Update `stalledPasses`** (protocol skill §4): no material progress this pass
+(no `phase` change and no new commit/PR/comment) ⇒ increment it; any progress
+⇒ reset to 0; at 2 set `health="error"` + a
+`"<n> passes with no progress — needs operator"` blocker (the format protocol
+skill §4 specifies) so the stall surfaces instead of looking healthy.
 Then report in one short block: what advanced, what you're waiting on (with
 links), what the operator must do. Exit cleanly — a worker error you
 recovered from is a history note, not a failure.

@@ -162,6 +162,11 @@
 				}
 			]
 		},
+		"stalledPasses": {
+			"type": "integer",
+			"minimum": 0,
+			"description": "Count of consecutive worker passes that ended with no material progress (no phase change and no new commit/PR/comment). Reset to 0 on any pass that advances. At the worker's threshold the worker escalates (health=error + blocker) so a spinning worker becomes visible instead of looking healthy. Absent = 0."
+		},
 		"updatedAt": { "type": "string", "format": "date-time" }
 	}
 }

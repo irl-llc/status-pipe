@@ -84,6 +84,7 @@ extension interprets them:
 | `agentCommentIds[]` | optional string[] | API ids of comments the agent itself posted (written by the plugin's posting wrapper); the trust gateway excludes them from operator-signal detection on shared accounts ([07-claude-plugin.md](07-claude-plugin.md)). Not rendered. |
 | `history[]` | `{at, phase, note, runId}` | Append-only log; the expanded card's timeline. `runId` is a deliberately generic run reference (CI run, workflow run). Ack consumption/supersession is recorded here. |
 | `worker` | `{status: idle\|running\|error, taskId, startedAt, heartbeatAt}` | Worker liveness. `running` with `heartbeatAt` older than `staleWorkerMinutes` ⇒ stale-worker escalation (NEEDS YOU, top priority). `taskId` is diagnostic only — surfaced in the raw-JSON peek, not rendered. |
+| `stalledPasses` | optional integer | Consecutive worker passes that ended with no material progress; reset to 0 on any advancing pass. At the worker's threshold it escalates (`health="error"` + a blocker) so a spinning worker surfaces in NEEDS YOU instead of looking healthy. Absent = 0; not rendered directly (the escalation is). |
 | `updatedAt` | ISO-8601 | Relative timestamp; fair-scheduling sort key within lanes. |
 
 ### Agent working memory (`plan`, `deadEnds[]`, `notes`)
