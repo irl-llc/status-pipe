@@ -144,7 +144,10 @@ taskId: null, startedAt: <unchanged>, heartbeatAt: now}`, `updatedAt: now`.
 `"<n> passes with no progress — needs operator"` blocker (the format protocol
 skill §4 specifies) so the stall surfaces instead of looking healthy.
 Then report in one short block: what advanced, what you're waiting on (with
-links), what the operator must do. Exit cleanly — a worker error you
+links), what the operator must do. Keep it to the **shortest form that
+conveys the information** (protocol skill §4): if nothing material advanced,
+say that in one line — do not narrate the reconciliation or restate the plan;
+prefer a link over a paragraph about it. Exit cleanly — a worker error you
 recovered from is a history note, not a failure.
 
 If the pass itself crashes irrecoverably, best-effort write
