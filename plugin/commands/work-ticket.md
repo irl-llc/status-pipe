@@ -71,11 +71,12 @@ what was reconciled).
 ### 2. plan
 
 If the work isn't already planned: derive a short, reviewable plan from the
-ticket body + authoritative comments. If the plan needs an operator decision
-(ambiguous scope, two defensible architectures), post the question
-(`post-comment`), set `waitingOn = {kind: "owner", ref: <comment URL>,
-since: now}`, and end the pass. Otherwise write `phase: "implementation"`
-(history: the plan summary, one line).
+ticket body + authoritative comments. **Persist it to the ticket file's `plan`
+field** (a few lines — your carry-over for the next pass, protocol skill §4),
+not just a history one-liner. If the plan needs an operator decision (ambiguous
+scope, two defensible architectures), post the question (`post-comment`), set
+`waitingOn = {kind: "owner", ref: <comment URL>, since: now}`, and end the pass.
+Otherwise write `phase: "implementation"` (history: the plan summary, one line).
 
 ### 3. implement
 
@@ -114,7 +115,9 @@ If CI is green and review comments are addressed: `phase: "awaiting-merge"`,
 ### 7. wrap
 
 Final atomic rewrite: accurate `phase`/`health`/`headline`/`waitingOn`/
-`prs[]`/`blockers[]`, history note for the pass, `worker = {status: "idle",
+`prs[]`/`blockers[]`, **current `plan`/`notes` and any new `deadEnds[]`**
+(working memory, protocol skill §4 — so the next pass resumes instead of
+re-deriving), history note for the pass, `worker = {status: "idle",
 taskId: null, startedAt: <unchanged>, heartbeatAt: now}`, `updatedAt: now`.
 Then report in one short block: what advanced, what you're waiting on (with
 links), what the operator must do. Exit cleanly — a worker error you

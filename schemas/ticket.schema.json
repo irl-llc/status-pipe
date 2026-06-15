@@ -85,6 +85,32 @@
 			"items": { "type": "string" },
 			"description": "Non-empty forces the NEEDS YOU lane regardless of health"
 		},
+		"plan": {
+			"type": ["string", "null"],
+			"description": "The worker's current plan for this ticket, carried across passes. Rewritten as the plan evolves (NOT append-only). Lets a fresh pass resume from a known plan instead of re-deriving one. Agent-owned working memory."
+		},
+		"deadEnds": {
+			"type": "array",
+			"description": "Append-only record of approaches that were tried and failed, so a later pass does not repeat them. Agent-owned working memory.",
+			"items": {
+				"type": "object",
+				"required": ["at", "tried", "failedBecause"],
+				"additionalProperties": true,
+				"properties": {
+					"at": { "type": "string", "format": "date-time" },
+					"tried": { "type": "string", "description": "What was attempted." },
+					"failedBecause": { "type": "string", "description": "Why it did not work." },
+					"doNotRetryWithout": {
+						"type": ["string", "null"],
+						"description": "What would have to change before this is worth retrying (e.g. 'operator runs the CI snapshot job'). null = a hard dead-end."
+					}
+				}
+			}
+		},
+		"notes": {
+			"type": ["string", "null"],
+			"description": "Free-form scratchpad: the worker's mental model of the code/task worth carrying across passes but not fitting plan/deadEnds. Agent-owned; not rendered by the extension."
+		},
 		"subTickets": {
 			"type": "array",
 			"description": "Discussion channels carved out of an epic's tracking ticket. Not work items.",

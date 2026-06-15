@@ -57,10 +57,12 @@ unchecked item in the tracking ticket's tranche checklist):
   edited scope). Consume inbox acks for this ticket (match/supersede →
   history → delete). The epic-level `phase` is the frontier tranche's
   lifecycle position.
-- **plan**: pick the frontier tranche; if the spec is ambiguous or a design
-  decision is operator-shaped, post the question on the **tracking ticket**
-  (or the right sub-ticket), set `waitingOn = {kind: "owner", ref: <comment
-  URL>, since: now}`, end the pass.
+- **plan**: pick the frontier tranche and **persist the tranche plan to the
+  ticket file's `plan` field** (working memory, protocol skill §4 — carry-over
+  for the next pass, not just a history line). If the spec is ambiguous or a
+  design decision is operator-shaped, post the question on the **tracking
+  ticket** (or the right sub-ticket), set `waitingOn = {kind: "owner",
+  ref: <comment URL>, since: now}`, end the pass.
 - **implement / review / submit / gate**: as in `work-ticket`, on the
   tranche's branch (`<branchPrefix><tranche>` — default prefix
   `epic/<slug>/`), stacked via git-spice when available. Keep the tracking

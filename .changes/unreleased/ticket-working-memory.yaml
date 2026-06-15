@@ -1,0 +1,2 @@
+kind: Added
+body: 'Ticket state files gain agent **working memory**: `plan` (the current plan, carried across passes and rewritten as it evolves), `deadEnds[]` (an append-only log of approaches that failed, so a later pass does not repeat them), and `notes` (a free scratchpad). Worker passes run with no session memory, so these fields let the next pass resume from a known plan and a known set of dead-ends instead of re-deriving everything from scratch. All optional and agent-owned; the extension tolerates their presence and absence.'

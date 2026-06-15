@@ -52,6 +52,32 @@ describe('protocol/schema contract (schemas/ vs fixtures and writers)', () => {
 		);
 	});
 
+	it('validates a ticket carrying agent working memory (plan/notes/deadEnds)', () => {
+		assertValid(
+			ticketSchema,
+			ticketBody({
+				plan: 'Implement the parser, then wire it into the CLI.',
+				notes: 'Key file: src/parse.ts; gotcha: the lexer is whitespace-sensitive.',
+				deadEnds: [
+					{
+						at: '2026-06-13T10:00:00Z',
+						tried: 'publish the release to the registry',
+						failedBecause: 'needs an operator-only publish token not present in this environment',
+						doNotRetryWithout: 'operator runs the gated release step',
+					},
+					{ at: '2026-06-13T10:30:00Z', tried: 'bump the timeout', failedBecause: 'flaky test is a real race' },
+				],
+			}),
+			'ticketBody with working memory',
+		);
+
+		assert.equal(
+			ticketSchema(ticketBody({ deadEnds: [{ at: '2026-06-13T10:00:00Z' }] })),
+			false,
+			'a deadEnds entry missing required tried/failedBecause must fail validation',
+		);
+	});
+
 	it('validates the unit fixture ticket (the parsed shape serializes to a valid file)', () => {
 		assertValid(ticketSchema, JSON.parse(JSON.stringify(makeTicket())), 'makeTicket()');
 	});
