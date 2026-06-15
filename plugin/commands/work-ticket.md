@@ -68,6 +68,15 @@ have missed one between ticks. Decide the real current phase from evidence,
 not from the cached file; correct the file if they disagree (history note:
 what was reconciled).
 
+**Trust your working memory (`plan`/`notes`/`deadEnds`), don't re-derive it.**
+The "evidence over cache" rule is about `phase` — it does **not** mean discard
+the carry-over from the last pass. Read `plan`/`notes`/`deadEnds` as your
+starting point: resume the existing `plan` rather than inventing a fresh one,
+and **never re-attempt anything in `deadEnds[]`** unless its `doNotRetryWithout`
+condition is now met. Only revise the plan when evidence actually contradicts
+it (history note when you do). This is what stops each pass from rebuilding
+context from zero and confabulating to fill the gaps.
+
 ### 2. plan
 
 If the work isn't already planned: derive a short, reviewable plan from the
