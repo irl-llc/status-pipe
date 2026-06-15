@@ -101,6 +101,13 @@ record the `deadEnds[]` entry, escalate via `blockers[]` + `post-comment`, and
 end the pass rather than improvising a workaround. A merely-down local tool is
 a transient fault to report, not a wall (§4).
 
+If you spot real work **outside this ticket's scope** (a separate bug, a
+missing feature, an infra gap), do not implement it: apply the **orthogonal
+work** rule (protocol skill §4) — search for an existing issue, file a
+cross-referenced one if absent, and never build a self-generated design without
+operator approval. Keep going on this ticket unless it is genuinely blocked on
+that work.
+
 ### 4. review (self-review)
 
 Review your own diff as a skeptical colleague: correctness, tests, scope

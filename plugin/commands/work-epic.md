@@ -72,7 +72,10 @@ unchecked item in the tracking ticket's tranche checklist):
   tranche's branch (`<branchPrefix><tranche>` — default prefix
   `epic/<slug>/`), stacked via git-spice when available. Keep the tracking
   ticket's checklist current: check off a tranche when its PR merges (one
-  `post-comment` lifecycle one-liner, not a paragraph).
+  `post-comment` lifecycle one-liner, not a paragraph). Work outside the
+  epic's scope is **orthogonal work** (protocol skill §4): search, file a
+  cross-referenced ticket, get operator approval before building — never
+  silently fold it into a tranche.
 - **wrap**: as in `work-ticket`, plus epic extras below.
 
 ## Epic extras
