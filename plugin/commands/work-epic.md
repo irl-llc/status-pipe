@@ -56,7 +56,11 @@ unchecked item in the tracking ticket's tranche checklist):
   ticket file, and the **epic spec** (re-read it — the operator may have
   edited scope). Consume inbox acks for this ticket (match/supersede →
   history → delete). The epic-level `phase` is the frontier tranche's
-  lifecycle position.
+  lifecycle position. **Trust your working memory** (`plan`/`notes`/
+  `deadEnds`, protocol skill §4): resume the existing tranche plan instead of
+  re-deriving it, and never re-attempt a recorded dead-end unless its
+  `doNotRetryWithout` condition is now met — reconcile `phase` from evidence,
+  but carry the memory forward.
 - **plan**: pick the frontier tranche and **persist the tranche plan to the
   ticket file's `plan` field** (working memory, protocol skill §4 — carry-over
   for the next pass, not just a history line). If the spec is ambiguous or a

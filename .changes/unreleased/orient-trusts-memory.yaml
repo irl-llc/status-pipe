@@ -1,0 +1,2 @@
+kind: Changed
+body: 'The worker''s orient phase now treats its persisted working memory (`plan`/`notes`/`deadEnds`) as the starting point instead of re-deriving everything each pass. The "decide phase from evidence, not the cached file" rule is clarified to apply to `phase` only: the worker resumes the existing plan rather than inventing a new one, and never re-attempts a recorded dead-end unless its `doNotRetryWithout` condition is met. This cuts the per-pass context rebuild that produced confabulated explanations.'
