@@ -1,0 +1,2 @@
+kind: Changed
+body: 'Workers now escalate at a **capability wall** instead of grinding on it. When the same operation fails twice, or a step needs something the environment cannot provide (a CI-only action like snapshot regeneration, a host-only step, a missing credential or tool), the worker stops, records a `deadEnds[]` entry, sets a blocker, posts the specific ask, and ends the pass — rather than retrying or inventing a workaround. The recorded dead-end stops the next pass from repeating the same impossible attempt, the loop this rule exists to kill.'

@@ -83,7 +83,12 @@ Otherwise write `phase: "implementation"` (history: the plan summary, one line).
 Do the work in this worktree on a ticket branch (`ticket/<key>` or the
 repo's convention; stack with git-spice when the repo uses it — it is NOT
 required). Commit in reviewable units. Run the repo's tests/build locally to
-the extent it defines them. Heartbeat during long stretches.
+the extent it defines them. Heartbeat during long stretches. If an operation
+hits a **capability wall** (protocol skill §4 — fails twice, or needs an
+operator-only credential/privileged step you genuinely cannot perform), stop:
+record the `deadEnds[]` entry, escalate via `blockers[]` + `post-comment`, and
+end the pass rather than improvising a workaround. A merely-down local tool is
+a transient fault to report, not a wall (§4).
 
 ### 4. review (self-review)
 
@@ -107,7 +112,12 @@ Kick CI if it doesn't start automatically; update `prs[].ci` from
 CI**: if CI is running, set `waitingOn = {kind: "build", ref: <run URL>,
 pr: N, since: now}`, `health: "ok"`, and end the pass — the next pass
 re-checks cheaply. If CI failed, that's the next pass's implement/fix work:
-`phase: "fixing"`, fix now if the pass has budget, else headline it and end.
+`phase: "fixing"`, fix now if the pass has budget and the fix is tractable —
+but apply the **capability wall** (protocol skill §4): if this failure has
+already been attempted once, or the fix needs something this environment can't
+provide (an operator-only credential or privileged step), do not retry or
+improvise — record a `deadEnds[]` entry, set `blockers[]`/`health="blocked"`,
+post the specific ask, and end. Otherwise headline it and end.
 If CI is green and review comments are addressed: `phase: "awaiting-merge"`,
 `waitingOn = {kind: "merge", ref: <PR URL>, pr: N, since: now}`,
 `health: "waiting"` — the operator merges, never you.

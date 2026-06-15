@@ -117,6 +117,36 @@ Schema: `ticket.schema.json`, `schemaVersion: 1`. The filename stem equals the
   `"blocked"` + `blockers[]`), post the actual question on the tracking
   ticket via `post-comment`, write the file, **then end the pass**. Never
   poll or busy-wait for a human.
+- **Capability wall — stop, do not improvise.** A *decision* is not the only
+  reason to hand back. When you hit a wall the environment **fundamentally
+  cannot get you past**, escalate instead of grinding:
+  - **The same operation fails twice**, or
+  - a step needs something this environment cannot provide — an operator-only
+    secret or credential, a privileged action reserved to the operator (merge,
+    approve, production deploy/publish), hardware the environment lacks.
+
+  Do **not** retry a third time, invent a workaround, or fabricate a reason it
+  "should" work. Instead: append a `deadEnds[]` entry (`at`, `tried`,
+  `failedBecause`, `doNotRetryWithout`), set `blockers[]` and
+  `health="blocked"`, post the specific ask via `post-comment`, and end the
+  pass. The recorded dead-end is what stops the *next* pass from repeating the
+  same attempt — that loop is the failure mode this rule exists to kill.
+
+  **A transient fault is not a capability wall.** A prerequisite you are
+  *expected* to be able to run that happens to be broken right now — a stopped
+  local Docker daemon, a flaky network, a tool that needs restarting — is an
+  **environment fault**: fix it if you can, otherwise escalate the *literal
+  breakage* (`blockers[]`: "local Docker daemon is down"). It is **never**
+  license to redesign the workflow to route around the down tool. Do not invent
+  new infrastructure to dodge a fault.
+
+  **Not a capability wall:** regenerating Playwright snapshots. That is
+  ordinary local work — run the project's `:docker` script against the Linux
+  amd64 image and be methodical about it (see CLAUDE.md). If the Docker daemon
+  is down, that is the transient fault above — report it; do **not** conclude
+  "this needs a CI job" and do **not** propose a CI-based snapshot-regen
+  workflow — that is self-generated orthogonal work, which you file for
+  operator approval rather than implement on your own.
 
 ## 5. The ack inbox and ackId derivation
 
