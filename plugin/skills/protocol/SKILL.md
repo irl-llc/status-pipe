@@ -301,7 +301,8 @@ The reviewer returns PASS or specific fixes; revise and re-review.
   can't pass, that failure is itself the signal something has gone awry:
   reframe the final comment around the back-and-forth with the reviewer — what
   you were trying to say, where it pushed back, and why you can't yet produce a
-  clean question or explanation — and post **that**. An honest "here's where
+  clean question or explanation — and post **that** (this final fallback comment
+  bypasses further gating to prevent an infinite loop). An honest "here's where
   I'm stuck articulating this" is the right operator hand-off, not silence and
   not polished noise.
 - **The reviewer is required, not optional.** If the `Task` tool is
