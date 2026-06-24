@@ -1,25 +1,125 @@
 /**
- * Editor-mode right pane (design/05-ui.md "Editor tab"): full headline,
- * worker liveness, PR table, sub-tickets, history timeline, raw-JSON peek.
+ * Editor-mode right pane (design/05-ui.md "Editor tab"). Read top-to-bottom as
+ * a hierarchy, every block under a labeled header:
+ *   Status — one line: named health, phase, age, worker liveness.
+ *   What needs you — blockers + the waiting line (long blocker clamps, full
+ *     text on hover — structure verbose content, don't dump it).
+ *   Context — the headline, markdown-stripped, not a floating <p>.
+ *   Evidence — PR table, sub-tickets, history timeline, raw-JSON peek, links.
  */
 
 import type { JSX } from 'react';
-import { CardDisplay, DisplayState, PrRowDisplay } from '../../queue/displayTypes';
-import { formatAge, formatDuration } from '../format';
+import { CardDisplay, DisplayState, PrRowDisplay, WaitingDisplay, WorkerDisplay } from '../../queue/displayTypes';
+import { formatAge, formatDuration, plainHeadline } from '../format';
+import { WAITING_ICON } from '../icons';
 import { AckControl } from './AckControl';
 import { usePost } from './QueueApp';
 
 export function DetailPane({ card, state }: { card: CardDisplay; state: DisplayState }): JSX.Element {
 	return (
 		<div>
-			<DetailHeader card={card} state={state} />
-			{card.headline && <p>{card.headline}</p>}
+			<DetailHeader card={card} />
+			<StatusSection card={card} state={state} />
+			<NeedsYouSection card={card} />
+			<ContextSection card={card} />
+			<EvidenceSection card={card} />
+		</div>
+	);
+}
+
+function DetailHeader({ card }: { card: CardDisplay }): JSX.Element {
+	const post = usePost();
+	return (
+		<div className="card-header detail-header">
+			<span className="repo-badge">{card.repoName}</span>
+			{card.ticket && (
+				<span className="ticket-key" onClick={() => card.url && post({ type: 'openExternal', url: card.url })}>
+					#{card.ticket}
+				</span>
+			)}
+			<span className="card-title">{card.title}</span>
+			<AckControl card={card} />
+		</div>
+	);
+}
+
+/** Status — one line: named health, phase, age, worker liveness. */
+function StatusSection({ card, state }: { card: CardDisplay; state: DisplayState }): JSX.Element {
+	const repo = state.repos.find((r) => r.repoRoot === card.repoRoot);
+	const lastRan = repo?.lastPassFinishedAt
+		? `orchestrator ran ${formatAge(repo.lastPassFinishedAt, state.generatedAt)} ago`
+		: null;
+	const parts = [
+		`health: ${card.health}`,
+		card.phase,
+		card.updatedAt ? `${formatAge(card.updatedAt, state.generatedAt)} old` : null,
+		workerLiveness(card.worker),
+		lastRan,
+	].filter((p): p is string => Boolean(p));
+	return (
+		<div className="detail-section">
+			<h3>Status</h3>
+			<div className="detail-status-line">{parts.join(' · ')}</div>
+		</div>
+	);
+}
+
+function workerLiveness(worker: WorkerDisplay | null): string | null {
+	if (!worker) return null;
+	const beat =
+		worker.heartbeatAgeMs !== null ? `heartbeat ${formatDuration(worker.heartbeatAgeMs)} ago` : 'no heartbeat';
+	const stale = worker.stale ? ' (stale)' : '';
+	return `worker ${worker.status}${stale}, ${beat}`;
+}
+
+/** What needs you — blockers + the waiting line, under one header. */
+function NeedsYouSection({ card }: { card: CardDisplay }): JSX.Element | null {
+	if (card.blockers.length === 0 && !card.waiting) return null;
+	return (
+		<div className="detail-section">
+			<h3>What needs you</h3>
 			{card.blockers.map((blocker, i) => (
-				<div key={i} className="blocker-line">
-					{blocker}
+				<div key={i} className="blocker-line detail-clamp" title={blocker}>
+					<span className="codicon codicon-circle-slash" />
+					<span className="detail-clamp-text">{blocker}</span>
 				</div>
 			))}
-			<WorkerLine card={card} />
+			<WaitingLine waiting={card.waiting} />
+		</div>
+	);
+}
+
+function WaitingLine({ waiting }: { waiting: WaitingDisplay | null }): JSX.Element | null {
+	const post = usePost();
+	if (!waiting) return null;
+	return (
+		<div
+			className="waiting-line"
+			onClick={() => waiting.ref && post({ type: 'openExternal', url: waiting.ref })}
+			title={waiting.ref ?? ''}
+		>
+			<span className={`codicon codicon-${WAITING_ICON[waiting.kind]}`} />
+			<span>{waiting.detail ?? `waiting on ${waiting.kind}`}</span>
+			<span className="dim">· {formatDuration(waiting.durationMs)}</span>
+		</div>
+	);
+}
+
+/** Context — the headline, markdown-stripped, under a header (not a floating <p>). */
+function ContextSection({ card }: { card: CardDisplay }): JSX.Element | null {
+	if (!card.headline) return null;
+	return (
+		<div className="detail-section">
+			<h3>Context</h3>
+			<div className="detail-headline">{plainHeadline(card.headline)}</div>
+		</div>
+	);
+}
+
+/** Evidence — the heavier sections, each under its own header. */
+function EvidenceSection({ card }: { card: CardDisplay }): JSX.Element {
+	return (
+		<>
 			{card.prs.length > 0 && <PrTable card={card} prs={card.prs} />}
 			{card.subTickets.length > 0 && <SubTickets card={card} />}
 			{card.history.length > 0 && <Timeline card={card} />}
@@ -30,34 +130,6 @@ export function DetailPane({ card, state }: { card: CardDisplay; state: DisplayS
 				</div>
 			)}
 			<DetailLinks card={card} />
-		</div>
-	);
-}
-
-function DetailHeader({ card, state }: { card: CardDisplay; state: DisplayState }): JSX.Element {
-	const post = usePost();
-	const repo = state.repos.find((r) => r.repoRoot === card.repoRoot);
-	const lastRan = repo?.lastPassFinishedAt
-		? ` · orchestrator last ran ${formatAge(repo.lastPassFinishedAt, state.generatedAt)} ago`
-		: '';
-	return (
-		<>
-			<div className="card-header">
-				<span className="repo-badge">{card.repoName}</span>
-				{card.ticket && (
-					<span className="ticket-key" onClick={() => card.url && post({ type: 'openExternal', url: card.url })}>
-						#{card.ticket}
-					</span>
-				)}
-				<span className="card-title">{card.title}</span>
-				<AckControl card={card} />
-			</div>
-			{card.phase && (
-				<div className="card-phase">
-					{card.phase}
-					{lastRan}
-				</div>
-			)}
 		</>
 	);
 }
@@ -80,22 +152,6 @@ function DetailLinks({ card }: { card: CardDisplay }): JSX.Element {
 					Open epic file
 				</button>
 			)}
-		</div>
-	);
-}
-
-function WorkerLine({ card }: { card: CardDisplay }): JSX.Element | null {
-	const worker = card.worker;
-	if (!worker) return null;
-	const beat =
-		worker.heartbeatAgeMs !== null ? `heartbeat ${formatDuration(worker.heartbeatAgeMs)} ago` : 'no heartbeat';
-	return (
-		<div className="detail-section">
-			<h3>Worker</h3>
-			<span className={worker.stale || worker.status === 'error' ? 'blocker-line' : ''}>
-				{worker.status}
-				{worker.stale ? ' (stale)' : ''} · {beat}
-			</span>
 		</div>
 	);
 }
