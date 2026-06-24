@@ -3,14 +3,16 @@
  * library — snapshots ARE the store) and renders tray or editor layout.
  */
 
-import { createContext, useContext, useEffect, useMemo, useState, type JSX } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type JSX } from 'react';
 
 import { ExtensionMessage, ViewMode, WebviewMessage } from '../../host/webviewTypes';
 import { CardDisplay, DisplayState } from '../../queue/displayTypes';
+import { clampEditorListWidth, readEditorListWidth, type UiState } from '../uiState';
 import { AgentsStrip } from './AgentsStrip';
 import { DetailPane } from './DetailPane';
 import { Header } from './Header';
 import { LaneSection } from './LaneSection';
+import { Splitter } from './Splitter';
 
 export const PostContext = createContext<(message: WebviewMessage) => void>(() => undefined);
 export const usePost = (): ((message: WebviewMessage) => void) => useContext(PostContext);
@@ -22,6 +24,8 @@ export const useRepoFilter = (): ((repoRoot: string) => void) => useContext(Repo
 export interface QueueAppProps {
 	postMessage: (message: WebviewMessage) => void;
 	subscribeMessages: (handler: (message: ExtensionMessage) => void) => () => void;
+	getUiState?: () => unknown;
+	setUiState?: (state: unknown) => void;
 }
 
 export interface ViewOptions {
@@ -33,11 +37,22 @@ export interface ViewOptions {
 
 const DEFAULT_OPTIONS: ViewOptions = { filter: '', repoFilter: null, showDone: false, groupByRepo: false };
 
-export function QueueApp({ postMessage, subscribeMessages }: QueueAppProps): JSX.Element {
+export function QueueApp({ postMessage, subscribeMessages, getUiState, setUiState }: QueueAppProps): JSX.Element {
 	const [mode, setMode] = useState<ViewMode>('tray');
 	const [state, setState] = useState<DisplayState | null>(null);
 	const [options, setOptions] = useState<ViewOptions>(DEFAULT_OPTIONS);
 	const [selectedId, setSelectedId] = useState<string | null>(null);
+	const [editorListWidth, setEditorListWidth] = useState<number>(() => readEditorListWidth(getUiState?.()));
+
+	const onResizeList = useCallback(
+		(width: number): void => {
+			const clamped = clampEditorListWidth(width);
+			setEditorListWidth(clamped);
+			const next: UiState = { ...((getUiState?.() as Partial<UiState>) ?? {}), editorListWidth: clamped };
+			setUiState?.(next);
+		},
+		[getUiState, setUiState],
+	);
 
 	useEffect(() => {
 		const unsubscribe = subscribeMessages((message) => {
@@ -53,7 +68,15 @@ export function QueueApp({ postMessage, subscribeMessages }: QueueAppProps): JSX
 	if (!state) return <div className="lane-empty">Loading…</div>;
 	const body =
 		mode === 'editor' ? (
-			<EditorBody state={state} cards={cards} selectedId={selectedId} onSelect={setSelectedId} options={options} />
+			<EditorBody
+				state={state}
+				cards={cards}
+				selectedId={selectedId}
+				onSelect={setSelectedId}
+				options={options}
+				listWidth={editorListWidth}
+				onResizeList={onResizeList}
+			/>
 		) : (
 			<Lanes state={state} cards={cards} selectedId={selectedId} onSelect={setSelectedId} />
 		);
@@ -127,15 +150,18 @@ function Lanes({ state, cards, selectedId, onSelect }: LanesProps): JSX.Element 
 
 interface EditorBodyProps extends LanesProps {
 	options: ViewOptions;
+	listWidth: number;
+	onResizeList: (width: number) => void;
 }
 
-function EditorBody({ state, cards, selectedId, onSelect }: EditorBodyProps): JSX.Element {
+function EditorBody({ state, cards, selectedId, onSelect, listWidth, onResizeList }: EditorBodyProps): JSX.Element {
 	const selected = cards.find((c) => c.id === selectedId) ?? cards[0] ?? null;
 	return (
 		<div className="editor-layout">
-			<div className="editor-list">
+			<div className="editor-list" style={{ width: `${listWidth}px` }}>
 				<Lanes state={state} cards={cards} selectedId={selected?.id ?? null} onSelect={onSelect} />
 			</div>
+			<Splitter width={listWidth} onResize={onResizeList} />
 			<div className="editor-detail">
 				{selected ? <DetailPane card={selected} state={state} /> : <div className="lane-empty">Select an item</div>}
 			</div>
