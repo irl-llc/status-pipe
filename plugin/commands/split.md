@@ -21,7 +21,7 @@ one-line lifecycle summaries.
    read `$PROTO/tickets/<key>.json` (slug, repo, source) and
    `config.json` (ticketing source, attribution). Epic slug = the ticket
    file's `slug`, else derive from the epic header/title. Read the parent's
-   comment digest via `${CLAUDE_PLUGIN_ROOT}/bin/fetch-comments --repo-root
+   comment digest via `fetch-comments --repo-root
    "$(git rev-parse --show-toplevel)" --ticket <key>` to identify the
    in-flight discussion being moved (operator comments are the authoritative
    thread).
@@ -51,7 +51,7 @@ one-line lifecycle summaries.
    a pointer comment is short, so this is quick):
 
    ```bash
-   ${CLAUDE_PLUGIN_ROOT}/bin/post-comment --repo-root "$(git rev-parse --show-toplevel)" \
+   post-comment --repo-root "$(git rev-parse --show-toplevel)" \
      --ticket <key> --issue <parent-number> \
      --body "Discussion on **<topic>** moved to <sub-ticket-url> to keep this checklist readable. Please continue there."
    ```

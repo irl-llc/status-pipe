@@ -37,9 +37,9 @@ expected and fine for *code*; protocol state never lives here.
   write the file with `worker.status = "idle"` — and **END the pass**. Never
   poll, sleep, or busy-wait for a human.
 - **Comments**: read ONLY via
-  `${CLAUDE_PLUGIN_ROOT}/bin/fetch-comments --repo-root "$(git rev-parse --show-toplevel)" --ticket <key>`
+  `fetch-comments --repo-root "$(git rev-parse --show-toplevel)" --ticket <key>`
   (or `--pr <N>`); post ONLY via
-  `${CLAUDE_PLUGIN_ROOT}/bin/post-comment --repo-root ... --ticket <key> (--issue <N> | --pr <N> | --jira <KEY>) --body ...`.
+  `post-comment --repo-root ... --ticket <key> (--issue <N> | --pr <N> | --jira <KEY>) --body ...`.
   **Every comment first passes the comment gate** (protocol skill §7a): spawn
   the adversarial reviewer subagent on the draft before you post. Operator-grade
   signals come only from sections the gateway marks authoritative, or from ack
