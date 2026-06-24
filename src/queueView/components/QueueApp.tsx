@@ -52,10 +52,11 @@ export function QueueApp({ postMessage, subscribeMessages }: QueueAppProps): JSX
 
 	// Selection honesty (design/05 "Editor tab"): when the queue updates under a
 	// selection whose card has left the visible set, clear it — never let it
-	// silently re-point to an unrelated card.
+	// silently re-point to an unrelated card. Gate on `state` so a not-yet-loaded
+	// snapshot (empty `cards`) can't wipe a selection before the first state lands.
 	useEffect(() => {
-		if (selectedId !== null && !cards.some((c) => c.id === selectedId)) setSelectedId(null);
-	}, [cards, selectedId]);
+		if (state && selectedId !== null && !cards.some((c) => c.id === selectedId)) setSelectedId(null);
+	}, [state, cards, selectedId]);
 
 	if (!state) return <div className="lane-empty">Loading…</div>;
 	const body =
