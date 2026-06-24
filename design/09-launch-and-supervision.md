@@ -38,7 +38,7 @@ arg vector, stdin payload), not a Claude invocation. JSON Schema ships at
       "args": [
         "-p", "/status-pipe:tick --max-concurrent 3",
         "--output-format", "stream-json", "--verbose",
-        "--permission-mode", "acceptEdits"
+        "--permission-mode", "auto"
       ],
       "stdin": "",
       "cwd": ".",
@@ -137,8 +137,8 @@ gives us for free:
 - **Exit codes** distinguish clean passes from fatal errors (auth, crash),
   feeding health directly.
 - **Unattended permissions** come from the repo's committed
-  `.claude/settings.json` allowlists plus `--permission-mode acceptEdits`
-  (or stronger, the repo owner's choice — it lives in the committed launch
+  `.claude/settings.json` allowlists plus `--permission-mode auto`
+  (or another mode, the repo owner's choice — it lives in the committed launch
   file, reviewable like any code).
 - **`--resume <session-id>`** exists as a recovery path for daemon-style
   sessions, but tick mode mostly removes the need: each pass reconstructs from

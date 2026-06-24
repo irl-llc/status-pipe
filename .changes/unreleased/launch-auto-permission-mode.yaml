@@ -1,0 +1,2 @@
+kind: Changed
+body: 'The example orchestrator launch config now defaults to `--permission-mode auto` instead of `acceptEdits`, matching the recommended unattended setup. The mode still lives in the committed launch file and remains the repo owner''s choice.'

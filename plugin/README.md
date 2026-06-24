@@ -106,7 +106,7 @@ from storage or fails; it never prompts mid-run.
          "args": [
            "-p", "/status-pipe:tick --max-concurrent 3",
            "--output-format", "stream-json", "--verbose",
-           "--permission-mode", "acceptEdits"
+           "--permission-mode", "auto"
          ],
          "stdin": "",
          "cwd": ".",
