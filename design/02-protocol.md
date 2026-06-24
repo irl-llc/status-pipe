@@ -87,6 +87,32 @@ extension interprets them:
 | `stalledPasses` | optional integer | Consecutive worker passes that ended with no material progress; reset to 0 on any advancing pass. At the worker's threshold it escalates (`health="error"` + a blocker) so a spinning worker surfaces in NEEDS YOU instead of looking healthy. Absent = 0; not rendered directly (the escalation is). |
 | `updatedAt` | ISO-8601 | Relative timestamp; fair-scheduling sort key within lanes. |
 
+### Operator-facing prose: the brevity contract
+
+`headline`, `blockers[]`, `waitingOn.detail`, and each `history[].note` are the
+only free prose the operator reads at a glance. They are a triage signal, not a
+log — the display's whole value is beating the raw ticket file at "what needs
+me, and the shortest path to act." Verbose fields defeat that, so brevity here
+is a protocol rule, not a style note:
+
+- **`headline`** — one clause, present tense, fits one rendered line: *what just
+  happened*. "Operator must restore the worktree git allowlist for ticket-72."
+  Not three sentences, not the reasoning chain, not a recap of the pass.
+- **`blockers[]`** — each entry is one terse imperative naming the thing **only
+  the operator can do** ("Grant `docker` to the ticket-72 worktree"). One
+  blocker per array entry; no entry is a paragraph.
+- **`waitingOn.detail`** — one short phrase that labels the wait; the
+  deep-linkable `ref` carries the rest.
+- **Action, not justification.** The operator-facing field states the *action*;
+  the *why* — context, reasoning, what was tried — goes in a `history[]` note
+  (the operator-facing record) or in `plan`/`notes` (agent working memory),
+  never crammed into `headline` or `blockers`. The common failure mode is
+  defensive over-explanation when blocked: a wall of permission/trust prose
+  belongs in history, and the blocker stays one line.
+
+The renderer enforces the ceiling (headline 2-line clamp, full text on hover),
+but a field that *needs* the clamp is already too long. Write to the glance.
+
 ### Agent working memory (`plan`, `deadEnds[]`, `notes`)
 
 Workers run as fresh, memory-less passes (`claude -p`); the durable state above
