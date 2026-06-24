@@ -13,23 +13,30 @@ export interface SplitterProps {
 	width: number;
 	/** Called with the candidate new width during a drag; parent clamps it. */
 	onResize: (width: number) => void;
+	/** Called once with the final width when the drag ends, to persist it. */
+	onResizeEnd?: (width: number) => void;
 }
 
-export function Splitter({ width, onResize }: SplitterProps): JSX.Element {
+export function Splitter({ width, onResize, onResizeEnd }: SplitterProps): JSX.Element {
 	const onPointerDown = useCallback(
 		(event: React.PointerEvent<HTMLDivElement>): void => {
 			event.preventDefault();
 			const startX = event.clientX;
 			const startWidth = width;
-			const onMove = (move: PointerEvent): void => onResize(startWidth + (move.clientX - startX));
+			let lastWidth = startWidth;
+			const onMove = (move: PointerEvent): void => {
+				lastWidth = startWidth + (move.clientX - startX);
+				onResize(lastWidth);
+			};
 			const onUp = (): void => {
 				window.removeEventListener('pointermove', onMove);
 				window.removeEventListener('pointerup', onUp);
+				onResizeEnd?.(lastWidth);
 			};
 			window.addEventListener('pointermove', onMove);
 			window.addEventListener('pointerup', onUp);
 		},
-		[width, onResize],
+		[width, onResize, onResizeEnd],
 	);
 
 	return (

@@ -44,7 +44,9 @@ export function QueueApp({ postMessage, subscribeMessages, getUiState, setUiStat
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [editorListWidth, setEditorListWidth] = useState<number>(() => readEditorListWidth(getUiState?.()));
 
-	const onResizeList = useCallback(
+	const onResizeList = useCallback((width: number): void => setEditorListWidth(clampEditorListWidth(width)), []);
+
+	const onResizeListEnd = useCallback(
 		(width: number): void => {
 			const clamped = clampEditorListWidth(width);
 			setEditorListWidth(clamped);
@@ -76,6 +78,7 @@ export function QueueApp({ postMessage, subscribeMessages, getUiState, setUiStat
 				options={options}
 				listWidth={editorListWidth}
 				onResizeList={onResizeList}
+				onResizeListEnd={onResizeListEnd}
 			/>
 		) : (
 			<Lanes state={state} cards={cards} selectedId={selectedId} onSelect={setSelectedId} />
@@ -152,16 +155,25 @@ interface EditorBodyProps extends LanesProps {
 	options: ViewOptions;
 	listWidth: number;
 	onResizeList: (width: number) => void;
+	onResizeListEnd: (width: number) => void;
 }
 
-function EditorBody({ state, cards, selectedId, onSelect, listWidth, onResizeList }: EditorBodyProps): JSX.Element {
+function EditorBody({
+	state,
+	cards,
+	selectedId,
+	onSelect,
+	listWidth,
+	onResizeList,
+	onResizeListEnd,
+}: EditorBodyProps): JSX.Element {
 	const selected = cards.find((c) => c.id === selectedId) ?? cards[0] ?? null;
 	return (
 		<div className="editor-layout">
 			<div className="editor-list" style={{ width: `${listWidth}px` }}>
 				<Lanes state={state} cards={cards} selectedId={selected?.id ?? null} onSelect={onSelect} />
 			</div>
-			<Splitter width={listWidth} onResize={onResizeList} />
+			<Splitter width={listWidth} onResize={onResizeList} onResizeEnd={onResizeListEnd} />
 			<div className="editor-detail">
 				{selected ? <DetailPane card={selected} state={state} /> : <div className="lane-empty">Select an item</div>}
 			</div>
