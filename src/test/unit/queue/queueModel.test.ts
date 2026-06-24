@@ -366,6 +366,22 @@ describe('queue/queueModel buildDisplayState', () => {
 			assert.strictEqual(unconfirmed.acked, false);
 		});
 
+		it('does NOT calm off an older ack when the newest ack has moved on', () => {
+			// An older fresh-pending ack (matches the current owner question) keeps
+			// the card in WAITING; a newer ack targets a now-superseded state →
+			// moved-on, the chip the operator actually sees. The card must NOT calm:
+			// isAcked evaluates the newest ack only, matching the chip from
+			// deriveAckControl (gemini flag on PR #27). `acks.some(...)` calmed it
+			// off the older pending entry while the visible chip showed a warning.
+			const current = makeTicket({ waitingOn: waiting({ kind: 'owner', since: minutesAgo(30) }) });
+			const pending = ackFor(current, minutesAgo(8));
+			const movedOn = ackFor(makeTicket({ waitingOn: waiting({ kind: 'owner', since: hoursAgo(5) }) }), minutesAgo(3));
+			const card = soloCard(current, { acks: [pending, movedOn] });
+			assertLane(card, 'waiting', null);
+			assert.strictEqual(card.ackControl.chip?.state, 'moved-on');
+			assert.strictEqual(card.acked, false);
+		});
+
 		it('does NOT flag a QUIET (done) card as acked — done keeps its own treatment', () => {
 			// Ackable (has a leftover blocker) but merged → QUIET wins; the calm
 			// state is WAITING-only, so QUIET keeps its done treatment.
