@@ -8,10 +8,10 @@
 import { installJsdomGlobals } from './reactTestHelper';
 
 import assert from 'node:assert/strict';
-import { cleanup, fireEvent, render, RenderResult } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, RenderResult } from '@testing-library/react';
 import type { ReactElement } from 'react';
 
-import { WebviewMessage } from '../../../host/webviewTypes';
+import { ExtensionMessage, WebviewMessage } from '../../../host/webviewTypes';
 import { emptyActivity } from '../../../output/claudeStream';
 import {
 	AckChipState,
@@ -26,7 +26,7 @@ import { AckControl } from '../../../queueView/components/AckControl';
 import { AgentsStrip } from '../../../queueView/components/AgentsStrip';
 import { LaneSection } from '../../../queueView/components/LaneSection';
 import { PrRows } from '../../../queueView/components/PrRows';
-import { PostContext } from '../../../queueView/components/QueueApp';
+import { EditorBody, PostContext, QueueApp } from '../../../queueView/components/QueueApp';
 import { TicketCard } from '../../../queueView/components/TicketCard';
 import { formatClock } from '../../../queueView/format';
 import { ACK_CHIP_ICON } from '../../../queueView/icons';
@@ -724,6 +724,112 @@ describe('queueView/components', () => {
 		it('renders the circle-slash glyph on blocker lines', () => {
 			const { result } = renderCard(makeCard({ blockers: ['need creds'] }));
 			assert.ok(result.container.querySelector('.blocker-line .codicon-circle-slash'));
+		});
+	});
+
+	describe('EditorBody selection honesty', () => {
+		function renderEditor(cards: CardDisplay[], selectedId: string | null, state = makeState({ cards })): Rendered {
+			return renderWithPost(
+				<EditorBody state={state} cards={cards} selectedId={selectedId} onSelect={() => undefined} />,
+			);
+		}
+
+		// The detail pane repeats the card title (its own header), so scope
+		// "which ticket is shown" assertions to .editor-detail, not the list.
+		function detailTitle(result: RenderResult): string | null {
+			return result.container.querySelector('.editor-detail .card-title')?.textContent ?? null;
+		}
+
+		it('shows the explicit selection with no nothing-selected note', () => {
+			const cards = [makeCard({ id: 'a', ticket: 'A' }), makeCard({ id: 'b', ticket: 'B', title: 'Second' })];
+			const { result } = renderEditor(cards, 'b');
+			assert.equal(detailTitle(result), 'Second');
+			assert.equal(result.container.querySelector('.selection-note'), null);
+		});
+
+		it('falls back to the top NEEDS-YOU card and says so when nothing is selected', () => {
+			const cards = [
+				makeCard({ id: 'q', ticket: 'Q', title: 'Quiet one', lane: 'quiet' }),
+				makeCard({ id: 'n', ticket: 'N', title: 'Needs you', lane: 'needs-you' }),
+			];
+			const { result } = renderEditor(cards, null);
+			assert.ok(result.getByText('most urgent — nothing selected'));
+			assert.equal(detailTitle(result), 'Needs you');
+		});
+
+		it('shows no nothing-selected note for an explicit pick even amid other cards', () => {
+			const cards = [makeCard({ id: 'n', lane: 'needs-you' }), makeCard({ id: 'q', title: 'Picked', lane: 'quiet' })];
+			const { result } = renderEditor(cards, 'q');
+			assert.equal(detailTitle(result), 'Picked');
+			assert.equal(result.container.querySelector('.selection-note'), null);
+		});
+
+		it('never highlights the implicit fallback in the list (selectedId stays null)', () => {
+			// The implicit card is shown in the detail pane but must not read as
+			// chosen in the list — no .selected card when nothing is picked.
+			const cards = [makeCard({ id: 'n', lane: 'needs-you' })];
+			const { result } = renderEditor(cards, null);
+			assert.equal(result.container.querySelector('.card.selected'), null);
+		});
+
+		it('shows the empty prompt when there are no cards at all', () => {
+			const { result } = renderEditor([], null);
+			assert.ok(result.getByText('Select an item'));
+			assert.equal(result.container.querySelector('.selection-note'), null);
+		});
+	});
+
+	describe('QueueApp selection reconcile on state change', () => {
+		function mountEditor(initialCards: CardDisplay[]): {
+			result: RenderResult;
+			push: (cards: CardDisplay[]) => void;
+		} {
+			let handler: ((m: ExtensionMessage) => void) | null = null;
+			const result = render(
+				<QueueApp
+					postMessage={() => undefined}
+					subscribeMessages={(h) => {
+						handler = h;
+						return () => undefined;
+					}}
+				/>,
+			);
+			handler!({ type: 'init', mode: 'editor' });
+			const push = (cards: CardDisplay[]): void =>
+				act(() => handler!({ type: 'displayState', state: makeState({ cards }) }));
+			push(initialCards);
+			return { result, push };
+		}
+
+		function listCardByTitle(result: RenderResult, title: string): Element {
+			const card = Array.from(result.container.querySelectorAll('.editor-list .card')).find(
+				(el) => el.querySelector('.card-title')?.textContent === title,
+			);
+			assert.ok(card, `list card "${title}" present`);
+			return card!;
+		}
+
+		it('clears a selection whose card left the queue rather than swapping it', () => {
+			const a = makeCard({ id: 'a', ticket: 'A', title: 'Alpha', lane: 'needs-you' });
+			const b = makeCard({ id: 'b', ticket: 'B', title: 'Bravo', lane: 'needs-you' });
+			const { result, push } = mountEditor([a, b]);
+			// Select B explicitly (click its list card).
+			fireEvent.click(listCardByTitle(result, 'Bravo'));
+			assert.equal(result.container.querySelector('.selection-note'), null);
+			// B leaves the queue; the pane must not silently show A as authoritative.
+			push([a]);
+			assert.ok(result.getByText('most urgent — nothing selected'));
+			assert.equal(result.container.querySelector('.editor-detail .card-title')?.textContent, 'Alpha');
+		});
+
+		it('keeps a still-present selection across a state update', () => {
+			const a = makeCard({ id: 'a', ticket: 'A', title: 'Alpha', lane: 'needs-you' });
+			const b = makeCard({ id: 'b', ticket: 'B', title: 'Bravo', lane: 'needs-you' });
+			const { result, push } = mountEditor([a, b]);
+			fireEvent.click(listCardByTitle(result, 'Bravo'));
+			push([a, makeCard({ id: 'b', ticket: 'B', title: 'Bravo', lane: 'needs-you', phase: 'review' })]);
+			assert.equal(result.container.querySelector('.selection-note'), null);
+			assert.equal(result.container.querySelector('.editor-detail .card-title')?.textContent, 'Bravo');
 		});
 	});
 

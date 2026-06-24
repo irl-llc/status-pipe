@@ -50,10 +50,17 @@ export function QueueApp({ postMessage, subscribeMessages }: QueueAppProps): JSX
 
 	const cards = useMemo(() => filterCards(state, options), [state, options]);
 
+	// Selection honesty (design/05 "Editor tab"): when the queue updates under a
+	// selection whose card has left the visible set, clear it — never let it
+	// silently re-point to an unrelated card.
+	useEffect(() => {
+		if (selectedId !== null && !cards.some((c) => c.id === selectedId)) setSelectedId(null);
+	}, [cards, selectedId]);
+
 	if (!state) return <div className="lane-empty">Loading…</div>;
 	const body =
 		mode === 'editor' ? (
-			<EditorBody state={state} cards={cards} selectedId={selectedId} onSelect={setSelectedId} options={options} />
+			<EditorBody state={state} cards={cards} selectedId={selectedId} onSelect={setSelectedId} />
 		) : (
 			<Lanes state={state} cards={cards} selectedId={selectedId} onSelect={setSelectedId} />
 		);
@@ -125,19 +132,33 @@ function Lanes({ state, cards, selectedId, onSelect }: LanesProps): JSX.Element 
 	);
 }
 
-interface EditorBodyProps extends LanesProps {
-	options: ViewOptions;
+/**
+ * Resolve what the right pane shows (design/05 "Editor tab"): an `explicit`
+ * selection wins; otherwise the top NEEDS-YOU item is the `implicit` fallback,
+ * which the pane must label so it never reads as authoritative.
+ */
+function resolveSelection(
+	cards: CardDisplay[],
+	selectedId: string | null,
+): { explicit: CardDisplay | null; implicit: CardDisplay | null } {
+	const explicit = selectedId !== null ? (cards.find((c) => c.id === selectedId) ?? null) : null;
+	if (explicit) return { explicit, implicit: null };
+	return { explicit: null, implicit: cards.find((c) => c.lane === 'needs-you') ?? cards[0] ?? null };
 }
 
-function EditorBody({ state, cards, selectedId, onSelect }: EditorBodyProps): JSX.Element {
-	const selected = cards.find((c) => c.id === selectedId) ?? cards[0] ?? null;
+export function EditorBody({ state, cards, selectedId, onSelect }: LanesProps): JSX.Element {
+	const { explicit, implicit } = resolveSelection(cards, selectedId);
+	const shown = explicit ?? implicit;
 	return (
 		<div className="editor-layout">
 			<div className="editor-list">
-				<Lanes state={state} cards={cards} selectedId={selected?.id ?? null} onSelect={onSelect} />
+				{/* Highlight the list only for an explicit selection — the implicit
+				    fallback must not look chosen. */}
+				<Lanes state={state} cards={cards} selectedId={explicit?.id ?? null} onSelect={onSelect} />
 			</div>
 			<div className="editor-detail">
-				{selected ? <DetailPane card={selected} state={state} /> : <div className="lane-empty">Select an item</div>}
+				{implicit && <div className="selection-note">most urgent — nothing selected</div>}
+				{shown ? <DetailPane card={shown} state={state} /> : <div className="lane-empty">Select an item</div>}
 			</div>
 		</div>
 	);
