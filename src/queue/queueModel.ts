@@ -6,7 +6,7 @@
 
 import { emptyActivity } from '../output/claudeStream';
 import { LaunchAgent, TicketFile } from '../protocol/types';
-import { AckContext, deriveAckControl, hasFreshPendingAck, hasStaleAck } from './ackState';
+import { AckContext, deriveAckControl, hasFreshPendingAck, hasStaleAck, isAcked } from './ackState';
 import {
 	AgentDisplay,
 	CardDisplay,
@@ -74,6 +74,7 @@ const CARD_DEFAULTS: Omit<CardDisplay, 'id' | 'repoRoot' | 'repoName'> = {
 	subTickets: [],
 	history: [],
 	ackControl: { actionable: false, chip: null },
+	acked: false,
 	worker: null,
 	degraded: null,
 	rawJson: null,
@@ -91,6 +92,7 @@ interface TicketDerivation {
 	laneCtx: LaneContext;
 	lane: Lane;
 	reason: NeedsYouReason | null;
+	acked: boolean;
 	ticketAcks: RepoState['acks'];
 }
 
@@ -120,12 +122,25 @@ function deriveTicket(
 		prRows: buildPrRows(ticket, repoTickets, repo.enrichment),
 	};
 	const { lane, reason } = assignLane(ticket, laneCtx);
-	return { ackCtx, laneCtx, lane, reason, ticketAcks };
+	// "Acked" is the calm WAITING state: a pending/picked-up ack moved the card
+	// out of NEEDS YOU and it's awaiting pickup. NEEDS YOU keeps its alarm (the
+	// ack didn't park it); QUIET keeps its own done/abandoned treatment (issue #10).
+	const acked = lane === 'waiting' && isAcked(ticket, ticketAcks, ackCtx);
+	return { ackCtx, laneCtx, lane, reason, acked, ticketAcks };
 }
+
+/**
+ * Within WAITING, an ack'd card (operator handed it back, awaiting pickup)
+ * sinks below un-ack'd waiting work: the operator has already done their part,
+ * so it should not sit at the top reading as a fresh call to action (issue #10).
+ */
+const WAITING_RANK = 50;
+const ACKED_WAITING_RANK = 60;
 
 function rankFor(d: TicketDerivation): number {
 	if (d.reason) return REASON_RANK[d.reason];
-	return d.lane === 'waiting' ? 50 : 90;
+	if (d.lane === 'quiet') return 90;
+	return d.acked ? ACKED_WAITING_RANK : WAITING_RANK;
 }
 
 function ticketCard(
@@ -138,12 +153,27 @@ function ticketCard(
 	return {
 		...cardDefaults(`${repo.repoRoot}::${ticket.ticket}`, { repoRoot: repo.repoRoot, name: repo.name }),
 		...ticketIdentity(ticket),
+		...derivedCardFields(ticket, d, input),
+	};
+}
+
+/** The fields driven by lane/ack derivation (kept separate to keep ticketCard small). */
+function derivedCardFields(
+	ticket: TicketFile,
+	d: TicketDerivation,
+	input: QueueModelInput,
+): Pick<
+	CardDisplay,
+	'lane' | 'reason' | 'priorityRank' | 'waiting' | 'prs' | 'ackControl' | 'acked' | 'worker' | 'hiddenByDefault'
+> {
+	return {
 		lane: d.lane,
 		reason: d.reason,
 		priorityRank: rankFor(d),
 		waiting: waitingDisplay(ticket, input.now),
 		prs: d.laneCtx.prRows,
 		ackControl: deriveAckControl(ticket, d.ticketAcks, d.ackCtx),
+		acked: d.acked,
 		worker: workerDisplay(ticket, d.laneCtx),
 		hiddenByDefault: d.lane === 'quiet' && isPastRetention(ticket.updatedAt, input),
 	};

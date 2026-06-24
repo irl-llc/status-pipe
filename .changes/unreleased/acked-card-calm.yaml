@@ -1,0 +1,2 @@
+kind: Fixed
+body: 'After "Ready for another look", a card now reads as handed-back: its accent bar turns calm blue and the waiting/blocker lines lose their alarm color (meaning stays on hover), and it sinks below un-acked work within WAITING instead of staying at the top of the stack. Previously an acked card kept its red/amber alarm and held its position, making it look like it still needed you. Cards that genuinely still need you — a crashed worker, or an ack the loop never picked up — keep their alarm.'

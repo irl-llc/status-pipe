@@ -122,6 +122,13 @@ export interface CardDisplay {
 	subTickets: SubTicket[];
 	history: HistoryEntry[];
 	ackControl: AckControlDisplay;
+	/**
+	 * The operator has handed this card back — a fresh ack is pending or was
+	 * picked up (not superseded/stale/lost). Drives the calm visual treatment
+	 * and the within-WAITING demotion so an ack'd card stops reading as a call
+	 * to action (design/05-ui.md, issue #10).
+	 */
+	acked: boolean;
 	worker: WorkerDisplay | null;
 	degraded: DegradedInfo | null;
 	rawJson: string | null;

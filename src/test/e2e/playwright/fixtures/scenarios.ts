@@ -8,7 +8,8 @@
  * cover semantics.
  */
 
-import { FixtureRepoSpec, ticketBody } from '../../fixtures/protocolFixtures';
+import { deriveAckId } from '../../../../protocol/ackId';
+import { FixtureAck, FixtureRepoSpec, ticketBody } from '../../fixtures/protocolFixtures';
 
 /**
  * Workspace settings suppressing status-pipe toasts: persistent warning
@@ -20,6 +21,32 @@ export const QUIET_TOASTS: Record<string, unknown> = { 'statusPipe.notifications
 export function minutesAgo(minutes: number): string {
 	const ms = Date.now() - minutes * 60_000;
 	return new Date(Math.floor(ms / 60_000) * 60_000).toISOString();
+}
+
+// Ticket #150: the operator clicked "Ready for another look" on an owner
+// question. The pending ack on disk must use the same waitingSince as the
+// ticket so its ackId matches and the chip reads `pending` (issue #10 calm
+// state). Created recently so no orchestrator pass has gone stale on it.
+const ACKED_SINCE = minutesAgo(70);
+const ACKED_AT = minutesAgo(5);
+
+function ackedTicketAck(): FixtureAck {
+	const ackId = deriveAckId('150', 'owner', ACKED_SINCE);
+	return {
+		ticket: '150',
+		ackId,
+		body: {
+			schemaVersion: 1,
+			kind: 'ready-for-look',
+			ticket: '150',
+			ackId,
+			target: { waitingKind: 'owner', waitingSince: ACKED_SINCE, ref: null, pr: null },
+			stateUpdatedAt: ACKED_SINCE,
+			note: null,
+			createdAt: ACKED_AT,
+			createdBy: 'status-pipe-e2e',
+		},
+	};
 }
 
 export function lanesRepo(): FixtureRepoSpec {
@@ -34,7 +61,26 @@ export function lanesRepo(): FixtureRepoSpec {
 			lastPassFinishedAt: minutesAgo(18),
 			staleWorkerMinutes: 30,
 		},
+		acks: [ackedTicketAck()],
 		tickets: [
+			{
+				key: '150',
+				body: ticketBody({
+					ticket: '150',
+					title: 'Tune retry backoff',
+					health: 'waiting',
+					phase: 'implementation',
+					headline: 'Asked whether the max backoff should cap at 30s or 60s.',
+					waitingOn: {
+						kind: 'owner',
+						ref: 'https://github.com/acme/fleet-api/issues/150#issuecomment-7711',
+						pr: null,
+						since: ACKED_SINCE,
+						detail: 'max backoff 30s or 60s?',
+					},
+					updatedAt: ACKED_SINCE,
+				}),
+			},
 			{
 				key: '142',
 				body: ticketBody({

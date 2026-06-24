@@ -22,7 +22,12 @@ const ACCENT: Record<Health, string> = {
 };
 
 function accentClass(card: CardDisplay): string {
-	return card.worker?.stale || card.reason === 'stale-ack' ? 'accent-error' : ACCENT[card.health];
+	if (card.worker?.stale || card.reason === 'stale-ack') return 'accent-error';
+	// Handed back by the operator: calm the bar — it's no longer a call to
+	// action, just awaiting pickup (issue #10). Stale/lost acks fall through
+	// to their health accent above and keep their alarm.
+	if (card.acked) return 'accent-acked';
+	return ACCENT[card.health];
 }
 
 export interface TicketCardProps {
@@ -34,7 +39,10 @@ export interface TicketCardProps {
 
 export function TicketCard({ card, state, selected, onSelect }: TicketCardProps): JSX.Element {
 	return (
-		<div className={`card ${accentClass(card)}${selected ? ' selected' : ''}`} onClick={onSelect}>
+		<div
+			className={`card ${accentClass(card)}${card.acked ? ' acked' : ''}${selected ? ' selected' : ''}`}
+			onClick={onSelect}
+		>
 			<CardHeader card={card} state={state} />
 			{card.phase && <div className="card-phase">{card.phase}</div>}
 			{card.headline && (
