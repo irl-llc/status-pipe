@@ -53,6 +53,7 @@ function makeCard(overrides: Partial<CardDisplay> = {}): CardDisplay {
 		subTickets: [],
 		history: [],
 		ackControl: { actionable: false, chip: null },
+		acked: false,
 		worker: null,
 		degraded: null,
 		rawJson: null,

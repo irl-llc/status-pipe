@@ -13,10 +13,18 @@ export interface FixtureTicket {
 	body: Record<string, unknown>;
 }
 
+/** An inbox ack file written to .status-pipe/inbox/<ticket>/ack-<ackId>.json. */
+export interface FixtureAck {
+	ticket: string;
+	ackId: string;
+	body: Record<string, unknown>;
+}
+
 export interface FixtureRepoSpec {
 	name: string;
 	remoteUrl: string;
 	tickets: FixtureTicket[];
+	acks?: FixtureAck[];
 	orchestrator?: Record<string, unknown>;
 	config?: Record<string, unknown>;
 	launch?: Record<string, unknown>;
@@ -38,6 +46,11 @@ export function writeProtocolDir(repoRoot: string, spec: FixtureRepoSpec): void 
 	mkdirSync(join(protocolDir, 'tickets'), { recursive: true });
 	for (const ticket of spec.tickets) {
 		writeFileSync(join(protocolDir, 'tickets', `${ticket.key}.json`), JSON.stringify(ticket.body, null, 2));
+	}
+	for (const ack of spec.acks ?? []) {
+		const inboxDir = join(protocolDir, 'inbox', ack.ticket);
+		mkdirSync(inboxDir, { recursive: true });
+		writeFileSync(join(inboxDir, `ack-${ack.ackId}.json`), JSON.stringify(ack.body, null, 2));
 	}
 	if (spec.orchestrator) {
 		writeFileSync(join(protocolDir, 'orchestrator.json'), JSON.stringify(spec.orchestrator, null, 2));

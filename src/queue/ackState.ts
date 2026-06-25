@@ -98,3 +98,20 @@ export function hasFreshPendingAck(ticket: TicketFile, acks: KnownAck[], ctx: Ac
 export function hasStaleAck(ticket: TicketFile, acks: KnownAck[], ctx: AckContext): boolean {
 	return acks.some((k) => chipStateFor(k, ticket, ctx) === 'stale');
 }
+
+/**
+ * The operator handed this card back and the loop is honoring it: a fresh
+ * ack is pending pickup, or it was already picked up. Excludes stale /
+ * superseded / pickup-unconfirmed — those still want the operator's eye, so
+ * they must keep their alarm visuals (issue #10). Evaluates only the newest
+ * ack, matching the chip deriveAckControl shows: an older picked-up ack must
+ * not calm a card whose newest ack went stale/moved-on.
+ */
+export function isAcked(ticket: TicketFile, acks: KnownAck[], ctx: AckContext): boolean {
+	const newest = [...acks].sort(newestFirst)[0];
+	if (!newest) {
+		return false;
+	}
+	const state = chipStateFor(newest, ticket, ctx);
+	return state === 'pending' || state === 'picked-up';
+}

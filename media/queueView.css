@@ -249,6 +249,18 @@ body {
 	background: var(--vscode-charts-green, #89d185);
 }
 
+/* Ack'd — operator handed it back, awaiting pickup. Calm blue bar, and the
+   waiting/blocker lines lose their alarm color: they're stale context now,
+   not a call to action (issue #10). Meaning stays on hover (visual rule #6). */
+.card.accent-acked::before {
+	background: var(--vscode-charts-blue, #3794ff);
+}
+
+.card.acked .waiting-line,
+.card.acked .blocker-line {
+	color: var(--vscode-descriptionForeground);
+}
+
 .card-header {
 	display: flex;
 	align-items: baseline;

@@ -319,6 +319,76 @@ describe('queue/queueModel buildDisplayState', () => {
 			assertLane(card, 'waiting', null);
 			assert.strictEqual(card.ackControl.chip?.state, 'pending');
 			assert.strictEqual(card.ackControl.actionable, false);
+			// A handed-back card is flagged acked → calm visuals + WAITING demotion.
+			assert.strictEqual(card.acked, true);
+			assert.strictEqual(card.priorityRank, 60);
+		});
+
+		it('flags a picked-up ack as acked once the card has left NEEDS YOU', () => {
+			// Ack against the old owner-question; the agent picked it up and the
+			// ticket advanced to a WAITING kind (build). The picked-up chip plus
+			// the WAITING lane = calm.
+			const acked = makeTicket({ waitingOn: waiting({ kind: 'owner', since: hoursAgo(2) }) });
+			const known = ackFor(acked, hoursAgo(1), false);
+			const ticket = {
+				...makeTicket({ waitingOn: waiting({ kind: 'build', since: minutesAgo(20) }) }),
+				history: [{ at: minutesAgo(10), phase: null, note: `consumed ack ${known.ack.ackId}`, runId: null }],
+			};
+			const card = soloCard(ticket, { acks: [known] });
+			assert.strictEqual(card.ackControl.chip?.state, 'picked-up');
+			assertLane(card, 'waiting', null);
+			assert.strictEqual(card.acked, true);
+		});
+
+		it('does NOT calm a picked-up ack while the ticket still waits on the owner', () => {
+			// Agent re-looked, recorded the pickup, but still needs the operator —
+			// keep the alarm (stays in NEEDS YOU, acked=false).
+			const base = makeTicket({ waitingOn: waiting({ kind: 'owner' }) });
+			const known = ackFor(base, hoursAgo(1), false);
+			const ticket = {
+				...base,
+				history: [{ at: minutesAgo(10), phase: null, note: `consumed ack ${known.ack.ackId}`, runId: null }],
+			};
+			const card = soloCard(ticket, { acks: [known] });
+			assert.strictEqual(card.ackControl.chip?.state, 'picked-up');
+			assertLane(card, 'needs-you', 'owner');
+			assert.strictEqual(card.acked, false);
+		});
+
+		it('does NOT flag stale / pickup-unconfirmed / superseded acks as acked', () => {
+			const owner = (): TicketFile => makeTicket({ waitingOn: waiting({ kind: 'owner' }) });
+			const stale = soloCard(owner(), {
+				acks: [ackFor(owner(), hoursAgo(2))],
+				orchestrator: makeOrchestrator({ lastPassStartedAt: hoursAgo(1), lastPassFinishedAt: minutesAgo(30) }),
+			});
+			assert.strictEqual(stale.acked, false);
+			const unconfirmed = soloCard(owner(), { acks: [ackFor(owner(), hoursAgo(1), false)] });
+			assert.strictEqual(unconfirmed.acked, false);
+		});
+
+		it('does NOT calm off an older ack when the newest ack has moved on', () => {
+			// An older fresh-pending ack (matches the current owner question) keeps
+			// the card in WAITING; a newer ack targets a now-superseded state →
+			// moved-on, the chip the operator actually sees. The card must NOT calm:
+			// isAcked evaluates the newest ack only, matching the chip from
+			// deriveAckControl (gemini flag on PR #27). `acks.some(...)` calmed it
+			// off the older pending entry while the visible chip showed a warning.
+			const current = makeTicket({ waitingOn: waiting({ kind: 'owner', since: minutesAgo(30) }) });
+			const pending = ackFor(current, minutesAgo(8));
+			const movedOn = ackFor(makeTicket({ waitingOn: waiting({ kind: 'owner', since: hoursAgo(5) }) }), minutesAgo(3));
+			const card = soloCard(current, { acks: [pending, movedOn] });
+			assertLane(card, 'waiting', null);
+			assert.strictEqual(card.ackControl.chip?.state, 'moved-on');
+			assert.strictEqual(card.acked, false);
+		});
+
+		it('does NOT flag a QUIET (done) card as acked — done keeps its own treatment', () => {
+			// Ackable (has a leftover blocker) but merged → QUIET wins; the calm
+			// state is WAITING-only, so QUIET keeps its done treatment.
+			const done = makeTicket({ phase: 'merged', blockers: ['leftover note'] });
+			const card = soloCard(done, { acks: [ackFor(done, minutesAgo(5))] });
+			assertLane(card, 'quiet', null);
+			assert.strictEqual(card.acked, false);
 		});
 
 		it('suppresses blocked with a fresh pending ack against the blockers target', () => {
@@ -331,6 +401,21 @@ describe('queue/queueModel buildDisplayState', () => {
 			const ticket = makeTicket({ waitingOn: waiting({ kind: 'owner' }), worker: ERROR_WORKER });
 			const card = soloCard(ticket, { acks: [ackFor(ticket, minutesAgo(5))] });
 			assertLane(card, 'needs-you', 'worker-crashed');
+			// Crash overrides the ack — the card is not "handed back, all good".
+			assert.strictEqual(card.acked, false);
+		});
+
+		it('sinks an acked WAITING card below an un-acked one (issue #10 reorder)', () => {
+			const acked = makeTicket({ ticket: '1', waitingOn: waiting({ kind: 'owner', since: hoursAgo(4) }) });
+			const unacked = makeTicket({ ticket: '2', waitingOn: waiting({ kind: 'build', since: hoursAgo(1) }) });
+			const state = buildDisplayState(
+				makeInput([ticketRepo([acked, unacked], { acks: [ackFor(acked, minutesAgo(5))] })]),
+			);
+			// Both WAITING; despite the acked one being older, it sorts last.
+			assert.deepStrictEqual(
+				state.cards.map((c) => c.ticket),
+				['2', '1'],
+			);
 		});
 	});
 
