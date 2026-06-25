@@ -17,7 +17,7 @@
   Baselines are regenerated locally and committed by the submitter:
   `npm run test:e2e:playwright:docker:update`. On Apple Silicon this emulates
   amd64 via **OrbStack/Rosetta** (NOT QEMU) and renders the headless VS Code
-  webview fine — verified 8/8 specs pass locally. If you genuinely cannot
+  webview fine; the full snapshot suite passes locally. If you genuinely cannot
   regenerate locally, that is a human handoff: say so and stop. Do not look for
   a CI dispatch to trigger, and do not author a new CI workflow to do it.
 

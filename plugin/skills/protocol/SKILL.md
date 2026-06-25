@@ -92,6 +92,11 @@ Schema: `ticket.schema.json`, `schemaVersion: 1`. The filename stem equals the
   reconciliation, do not restate the plan, do not pad. Prefer a link over a
   paragraph describing what's behind the link. Length is earned by content,
   never by formatting or recap.
+- **Concrete counts, not "all".** Report test/check outcomes as the actual
+  `n/m` at that moment (e.g. `8/8` snapshots, `7/9` unit tests, `2/8` failing) —
+  not "all pass" (hides how many ran) and not a memorized total (goes stale as
+  suites grow). The ratio is the signal: did everything run, and how many
+  failed. Same for any "X of Y" outcome.
 - **`history[]` is append-only.** Append `{at, phase, note, runId}` on every
   meaningful action (phase change, PR opened, ack consumed, error). Never
   rewrite or delete entries. Notes name ack ids verbatim
