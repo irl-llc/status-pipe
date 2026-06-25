@@ -94,7 +94,11 @@ Otherwise write `phase: "implementation"` (history: the plan summary, one line).
 Do the work in this worktree on a ticket branch (`ticket/<key>` or the
 repo's convention; stack with git-spice when the repo uses it — it is NOT
 required). Commit in reviewable units. Run the repo's tests/build locally to
-the extent it defines them. Heartbeat during long stretches. If an operation
+the extent it defines them. If the change alters user-facing or visual
+behavior, it is not done until it carries the coverage the repo requires for
+that surface (e.g. snapshot/visual baselines): regenerate those baselines
+locally per the repo's docs and commit them in the same change — never defer
+baseline regeneration to CI. Heartbeat during long stretches. If an operation
 hits a **capability wall** (protocol skill §4 — fails twice, or needs an
 operator-only credential/privileged step you genuinely cannot perform), stop:
 record the `deadEnds[]` entry, escalate via `blockers[]` + `post-comment`, and

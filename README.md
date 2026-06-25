@@ -73,9 +73,10 @@ and an empty needs-you lane renders the product sentence:
 
 ![All quiet](src/test/e2e/playwright/allQuiet.spec.ts-snapshots/all-quiet-linux.png)
 
-To regenerate after an intentional UI change:
-`npm run test:e2e:playwright:docker:update` (or the `update_snapshots`
-workflow dispatch in CI, which is the oracle for the Linux baselines).
+To regenerate after an intentional UI change, run
+`npm run test:e2e:playwright:docker:update` locally and commit the PNGs (amd64
+via OrbStack/Rosetta — byte-identical to the CI oracle). CI only verifies; it
+never regenerates baselines.
 
 ## Installing from source
 

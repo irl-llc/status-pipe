@@ -1,0 +1,2 @@
+kind: Changed
+body: 'CI no longer regenerates Playwright snapshot baselines — the `update_snapshots` workflow_dispatch input and the generated-snapshots upload were removed. CI is verify-only; baselines are regenerated locally by the submitter (`npm run test:e2e:playwright:docker:update`, amd64 via OrbStack/Rosetta) and committed with the change.'
