@@ -10,9 +10,16 @@
     (NOT `npm run test:e2e:playwright`)
 - Unit tests are plain mocha and safe on the host:
   `npm run compile-tests && npm run test:unit`.
-- Snapshot baselines are Linux renders. The CI amd64 render is the oracle;
-  regenerate via the `update_snapshots` workflow_dispatch input on ci.yml
-  (or locally via the docker `:update` script on an amd64-comparable setup).
+- Snapshot baselines are Linux/amd64 renders. The CI amd64 render is the
+  **verify-only oracle** — it pixel-compares and reports drift; it never
+  regenerates baselines.
+- **Never regenerate snapshots via CI — there is no CI snapshot-update path.**
+  Baselines are regenerated locally and committed by the submitter:
+  `npm run test:e2e:playwright:docker:update`. On Apple Silicon this emulates
+  amd64 via **OrbStack/Rosetta** (NOT QEMU) and renders the headless VS Code
+  webview fine — verified 8/8 specs pass locally. If you genuinely cannot
+  regenerate locally, that is a human handoff: say so and stop. Do not look for
+  a CI dispatch to trigger, and do not author a new CI workflow to do it.
 
 ## Source layout
 

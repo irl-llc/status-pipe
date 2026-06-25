@@ -93,15 +93,32 @@ Snapshot discipline (proven in git-spice-code-extension):
   removed 2026-06-11 — pointer files made the screenshots unreviewable in
   diffs and the README gallery)
 - `workers: 1`, animations disabled, fonts awaited, `maxDiffPixelRatio: 0.005`
-- CI `workflow_dispatch` input `update_snapshots`: regenerates baselines in CI
-  and uploads them as artifacts for download-and-commit
+- CI is **verify-only** — it pixel-compares against the committed baselines and
+  never regenerates them. Regen is a local developer task: the submitter runs
+  the docker `:update` script (amd64 via OrbStack/Rosetta) and commits the PNGs.
+  This keeps baseline ownership with the submitter, so a real regression can't
+  be blessed by the same job that renders it.
+
+**Snapshot coverage is required for UI changes.** Any change that renders a new
+or altered UI state — a new card variant, badge combination, lane configuration,
+pane, or detail-section — is not complete until it carries Playwright snapshot
+coverage:
+
+1. Add or extend a `.spec.ts` under `src/test/e2e/playwright/`, seeding state
+   via `buildFixtureWorkspace()` (`src/test/e2e/fixtures/`) and capturing with
+   `await expect(vscode.workbench).toHaveScreenshot('<state>.png', { fullPage: true })`.
+2. Regenerate the baseline locally: `npm run test:e2e:playwright:docker:update`
+   (writes `<spec>-snapshots/<state>-linux.png`).
+3. Commit the PNG in the same change. A UI change that shifts an existing
+   baseline must commit the refreshed PNG too.
+
+A new visual state with no snapshot is untested surface that drift can't catch.
 
 ## CI (`.github/workflows/ci.yml`)
 
 On PR + main push: install → lint → compile (webpack both bundles) →
 unit tests → e2e suite → Playwright snapshots in Docker (with buildx cache and
-MCR retry) → upload `test-results/` + generated snapshots on failure or
-`update_snapshots`. A `changelog-gate.yml` requires a changie fragment under
+MCR retry) → upload `test-results/` on failure. A `changelog-gate.yml` requires a changie fragment under
 `.changes/unreleased/` on every PR (label opt-out for chores).
 
 ## Release automation

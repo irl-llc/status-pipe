@@ -31,9 +31,10 @@ npm run test:e2e:playwright:docker:update   # regenerate baselines
 
 Running `npm run test:e2e:playwright` natively on macOS produces diffs that
 don't match the Linux baselines; that's expected. CI Linux/amd64 is the
-baseline oracle: the CI workflow's `update_snapshots` dispatch input
-regenerates baselines in CI and uploads them as an artifact for
-download-and-commit.
+baseline **oracle** — it pixel-compares against the committed PNGs and reports
+drift, but it never regenerates them. Regen is yours to do: run the docker
+`:update` script locally (amd64 via OrbStack/Rosetta, byte-identical to CI) and
+commit the PNGs in the same change.
 
 ## Changelog fragments (Changie)
 

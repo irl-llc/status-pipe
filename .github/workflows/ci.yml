@@ -8,13 +8,10 @@ on:
   pull_request:
   release:
     types: [created]
+  # Bare manual trigger for re-running CI on a branch. CI never regenerates
+  # snapshot baselines — that is a local developer task (see the Playwright
+  # step below).
   workflow_dispatch:
-    inputs:
-      update_snapshots:
-        description: 'Regenerate Playwright snapshot baselines and upload them as an artifact'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -141,18 +138,12 @@ jobs:
 
       - name: Run Playwright snapshot tests (Linux container)
         id: playwright-tests
-        # On a normal run, the Docker image renders Linux/amd64 baselines, so a
-        # missing-baseline spec writes its PNG into the bind-mounted workspace
-        # (and still reports failure). With the update_snapshots dispatch input
-        # it regenerates ALL baselines. Either way the generated PNGs are
-        # uploaded below so they can be reviewed + committed — local arm64
-        # renders are not byte-identical to CI, so CI is the baseline oracle.
-        run: |
-          if [ "${{ github.event.inputs.update_snapshots }}" = "true" ]; then
-            npm run test:e2e:playwright:docker:update
-          else
-            npm run test:e2e:playwright:docker
-          fi
+        # Verify-only: the Docker image renders Linux/amd64 and pixel-compares
+        # against the committed baselines. CI never regenerates baselines —
+        # snapshot regen is a local developer task (`npm run
+        # test:e2e:playwright:docker:update`, amd64 via OrbStack/Rosetta). On
+        # failure the diff report is uploaded below so the drift can be reviewed.
+        run: npm run test:e2e:playwright:docker
         continue-on-error: true
 
       - name: Upload Playwright artifacts on failure
@@ -163,17 +154,6 @@ jobs:
           path: |
             test-results/
             playwright-report/
-          retention-days: 7
-
-      # Generated/updated baselines (missing-baseline writes on a normal run, or
-      # all baselines under update_snapshots) ride out as a reviewable artifact.
-      - name: Upload generated Playwright snapshots
-        if: always() && (steps.playwright-tests.outcome == 'failure' || github.event.inputs.update_snapshots == 'true')
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-snapshots
-          path: src/test/e2e/playwright/**/*-snapshots/**
-          if-no-files-found: ignore
           retention-days: 7
 
       - name: Fail if Playwright tests failed

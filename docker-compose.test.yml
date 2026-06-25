@@ -22,8 +22,10 @@
 services:
   playwright:
     # Pin amd64 so the PNG baselines are byte-identical to the ubuntu-latest
-    # CI render even when the host is an arm64 Mac (Docker emulates amd64).
-    # Without this, local `:update` produces arm64-Linux renders that drift
+    # CI render even when the host is an arm64 Mac. On Apple Silicon with
+    # OrbStack the amd64 emulation is Rosetta (NOT QEMU) — the headless VS Code
+    # webview renders fine under it; verified 8/8 snapshot specs pass locally.
+    # Without the pin, local `:update` produces arm64-Linux renders that drift
     # against the amd64 CI oracle.
     platform: linux/amd64
     build:
