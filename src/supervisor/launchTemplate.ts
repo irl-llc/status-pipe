@@ -13,10 +13,47 @@
  * to.
  */
 
+import * as path from 'path';
+
 import { SpawnRequest } from './agentRunner';
 
 export function substituteHome(value: string, home: string): string {
 	return value.replaceAll('%home%', home);
+}
+
+/**
+ * Worker-only tokens, resolved by the supervisor per dispatched item BEFORE the
+ * request reaches the spawner (which still resolves %home%): `%prompt%` is the
+ * worker's `claude -p` argument, `%worktree%` its cwd. Both come from the
+ * planner's dispatch item — the supervisor never builds them.
+ */
+function substituteWorker(value: string, prompt: string, worktree: string): string {
+	return value.replaceAll('%prompt%', prompt).replaceAll('%worktree%', worktree);
+}
+
+/** Resolve %prompt%/%worktree% in a worker template for one dispatched item. */
+export function resolveWorkerRequest(template: SpawnRequest, prompt: string, worktree: string): SpawnRequest {
+	return {
+		command: substituteWorker(template.command, prompt, worktree),
+		args: template.args.map((arg) => substituteWorker(arg, prompt, worktree)),
+		cwd: workerCwd(substituteWorker(template.cwd, prompt, worktree), worktree),
+		env: Object.fromEntries(Object.entries(template.env).map(([k, v]) => [k, substituteWorker(v, prompt, worktree)])),
+		// stdin can carry the prompt for backends that read it there (design/09),
+		// so it gets the worker tokens too (%home% is still left — it's prompt text).
+		stdin: substituteWorker(template.stdin, prompt, worktree),
+	};
+}
+
+/**
+ * A worker must run inside its dispatched worktree. A relative (or empty)
+ * template cwd is resolved against the worktree so the worker never lands in
+ * the extension host's cwd. An absolute path, or a %home%-anchored one (still
+ * a token here — the spawner resolves %home% to an absolute path), is left
+ * untouched: resolving the latter against the worktree would corrupt it.
+ */
+function workerCwd(cwd: string, worktree: string): string {
+	if (path.isAbsolute(cwd) || cwd.startsWith('%home%')) return cwd;
+	return path.resolve(worktree, cwd);
 }
 
 /** Return a copy of the request with `%home%` resolved in command/args/cwd/env. */

@@ -96,6 +96,31 @@ export interface ParkedState {
 	recheckAfter: string | null;
 }
 
+/**
+ * One worker the planner has stamped and wants the supervisor to spawn this
+ * pass. `prompt` is the fully-formed `claude -p` argument the planner built
+ * (e.g. `/status-pipe:work-ticket 19`, ack note already appended); `worktree`
+ * is the worker's cwd. The supervisor substitutes these into the `worker`-mode
+ * launch template and never constructs them itself (design/09).
+ */
+export interface DispatchItem {
+	key: string;
+	kind: 'ticket' | 'epic';
+	prompt: string;
+	worktree: string;
+}
+
+/**
+ * The planner's dispatch declaration, written to orchestrator.json each pass
+ * and consumed by the supervisor (or any executor) to spawn worker processes.
+ * `maxConcurrent` is the planner's declared ceiling; the executor treats it as
+ * a defensive cap on top of the already-capped item list.
+ */
+export interface DispatchPlan {
+	maxConcurrent: number;
+	items: DispatchItem[];
+}
+
 export interface OrchestratorFile {
 	schemaVersion: number;
 	repo: string | null;
@@ -104,6 +129,8 @@ export interface OrchestratorFile {
 	lastPassFinishedAt: string | null;
 	staleWorkerMinutes: number | null;
 	parked: ParkedState | null;
+	/** Workers the planner stamped this pass; the supervisor spawns them. */
+	dispatch: DispatchPlan | null;
 	note: string | null;
 }
 
@@ -126,7 +153,12 @@ export interface AckFile {
 	createdBy: string;
 }
 
-export type AgentMode = 'tick' | 'daemon';
+/**
+ * `tick`/`daemon` are scheduled by the supervisor; `worker` is NOT scheduled —
+ * it is a template the supervisor instantiates on demand, once per dispatched
+ * item, with `%prompt%`/`%worktree%` resolved from the dispatch plan.
+ */
+export type AgentMode = 'tick' | 'daemon' | 'worker';
 
 export interface LaunchAgent {
 	id: string;

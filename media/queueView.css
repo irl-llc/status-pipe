@@ -147,6 +147,12 @@ body {
 	flex: none;
 }
 
+/* Live worker processes read as children of the planner that dispatched them:
+   indented, no action controls (their lifecycle is the planner's). */
+.agent-row.worker-row {
+	padding-left: 30px;
+}
+
 .agent-state-failed {
 	color: var(--vscode-errorForeground);
 }

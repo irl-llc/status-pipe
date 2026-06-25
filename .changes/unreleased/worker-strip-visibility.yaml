@@ -1,0 +1,2 @@
+kind: Added
+body: 'The agents strip now shows live workers: a read-only row per running worker (ticket key + what it''s doing, parsed from its stream-json) beneath the launch configs, and a "N workers running" count in the collapsed summary. Worker rows are additive — a repo with no running worker looks exactly as before.'

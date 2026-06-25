@@ -3,7 +3,7 @@
 	"agents": [
 		{
 			"id": "tick",
-			"title": "status-pipe agent loop",
+			"title": "status-pipe planner loop",
 			"command": "claude",
 			"args": [
 				"-p",
@@ -26,6 +26,32 @@
 			},
 			"mode": "tick",
 			"intervalMinutes": 10,
+			"timeoutMinutes": 45
+		},
+		{
+			"id": "worker",
+			"title": "status-pipe work-item worker",
+			"command": "claude",
+			"args": [
+				"-p",
+				"%prompt%",
+				"--output-format",
+				"stream-json",
+				"--verbose",
+				"--permission-mode",
+				"auto"
+			],
+			"stdin": "",
+			"cwd": "%worktree%",
+			"env": {
+				"GH_CONFIG_DIR": "%home%/.config/claude-gh",
+				"GIT_CONFIG_COUNT": "2",
+				"GIT_CONFIG_KEY_0": "credential.https://github.com.helper",
+				"GIT_CONFIG_VALUE_0": "",
+				"GIT_CONFIG_KEY_1": "credential.https://github.com.helper",
+				"GIT_CONFIG_VALUE_1": "!gh auth git-credential"
+			},
+			"mode": "worker",
 			"timeoutMinutes": 45
 		}
 	]

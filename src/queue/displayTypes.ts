@@ -8,6 +8,7 @@
 import { CheckStatus, ForgeCapabilities } from '../forge/types';
 import { AgentActivity } from '../output/claudeStream';
 import {
+	AgentMode,
 	Health,
 	HistoryEntry,
 	ParkedState,
@@ -159,7 +160,7 @@ export interface AgentDisplay {
 	repoName: string;
 	agentId: string;
 	title: string;
-	mode: 'tick' | 'daemon';
+	mode: AgentMode;
 	/** Tick cadence in minutes; null for daemon mode or orphaned runners. */
 	intervalMinutes: number | null;
 	/** True once the supervisor holds a runner for this config (approved). */
@@ -192,6 +193,22 @@ export interface RepoDisplay {
 	issuesUrl: string | null;
 }
 
+/**
+ * One live worker process under the agents strip (design/09): a `claude -p`
+ * the supervisor spawned from the planner's dispatch plan. Distinct from
+ * AgentDisplay (a declared launch config) — workers are dynamic and unkeyed by
+ * launch.json; they appear while running and vanish on exit.
+ */
+export interface WorkerProcessDisplay {
+	repoRoot: string;
+	repoName: string;
+	/** Ticket key (an epic's tracking-ticket key) the worker is advancing. */
+	key: string;
+	runningSince: number | null;
+	lastOutputAt: number | null;
+	activity: AgentActivity;
+}
+
 export type ActivityState = 'idle' | 'refreshing' | 'degraded';
 
 /** Contents of the reserved activity slot — the only global network status. */
@@ -207,6 +224,8 @@ export interface DisplayState {
 	multiRepo: boolean;
 	repos: RepoDisplay[];
 	agents: AgentDisplay[];
+	/** Live worker processes (dispatch-driven), shown under the agents strip. */
+	workers: WorkerProcessDisplay[];
 	/** Sorted: lane, then priority rank, then age/repo/ticket. */
 	cards: CardDisplay[];
 	counts: { needsYou: number; waiting: number; quiet: number };

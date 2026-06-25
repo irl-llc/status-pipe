@@ -19,6 +19,7 @@ import {
 	makeAgent,
 	makeConfig,
 	makeInput,
+	makeWorker,
 	makeLaunch,
 	makeOrchestrator,
 	makePr,
@@ -113,6 +114,26 @@ describe('queue/queueModel buildDisplayState', () => {
 			const state = buildDisplayState(makeInput([makeRepo()], [makeAgent({ state: 'running' })]));
 			assert.deepStrictEqual(state.cards, []);
 			assert.strictEqual(state.agents.length, 1);
+		});
+	});
+
+	describe('agents strip: live workers', () => {
+		it('surfaces dispatched workers joined with the repo name', () => {
+			const state = buildDisplayState(
+				makeInput([makeRepo()], [makeAgent()], { workers: [makeWorker({ key: '19' }), makeWorker({ key: '20' })] }),
+			);
+			assert.deepStrictEqual(
+				state.workers.map((w) => w.key),
+				['19', '20'],
+			);
+			assert.strictEqual(state.workers[0].repoName, 'app');
+		});
+
+		it('drops workers whose repo is no longer present', () => {
+			const state = buildDisplayState(
+				makeInput([makeRepo()], [], { workers: [makeWorker({ repoRoot: '/gone', key: '99' })] }),
+			);
+			assert.deepStrictEqual(state.workers, []);
 		});
 	});
 
@@ -539,8 +560,8 @@ describe('queue/queueModel buildDisplayState', () => {
 		const tenMinuteHeartbeat = (): TicketFile => makeTicket({ worker: runningWorker(minutesAgo(10)) });
 
 		function laneWith(repoOverrides: Partial<RepoState>, settingsDefault: number): CardDisplay {
-			const input = makeInput([ticketRepo([tenMinuteHeartbeat()], repoOverrides)], [], undefined, {
-				staleWorkerMinutesDefault: settingsDefault,
+			const input = makeInput([ticketRepo([tenMinuteHeartbeat()], repoOverrides)], [], {
+				settings: { staleWorkerMinutesDefault: settingsDefault },
 			});
 			return buildDisplayState(input).cards[0];
 		}

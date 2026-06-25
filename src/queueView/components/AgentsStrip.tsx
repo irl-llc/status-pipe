@@ -9,7 +9,7 @@
 import { useState, type JSX } from 'react';
 
 import { AgentActivity } from '../../output/claudeStream';
-import { AgentDisplay, DisplayState } from '../../queue/displayTypes';
+import { AgentDisplay, DisplayState, WorkerProcessDisplay } from '../../queue/displayTypes';
 import { formatDuration } from '../format';
 import { AGENT_STATE_ICON } from '../icons';
 import { usePost } from './QueueApp';
@@ -23,20 +23,30 @@ function isActive(state: AgentDisplay['state']): boolean {
 
 export function AgentsStrip({ state }: { state: DisplayState }): JSX.Element | null {
 	const [expanded, setExpanded] = useState(true);
-	if (state.agents.length === 0) return null;
+	if (state.agents.length === 0 && state.workers.length === 0) return null;
+	// Only count launch configs in the header when there are some — otherwise a
+	// workers-only strip would read "0 launch configs: 2 workers running".
 	const label = state.agents.length === 1 ? 'launch config' : 'launch configs';
+	const prefix = state.agents.length > 0 ? `${state.agents.length} ${label}: ` : '';
 	return (
 		<div className="agents-strip">
 			<div className="summary" onClick={() => setExpanded(!expanded)}>
 				<span className={`codicon codicon-chevron-${expanded ? 'down' : 'right'}`} />
 				<span>
-					{state.agents.length} {label}: {summaryLine(state)}
+					{prefix}
+					{summaryLine(state)}
 				</span>
 			</div>
-			{expanded &&
-				state.agents.map((agent) => (
-					<AgentRow key={`${agent.repoRoot}:${agent.agentId}`} agent={agent} state={state} />
-				))}
+			{expanded && (
+				<>
+					{state.agents.map((agent) => (
+						<AgentRow key={`${agent.repoRoot}:${agent.agentId}`} agent={agent} state={state} />
+					))}
+					{state.workers.map((worker) => (
+						<WorkerRow key={`${worker.repoRoot}:${worker.key}`} worker={worker} state={state} />
+					))}
+				</>
+			)}
 		</div>
 	);
 }
@@ -44,7 +54,10 @@ export function AgentsStrip({ state }: { state: DisplayState }): JSX.Element | n
 function summaryLine(state: DisplayState): string {
 	const counts = new Map<string, number>();
 	for (const agent of state.agents) counts.set(agent.state, (counts.get(agent.state) ?? 0) + 1);
-	return [...counts.entries()].map(([s, n]) => describeGroup(s, n, state)).join(' · ');
+	const groups = [...counts.entries()].map(([s, n]) => describeGroup(s, n, state));
+	if (state.workers.length > 0)
+		groups.push(`${state.workers.length} ${state.workers.length === 1 ? 'worker' : 'workers'} running`);
+	return groups.join(' · ');
 }
 
 function describeGroup(runState: string, n: number, state: DisplayState): string {
@@ -76,6 +89,32 @@ function AgentRow({ agent, state }: { agent: AgentDisplay; state: DisplayState }
 			<AgentActions agent={agent} />
 		</div>
 	);
+}
+
+/**
+ * A live worker process (design/09): one `claude -p /work-ticket` the
+ * supervisor spawned from the dispatch plan. Read-only — its lifecycle is the
+ * planner's; the operator acts on the ticket card, not here.
+ */
+function WorkerRow({ worker, state }: { worker: WorkerProcessDisplay; state: DisplayState }): JSX.Element {
+	return (
+		<div className="agent-row worker-row">
+			<span className={`codicon codicon-${AGENT_STATE_ICON.running} agent-state-running`} title="worker running" />
+			{state.multiRepo && <span className="agent-repo">{worker.repoName}</span>}
+			<span className="agent-title" title={`worker · ${worker.key}`}>
+				{worker.key}
+			</span>
+			<span className="agent-meta">{workerMeta(worker, state.generatedAt)}</span>
+		</div>
+	);
+}
+
+function workerMeta(worker: WorkerProcessDisplay, now: number): string {
+	const activity = activitySummary(worker.activity);
+	if (activity) return `running · ${activity}`;
+	// Both timestamps come from the host clock, so this is only defensive: clamp
+	// in case a snapshot's generatedAt was captured a hair before runningSince.
+	return worker.runningSince !== null ? `running ${formatDuration(Math.max(0, now - worker.runningSince))}` : 'running';
 }
 
 function AgentActions({ agent }: { agent: AgentDisplay }): JSX.Element {

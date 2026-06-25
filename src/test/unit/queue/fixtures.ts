@@ -14,6 +14,7 @@ import {
 	KnownAck,
 	PrEnrichment,
 	QueueModelInput,
+	WorkerProcessState,
 	RepoState,
 	TicketEntry,
 } from '../../../queue/queueInputs';
@@ -103,6 +104,7 @@ export function makeOrchestrator(overrides: Partial<OrchestratorFile> = {}): Orc
 		lastPassFinishedAt: null,
 		staleWorkerMinutes: null,
 		parked: null,
+		dispatch: null,
 		note: null,
 		...overrides,
 	};
@@ -161,18 +163,31 @@ export function makeAgent(overrides: Partial<AgentProcessState> = {}): AgentProc
 	};
 }
 
-export function makeInput(
-	repos: RepoState[],
-	agents: AgentProcessState[] = [],
-	now: number = NOW,
-	settings: Partial<QueueModelInput['settings']> = {},
-): QueueModelInput {
+export function makeWorker(overrides: Partial<WorkerProcessState> = {}): WorkerProcessState {
+	return {
+		repoRoot: '/work/app',
+		key: '19',
+		runningSince: null,
+		lastOutputAt: null,
+		activity: emptyActivity(),
+		...overrides,
+	};
+}
+
+interface InputOpts {
+	now?: number;
+	settings?: Partial<QueueModelInput['settings']>;
+	workers?: WorkerProcessState[];
+}
+
+export function makeInput(repos: RepoState[], agents: AgentProcessState[] = [], opts: InputOpts = {}): QueueModelInput {
 	return {
 		repos,
 		agents,
+		workers: opts.workers ?? [],
 		activity: { state: 'idle', detail: null, oldestDataAgeMs: null },
-		now,
-		settings: { staleWorkerMinutesDefault: 30, quietRetentionHours: 24, ...settings },
+		now: opts.now ?? NOW,
+		settings: { staleWorkerMinutesDefault: 30, quietRetentionHours: 24, ...opts.settings },
 	};
 }
 

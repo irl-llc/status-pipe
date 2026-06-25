@@ -6,7 +6,15 @@
 
 import { ChecksInfo, ForgeCapabilities, PullRequestInfo, TicketRef } from '../forge/types';
 import { AgentActivity } from '../output/claudeStream';
-import { AckFile, ConfigFile, LaunchFile, OrchestratorFile, ParseResult, TicketFile } from '../protocol/types';
+import {
+	AckFile,
+	AgentMode,
+	ConfigFile,
+	LaunchFile,
+	OrchestratorFile,
+	ParseResult,
+	TicketFile,
+} from '../protocol/types';
 import { ActivityDisplay, AgentRunState } from './displayTypes';
 
 export interface TicketEntry {
@@ -59,7 +67,7 @@ export interface AgentProcessState {
 	repoRoot: string;
 	agentId: string;
 	title: string;
-	mode: 'tick' | 'daemon';
+	mode: AgentMode;
 	state: AgentRunState;
 	nextTickAt: number | null;
 	runningSince: number | null;
@@ -71,9 +79,22 @@ export interface AgentProcessState {
 	activity: AgentActivity;
 }
 
+/** One live worker process the supervisor spawned from the dispatch plan. */
+export interface WorkerProcessState {
+	repoRoot: string;
+	/** Dispatch item key — the ticket key (an epic's tracking-ticket key) the worker is advancing. */
+	key: string;
+	runningSince: number | null;
+	lastOutputAt: number | null;
+	/** Parsed from the worker's stream-json stdout; what it's doing right now. */
+	activity: AgentActivity;
+}
+
 export interface QueueModelInput {
 	repos: RepoState[];
 	agents: AgentProcessState[];
+	/** Live workers across all repos (supervisor-spawned, dispatch-driven). */
+	workers: WorkerProcessState[];
 	activity: ActivityDisplay;
 	/** Epoch ms — injected for deterministic tests. */
 	now: number;
