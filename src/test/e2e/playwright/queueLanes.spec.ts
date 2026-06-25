@@ -56,6 +56,11 @@ test.describe('queue lanes', () => {
 		await expect(ackedCard.locator('.ack-chip.pending')).toBeVisible();
 		expect(keys.indexOf('#150')).toBeGreaterThan(keys.indexOf('#161'));
 
+		// Dedicated baseline of the acked card alone (issue #10): isolates the
+		// calm accent + dimmed lines + pending chip so a reviewer can see the
+		// ack'd visual without hunting for it inside the full-lane shot above.
+		await expect(ackedCard).toHaveScreenshot('acked-card.png');
+
 		await expect(vscode.workbench).toHaveScreenshot('lanes-editor.png', { fullPage: true });
 	});
 
