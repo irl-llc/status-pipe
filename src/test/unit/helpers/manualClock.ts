@@ -1,7 +1,7 @@
 /**
  * Manual clock + scheduler for deterministic timer tests. Matches the
  * `schedule(fn, ms) => cancel` shape injected into ForgeEnricher,
- * AgentRunner, and AgentSupervisor.
+ * SupervisedRunner, and AgentSupervisor.
  */
 
 interface ManualTimer {

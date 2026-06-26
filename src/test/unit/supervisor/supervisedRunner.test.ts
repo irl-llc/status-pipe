@@ -1,13 +1,13 @@
 /**
- * Unit tests for supervisor/agentRunner.ts — the per-(repo, agent) state
- * machine, driven by a fake Spawner and a manual clock/scheduler.
+ * Unit tests for supervisor/supervisedRunner.ts — the per-(repo, launch-entry)
+ * state machine, driven by a fake Spawner and a manual clock/scheduler.
  */
 
 import assert from 'node:assert/strict';
 
 import { LaunchAgent, ParkedState } from '../../../protocol/types';
 import { AgentRunState } from '../../../queue/displayTypes';
-import { AgentRunner } from '../../../supervisor/agentRunner';
+import { SupervisedRunner } from '../../../supervisor/supervisedRunner';
 import { FakeSpawner } from '../helpers/fakeSpawner';
 import { ManualClock } from '../helpers/manualClock';
 
@@ -31,7 +31,7 @@ function agent(overrides: Partial<LaunchAgent> = {}): LaunchAgent {
 interface Harness {
 	clock: ManualClock;
 	spawner: FakeSpawner;
-	runner: AgentRunner;
+	runner: SupervisedRunner;
 	stateLog: AgentRunState[];
 	logs: string[];
 	parked: { value: ParkedState | null };
@@ -45,7 +45,7 @@ function makeRunner(overrides: Partial<LaunchAgent> = {}, maxRestarts = 3): Harn
 	const logs: string[] = [];
 	const parked = { value: null as ParkedState | null };
 	const idle = { value: false };
-	const runner: AgentRunner = new AgentRunner('/work/repo', agent(overrides), {
+	const runner: SupervisedRunner = new SupervisedRunner('/work/repo', agent(overrides), {
 		spawn: spawner.spawn,
 		now: () => clock.now,
 		schedule: clock.schedule,
@@ -60,7 +60,7 @@ function makeRunner(overrides: Partial<LaunchAgent> = {}, maxRestarts = 3): Harn
 
 const PARKED: ParkedState = { since: '2026-06-01T00:00:00Z', reason: 'all work waiting on you', recheckAfter: null };
 
-describe('supervisor/agentRunner', () => {
+describe('supervisor/supervisedRunner', () => {
 	it('start passes through launching to a running snapshot', () => {
 		const h = makeRunner();
 		h.runner.start();

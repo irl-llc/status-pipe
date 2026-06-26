@@ -1,10 +1,10 @@
 /**
- * A recording Spawner for AgentRunner/AgentSupervisor tests: captures every
+ * A recording Spawner for SupervisedRunner/AgentSupervisor tests: captures every
  * SpawnRequest, exposes the per-process event hooks so tests fire
  * onOutput/onExit manually, and counts kill() calls.
  */
 
-import { ProcessEvents, SpawnRequest, Spawner } from '../../../supervisor/agentRunner';
+import { ProcessEvents, SpawnRequest, Spawner } from '../../../supervisor/supervisedRunner';
 
 export class FakeSpawner {
 	readonly requests: SpawnRequest[] = [];

@@ -7,7 +7,7 @@
 import { ChildProcess, spawn } from 'child_process';
 import { homedir } from 'os';
 
-import { ProcessEvents, Spawner } from '../supervisor/agentRunner';
+import { ProcessEvents, Spawner } from '../supervisor/supervisedRunner';
 import { resolveLaunchTemplates } from '../supervisor/launchTemplate';
 
 /**

@@ -1,5 +1,5 @@
 /**
- * Fleet supervision (design/09-launch-and-supervision.md): one AgentRunner
+ * Fleet supervision (design/09-launch-and-supervision.md): one SupervisedRunner
  * per approved (repo, agent), parking honored via wake triggers, daemon
  * wedge checks. vscode-free; the host supplies spawning, approval gating,
  * logging, and focus state.
@@ -7,7 +7,7 @@
 
 import { DispatchItem, DispatchPlan, LaunchAgent, OrchestratorFile, ParkedState, WORKER_ID } from '../protocol/types';
 import { AgentProcessState, WorkerProcessState } from '../queue/queueInputs';
-import { AgentRunner, Spawner, launchAgentToRequest } from './agentRunner';
+import { SupervisedRunner, Spawner, launchAgentToRequest } from './supervisedRunner';
 import { resolveWorkerRequest } from './launchTemplate';
 import { WorkerRunner } from './workerRunner';
 
@@ -29,7 +29,7 @@ export interface SupervisorSettings {
 }
 
 interface RepoSupervision {
-	runners: Map<string, AgentRunner>;
+	runners: Map<string, SupervisedRunner>;
 	/** The worker launch template (the entry with reserved id 'worker'; first
 	 *  wins); null if none declared. */
 	workerTemplate: LaunchAgent | null;
@@ -175,8 +175,8 @@ export class AgentSupervisor {
 		repo.workers.clear();
 	}
 
-	private buildRunner(repoRoot: string, agent: LaunchAgent, repo: RepoSupervision): AgentRunner {
-		return new AgentRunner(repoRoot, agent, {
+	private buildRunner(repoRoot: string, agent: LaunchAgent, repo: RepoSupervision): SupervisedRunner {
+		return new SupervisedRunner(repoRoot, agent, {
 			spawn: this.deps.spawn,
 			now: () => this.deps.now(),
 			schedule: (fn, ms) => this.deps.schedule(fn, ms),
@@ -298,7 +298,7 @@ export class AgentSupervisor {
 		});
 	}
 
-	private forEachRunner(fn: (runner: AgentRunner) => void): void {
+	private forEachRunner(fn: (runner: SupervisedRunner) => void): void {
 		for (const repo of this.repos.values()) {
 			for (const runner of repo.runners.values()) fn(runner);
 		}
