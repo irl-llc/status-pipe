@@ -6,6 +6,7 @@
 
 import { emptyActivity } from '../output/claudeStream';
 import { LaunchAgent, TicketFile, WORKER_ID } from '../protocol/types';
+import { byCodepoint } from '../utils/ordering';
 import { AckContext, deriveAckControl, hasFreshPendingAck, hasStaleAck, isAcked } from './ackState';
 import {
 	AgentDisplay,
@@ -297,13 +298,6 @@ function ageKey(card: CardDisplay): number {
 	if (Number.isNaN(ms)) return Number.MAX_SAFE_INTEGER;
 	// QUIET shows the most recently completed first.
 	return card.lane === 'quiet' ? -ms : ms;
-}
-
-// Codepoint comparison, not localeCompare: tie-breaks must be identical on
-// every machine regardless of locale (design/05 demands full determinism).
-function byCodepoint(a: string, b: string): number {
-	if (a < b) return -1;
-	return a > b ? 1 : 0;
 }
 
 function sortCards(cards: CardDisplay[]): CardDisplay[] {
