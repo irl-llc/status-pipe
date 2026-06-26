@@ -18,12 +18,13 @@ import { QueueModelInput, RepoState } from '../queue/queueInputs';
 import { buildDisplayState } from '../queue/queueModel';
 import { AgentSupervisor } from '../supervisor/agentSupervisor';
 import { resolveAgentCwd } from '../supervisor/launchTemplate';
-import { nodeSpawner } from './nodeSpawner';
+import { PlannerRepo } from './plannerSpawn';
+import { createSupervisor } from './supervisorSetup';
 import { ForgeConnection, connectRepo } from './forgeSetup';
 import { approveAgents, isApproved } from './launchApproval';
 import { computeToasts } from './notifications';
 import { RecentAcks } from './recentAcks';
-import { RepoProtocolState, loadRepoProtocol } from './protocolStore';
+import { RepoProtocolState, changedPrNumbers, loadRepoProtocol } from './protocolStore';
 import * as settings from './settings';
 
 const RELOAD_COALESCE_MS = 250;
@@ -60,16 +61,15 @@ export class StatusPipeController implements vscode.Disposable {
 			{ refreshIntervalSeconds: settings.refreshIntervalSeconds() },
 		);
 		this.enricher.load(ctx.workspaceState.get<PersistedEnrichment>(ENRICHMENT_CACHE_KEY, {}));
-		this.supervisor = new AgentSupervisor(
-			{
-				spawn: nodeSpawner,
-				now: () => Date.now(),
-				schedule: scheduleTimer,
-				log: (repoRoot, agentId, line) => this.channel(repoRoot, agentId).append(line),
-				onStateChange: () => this.pushSoon(),
+		this.supervisor = createSupervisor({
+			log: (repoRoot, agentId, line) => this.channel(repoRoot, agentId).append(line),
+			onStateChange: () => this.pushSoon(),
+			schedule: scheduleTimer,
+			planner: {
+				lookup: (root) => this.plannerRepo(root),
+				liveWorkerKeys: (root) => this.supervisor.liveWorkerKeys(root),
 			},
-			settings.supervisorSettings(),
-		);
+		});
 		this.wireWorkspaceEvents();
 	}
 
@@ -202,6 +202,19 @@ export class StatusPipeController implements vscode.Disposable {
 			this.installApprovedAgents(repo, false);
 		}
 		this.supervisor.noteOrchestrator(root, repo.state.orchestrator);
+	}
+
+	/** Resolve a repo's planner inputs for the built-in tick spawner (by repo root). */
+	private plannerRepo(repoRoot: string): PlannerRepo | null {
+		const repo = this.repos.get(repoRoot);
+		if (!repo) return null;
+		return {
+			repo: repo.connection?.id.slug ?? repoRoot,
+			protocolDir: repo.context.protocolDir,
+			inventory: repo.connection?.inventory ?? null,
+			forgeConnected: repo.connection !== null,
+			config: repo.state?.config ?? null,
+		};
 	}
 
 	/** Install already-approved agents; optionally prompt for the rest. */
@@ -439,20 +452,6 @@ export class StatusPipeController implements vscode.Disposable {
 
 function goodTickets(state: RepoProtocolState): import('../protocol/types').TicketFile[] {
 	return state.tickets.flatMap((t) => (t.parsed.ok ? [t.parsed.value] : []));
-}
-
-function changedPrNumbers(prev: RepoProtocolState | null, next: RepoProtocolState): number[] {
-	const prevByKey = new Map(prev?.tickets.map((t) => [t.key, t]) ?? []);
-	const changed: number[] = [];
-	for (const entry of next.tickets) {
-		if (!entry.parsed.ok) continue;
-		const before = prevByKey.get(entry.key);
-		const beforeUpdated = before?.parsed.ok ? before.parsed.value.updatedAt : null;
-		if (beforeUpdated !== entry.parsed.value.updatedAt) {
-			changed.push(...entry.parsed.value.prs.map((pr) => pr.number));
-		}
-	}
-	return [...new Set(changed)];
 }
 
 function scheduleTimer(fn: () => void, ms: number): () => void {

@@ -16,6 +16,12 @@ const IDLE_PAUSE_MS = 30 * 60_000;
 
 export interface SupervisorDeps {
 	spawn: Spawner;
+	/**
+	 * Spawner for `type:"built-in"` entries — the in-process planner pass, which
+	 * presents as a one-shot process. Optional: absent in headless/test contexts
+	 * with no built-in entries.
+	 */
+	builtInSpawn?: Spawner;
 	now(): number;
 	schedule(fn: () => void, ms: number): () => void;
 	log(repoRoot: string, agentId: string, line: string): void;
@@ -176,8 +182,13 @@ export class AgentSupervisor {
 	}
 
 	private buildRunner(repoRoot: string, agent: LaunchAgent, repo: RepoSupervision): SupervisedRunner {
+		// A built-in entry runs the in-process planner pass through its own
+		// spawner; everything else spawns a real process. With no built-in
+		// spawner wired (headless/test), fail loudly rather than spawning the
+		// entry's empty command into a cryptic ENOENT.
+		const spawn = agent.type === 'built-in' ? (this.deps.builtInSpawn ?? missingBuiltInSpawn) : this.deps.spawn;
 		return new SupervisedRunner(repoRoot, agent, {
-			spawn: this.deps.spawn,
+			spawn,
 			now: () => this.deps.now(),
 			schedule: (fn, ms) => this.deps.schedule(fn, ms),
 			log: (line) => this.deps.log(repoRoot, agent.id, line),
@@ -310,6 +321,11 @@ export class AgentSupervisor {
 		return out;
 	}
 
+	/** Keys of live worker processes in a repo — the planner's never-re-dispatch set. */
+	liveWorkerKeys(repoRoot: string): string[] {
+		return [...(this.repos.get(repoRoot)?.workers.keys() ?? [])];
+	}
+
 	/** Live worker processes across all repos, for the agents strip. */
 	workerStates(): WorkerProcessState[] {
 		const out: WorkerProcessState[] = [];
@@ -329,3 +345,15 @@ export class AgentSupervisor {
 		this.repos.clear();
 	}
 }
+
+/**
+ * Stand-in spawner for a `built-in` entry when no in-process planner spawner is
+ * wired (headless/test contexts). A built-in entry carries no real command, so
+ * the default process spawner would fail with a cryptic ENOENT; this reports a
+ * clear line and exits non-zero so the runner records a normal failure instead.
+ */
+const missingBuiltInSpawn: Spawner = (_request, events) => {
+	events.onOutput('[supervisor] built-in entry has no in-process planner spawner in this context\n');
+	events.onExit(1);
+	return { kill: () => undefined };
+};

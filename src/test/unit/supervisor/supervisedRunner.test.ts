@@ -148,6 +148,24 @@ describe('supervisor/supervisedRunner', () => {
 		assert.equal(h.spawner.requests.length, 1);
 	});
 
+	it('stop() on a SYNCHRONOUS-kill spawner stays stopped — no phantom backoff, no relaunch', async () => {
+		// The built-in planner spawner's kill() settles the runner inline
+		// (kill: () => onExit(1)), unlike the async process spawners. stop() must
+		// still leave it stopped: the reentrant exit has to be inert, or it arms a
+		// backoff timer AFTER clearTimers() ran and silently relaunches the tick.
+		const h = makeRunner();
+		h.spawner.killExitCode = 1; // kill() fires onExit(1) inline, like the built-in tick
+		h.runner.start();
+		h.runner.stop();
+		const snap = h.runner.snapshot();
+		assert.equal(snap.state, 'stopped');
+		assert.equal(snap.consecutiveFailures, 0); // the reentrant exit was inert, not a failure
+		assert.equal(snap.detail, 'stopped by operator'); // not clobbered to 'exit 1 ×1'
+		assert.equal(h.clock.pendingCount(), 0); // no phantom backoff timer survived clearTimers()
+		await h.clock.advance(60 * 60_000);
+		assert.equal(h.spawner.requests.length, 1); // never relaunches the stopped tick
+	});
+
 	it('wake() while scheduled launches immediately', async () => {
 		const h = makeRunner();
 		h.runner.start();
@@ -271,6 +289,23 @@ describe('supervisor/supervisedRunner', () => {
 			h.runner.wake();
 			assert.equal(h.spawner.requests.length, 2);
 			assert.equal(h.runner.snapshot().state, 'running');
+		});
+
+		it('parkDaemon on a SYNCHRONOUS-kill spawner parks cleanly — no spurious failure, no backoff', () => {
+			// A daemon built-in planner is configurable (schema allows lifetime:"daemon"
+			// on the tick id), and the built-in spawner's kill() settles inline
+			// (kill: () => onExit(1)). parkDaemon must still land 'parked' with no failure
+			// accounting — the re-entrant exit has to be inert, or it bumps the failure
+			// count and arms a backoff timer, leaving the daemon in backoff, not parked.
+			const h = makeRunner({ lifetime: 'daemon' });
+			h.spawner.killExitCode = 1; // kill() fires onExit(1) inline, like the built-in tick
+			h.runner.start();
+			h.parked.value = PARKED;
+			h.runner.parkDaemon();
+			const snap = h.runner.snapshot();
+			assert.equal(snap.state, 'parked'); // scheduled + isParked ⇒ parked, NOT backoff
+			assert.equal(snap.consecutiveFailures, 0); // the re-entrant exit was inert, not a failure
+			assert.equal(snap.detail, 'all work waiting on you'); // not clobbered to 'exit 1 ×1'
 		});
 
 		it('parkDaemon is a no-op for tick agents and non-running daemons', () => {

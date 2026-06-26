@@ -110,7 +110,7 @@ for exactly one concern (see [09-launch-and-supervision.md](09-launch-and-superv
 | Field | Concern | Values |
 |---|---|---|
 | **`id`** | role / lookup key | reserved `tick` (planner) and `worker` (dispatch template); any other id is a generic supervised agent |
-| **`type`** | process mechanism | `claude` (the CLI with default prompt/args) · `exec` (explicit command/args). `built-in` (in-process planner) is added with its runner. |
+| **`type`** | work mechanism | `claude` (the CLI with default prompt/args) · `exec` (explicit command/args) · `built-in` (the in-process deterministic planner — no external process; the **default** for `tick`, valid only on that id) |
 | **`lifetime`** | supervision style of a single supervised process | `scheduled` (run → exit → relaunch) · `daemon` (long-running, restarted on death) |
 
 `mode` is **removed**, not migrated automatically — readers derive role and

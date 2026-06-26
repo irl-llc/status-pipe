@@ -2,7 +2,7 @@
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"$id": "https://github.com/irl-llc/status-pipe/schemas/launch.schema.json",
 	"title": "status-pipe launch file",
-	"description": "Committed at .status-pipe/launch.json: how to launch this repo's agents. A launch entry has three orthogonal fields. `id` is the role / lookup key: two ids are reserved — `tick` (the planner) and `worker` (the dispatch template the supervisor instantiates once per item the planner writes to orchestrator.json.dispatch, resolving %prompt% (the worker's `claude -p` argument) and %worktree% (its cwd)); any other id is a generic supervised agent. `type` is the process mechanism: `claude` (the CLI with default prompt/args supplied — only command/args you want to override) or `exec` (an explicit command/args). `lifetime` is how a single supervised process is managed: `scheduled` (run, exit, relaunch intervalMinutes later) or `daemon` (long-running, restarted on death); the `worker` template ignores it (on-demand by role). The token %home% in command/args/cwd/env values expands to the user's home directory at spawn time (deliberately not shell-style ${...}). Execution is trust-gated: workspace trust plus per-content-hash approval of the complete RESOLVED entry (id, type, command, args, stdin, cwd, env, lifetime). Never launched from a linked worktree.",
+	"description": "Committed at .status-pipe/launch.json: how to launch this repo's agents. A launch entry has three orthogonal fields. `id` is the role / lookup key: two ids are reserved — `tick` (the planner) and `worker` (the dispatch template the supervisor instantiates once per item the planner writes to orchestrator.json.dispatch, resolving %prompt% (the worker's `claude -p` argument) and %worktree% (its cwd)); any other id is a generic supervised agent. `type` is the work mechanism: `claude` (the CLI with default prompt/args supplied — only command/args you want to override), `exec` (an explicit command/args), or `built-in` (the in-process deterministic planner — no external process, valid only on the reserved `tick` id). `lifetime` is how a single supervised process is managed: `scheduled` (run, exit, relaunch intervalMinutes later) or `daemon` (long-running, restarted on death); the `worker` template ignores it (on-demand by role). The token %home% in command/args/cwd/env values expands to the user's home directory at spawn time (deliberately not shell-style ${...}). Execution is trust-gated: workspace trust plus per-content-hash approval of the complete RESOLVED entry (id, type, command, args, stdin, cwd, env, lifetime). Never launched from a linked worktree.",
 	"type": "object",
 	"required": ["schemaVersion", "agents"],
 	"additionalProperties": true,
@@ -16,8 +16,8 @@
 				"additionalProperties": true,
 				"allOf": [
 					{
-						"$comment": "exec (the default when type is absent) needs an explicit command; claude supplies it.",
-						"if": { "properties": { "type": { "const": "claude" } }, "required": ["type"] },
+						"$comment": "exec (the default when type is absent) needs an explicit command; claude and built-in supply (or carry no) command.",
+						"if": { "properties": { "type": { "enum": ["claude", "built-in"] } }, "required": ["type"] },
 						"then": {},
 						"else": { "required": ["command"] }
 					},
@@ -28,6 +28,11 @@
 							"required": ["type"]
 						},
 						"then": { "properties": { "args": { "minItems": 1 } }, "required": ["args"] }
+					},
+					{
+						"$comment": "built-in is the in-process planner: valid only on the reserved tick id.",
+						"if": { "properties": { "type": { "const": "built-in" } }, "required": ["type"] },
+						"then": { "properties": { "id": { "const": "tick" } }, "required": ["id"] }
 					}
 				],
 				"properties": {
@@ -38,9 +43,9 @@
 					},
 					"title": { "type": "string" },
 					"type": {
-						"enum": ["claude", "exec"],
+						"enum": ["claude", "exec", "built-in"],
 						"default": "exec",
-						"description": "Process mechanism. claude: command defaults to `claude` and args default to the canonical invocation for the reserved role (worker: `-p %prompt%` + stream-json/verbose/auto flags; tick: `-p /status-pipe:tick --max-concurrent 3`); override args to customize. exec: explicit command + args. Absent ⇒ exec (legacy untyped entries carried a command)."
+						"description": "Work mechanism. claude: command defaults to `claude` and args default to the canonical invocation for the reserved role (worker: `-p %prompt%` + stream-json/verbose/auto flags; tick: `-p /status-pipe:tick --max-concurrent 3`); override args to customize. exec: explicit command + args. built-in: the in-process deterministic planner (no external process, no command/args) — valid only on the reserved `tick` id. Absent ⇒ exec (legacy untyped entries carried a command)."
 					},
 					"command": { "type": "string", "minLength": 1 },
 					"args": {

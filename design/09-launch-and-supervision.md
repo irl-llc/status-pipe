@@ -34,8 +34,7 @@ arg vector, stdin payload), not a Claude invocation. JSON Schema ships at
     {
       "id": "tick",
       "title": "Planner loop",
-      "type": "claude",
-      "cwd": ".",
+      "type": "built-in",
       "intervalMinutes": 10,
       "timeoutMinutes": 45
     },
@@ -81,6 +80,22 @@ A launch entry has three orthogonal fields — `id` (role), `type` (mechanism),
     stdin then closed — supports backends that take their prompt on stdin rather
     than argv. A missing `type` on a committed entry that carries a `command`
     reads as `exec` (legacy compatibility).
+  - **`built-in`** — the deterministic planner runs *in-process*, with no
+    external process and no `command`/`args`. Valid only on the reserved `tick`
+    id. It is the **default** for `tick`: the ~95%-deterministic reconciliation
+    the LLM tick did (trust filter, inventory, ack consumption, staleness
+    reconcile, fair-schedule, `orchestrator.json`) is plain code, shared with the
+    standalone CLI, skipping a cold-start `claude` boot every interval. It rides
+    the same supervised-runner machinery as a process — it presents as a one-shot
+    "process" that streams a report and exits — so lifetime, parking, and backoff
+    are identical. One difference is invisible to the runner: an in-process pass
+    is **not preemptible** (no child to signal), so a timeout/stop settles the
+    runner immediately while the orphaned in-flight pass runs to completion.
+    Writes are atomic and idempotent on a serial re-run, so a normal kill is
+    harmless; the residual caveat is a pass hung past its backoff, where the
+    relaunch can briefly overlap the orphan — atomic per-file writes keep the
+    files from tearing, but the two can race last-writer-wins. The external
+    `claude` tick stays available as an escape hatch.
 - `cwd` relative to the repo root; `env` merged over the inherited environment.
 - **`%home%` substitution**: the token `%home%` in `command`, `args`, `cwd`, and
   `env` values expands to the user's home directory at spawn time, so a
@@ -250,10 +265,18 @@ escalate the planner's `failed` state — worker outcomes live in ticket files.
   the work-aware stop that makes a presence heuristic mostly redundant. Turn
   it on for battery-constrained laptops where "I'm away" should mean "stop
   spending", accepting that overnight runs stop too.
-- The supervisor never touches the protocol's agent-owned files — process health
-  (supervisor-owned) and work-item health (`worker` block in ticket files,
-  agent-owned) are deliberately separate layers; the UI shows both and labels
-  them distinctly.
+- The supervisor's *supervision* layer never touches the protocol's agent-owned
+  files — process health (supervisor-owned) and work-item health (`worker` block
+  in ticket files, agent-owned) are deliberately separate layers; the UI shows
+  both and labels them distinctly. The one exception is by **role, not layer**:
+  the default `tick` entry is now `type:"built-in"`, the deterministic planner
+  running *in-process* in the extension. The planner's writes — stamping `worker`
+  at dispatch, consuming acks, staleness reconcile, `orchestrator.json` — happen
+  inside the extension, exactly the writes the external `claude -p
+  /status-pipe:tick` made, with the same atomic temp-then-rename discipline and
+  the same one-writer-per-ticket invariant (planner stamps *before* the worker
+  starts). The planner is not the supervisor; it is the work the `tick` entry
+  schedules, and the external `claude` tick stays available as an escape hatch.
 
 ### Parking: when everything is blocked on the operator
 

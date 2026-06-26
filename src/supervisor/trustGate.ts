@@ -34,7 +34,7 @@ export function launchEntryHash(agent: LaunchAgent): string {
 export function describeLaunchEntry(agent: LaunchAgent): string {
 	const lines = [
 		`${agent.id} — type ${agent.type}, lifetime ${agent.lifetime}`,
-		`command: ${agent.command} ${agent.args.join(' ')}`.trim(),
+		commandLine(agent),
 		`interval ${agent.intervalMinutes}m, timeout ${agent.timeoutMinutes}m`,
 		`cwd: ${agent.cwd}`,
 	];
@@ -42,4 +42,10 @@ export function describeLaunchEntry(agent: LaunchAgent): string {
 	const env = Object.entries(agent.env);
 	if (env.length > 0) lines.push(`env: ${env.map(([k, v]) => `${k}=${v}`).join(' ')}`);
 	return lines.join('\n');
+}
+
+/** A built-in entry runs no external process — say so instead of a blank command. */
+function commandLine(agent: LaunchAgent): string {
+	if (agent.type === 'built-in') return 'in-process planner (no external command)';
+	return `command: ${agent.command} ${agent.args.join(' ')}`.trim();
 }
