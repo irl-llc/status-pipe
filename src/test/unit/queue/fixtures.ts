@@ -121,6 +121,7 @@ export function makeConfig(overrides: Partial<ConfigFile> = {}): ConfigFile {
 		jiraProjectKey: null,
 		staleWorkerMinutes: null,
 		trustMode: null,
+		trustOperators: [],
 		...overrides,
 	};
 }

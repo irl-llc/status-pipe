@@ -294,7 +294,10 @@ export function parseAckFile(raw: string): ParseResult<AckFile> {
 
 /** Missing/unknown type ⇒ `exec` (the untyped legacy form carried a command). */
 function agentTypeFromJson(v: unknown): AgentType {
-	return str(v) === 'claude' ? 'claude' : 'exec';
+	const type = str(v);
+	if (type === 'claude') return 'claude';
+	if (type === 'built-in') return 'built-in';
+	return 'exec';
 }
 
 /** Missing/unknown lifetime ⇒ `scheduled` (the common run-then-relaunch case). */
@@ -312,9 +315,16 @@ function claudeRoleArgs(id: string): string[] | null {
 	return null;
 }
 
-/** Resolve command/args per type: `claude` supplies defaults, `exec` requires them. */
+/**
+ * Resolve command/args per type: `claude` supplies defaults, `exec` requires
+ * them, `built-in` carries none (the in-process planner) and is valid only on
+ * the reserved `tick` id — any other id makes it an invalid entry (dropped).
+ */
 function resolveCommand(type: AgentType, id: string, a: Json): Pick<LaunchAgent, 'command' | 'args'> | null {
 	const userArgs = strArray(a.args);
+	if (type === 'built-in') {
+		return id === PLANNER_ID ? { command: '', args: [] } : null;
+	}
 	if (type === 'claude') {
 		const args = userArgs.length > 0 ? userArgs : claudeRoleArgs(id);
 		// `|| 'claude'` (not `??`): an explicit empty command falls back to the
@@ -372,6 +382,14 @@ function trustModeFromJson(json: Json): ConfigFile['trustMode'] {
 	return mode === 'single-maintainer' || mode === 'multi-maintainer' || mode === 'public' ? mode : null;
 }
 
+/** Flatten trust.operators: array form, or the per-channel (Bitbucket+Jira) object form. */
+function trustOperatorsFromJson(json: Json): string[] {
+	const operators = obj(json.trust)?.operators;
+	if (Array.isArray(operators)) return strArray(operators);
+	const byChannel = obj(operators);
+	return byChannel ? Object.values(byChannel).flatMap(strArray) : [];
+}
+
 /** Flatten inventory.assignees: array form, or the per-channel object form. */
 function inventoryAssigneesFromJson(inventory: Json | null): string[] {
 	const assignees = inventory?.assignees;
@@ -394,6 +412,7 @@ function configValueFromJson(json: Json): ConfigFile {
 		jiraProjectKey: str(jira.projectKey),
 		staleWorkerMinutes: num(json.staleWorkerMinutes),
 		trustMode: trustModeFromJson(json),
+		trustOperators: trustOperatorsFromJson(json),
 	};
 }
 

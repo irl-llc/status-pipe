@@ -128,13 +128,17 @@ export class SupervisedRunner {
 		// A wake aimed at the loop the operator just stopped must not fire a
 		// phantom launch after a later manual start.
 		this.pendingWake = false;
-		if (this.handle) {
-			this.detail = 'stopped by operator';
-			this.handle.kill();
-			this.handle = null;
-		}
+		const handle = this.handle;
+		if (handle) this.detail = 'stopped by operator';
+		// Settle to 'stopped' BEFORE kill(): an in-process spawner whose kill()
+		// fires onExit synchronously (the built-in tick) would otherwise re-enter
+		// while still 'running', slip past onExit's inert guard, and arm a fresh
+		// backoff timer after clearTimers() already ran — silently relaunching the
+		// agent the operator just stopped. Settling first makes that exit inert.
+		this.handle = null;
 		this.runningSince = null;
 		this.setState('stopped');
+		handle?.kill();
 	}
 
 	/**
@@ -148,10 +152,16 @@ export class SupervisedRunner {
 		this.clearTimers();
 		this.pendingWake = false;
 		this.detail = this.deps.isParked()?.reason ?? 'parked';
-		this.handle?.kill();
+		// Settle (scheduleNext sets a non-running state) and null the handle BEFORE
+		// kill(), mirroring stop(): an in-process spawner whose kill() fires onExit
+		// synchronously would otherwise re-enter while still 'running', record a
+		// spurious failure, and arm a backoff timer — leaving the daemon in backoff
+		// instead of parked. Settling first makes that re-entrant exit inert.
+		const handle = this.handle;
 		this.handle = null;
 		this.runningSince = null;
 		this.scheduleNext(PARKED_RECHECK_MS);
+		handle?.kill();
 	}
 
 	private pendingWake = false;

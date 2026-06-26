@@ -162,14 +162,15 @@ export interface AckFile {
  *   and `worker` (the dispatch template the supervisor instantiates per
  *   `orchestrator.json.dispatch` item, resolving `%prompt%`/`%worktree%`).
  *   Any other id is a generic supervised agent.
- * - **`type`** — how the process is produced: `claude` (the CLI with default
- *   prompt/args supplied) or `exec` (an explicit command/args). `built-in`
- *   (the in-process planner) is added with its runner.
+ * - **`type`** — how the work is produced: `claude` (the CLI with default
+ *   prompt/args supplied), `exec` (an explicit command/args), or `built-in`
+ *   (the in-process deterministic planner — no external process; valid only on
+ *   the reserved `tick` id, carrying no command/args).
  * - **`lifetime`** — how a single supervised process is managed: `scheduled`
  *   (run → exit → relaunch after `intervalMinutes`) or `daemon` (long-running,
  *   restarted on death). The `worker` template ignores it (on-demand by role).
  */
-export type AgentType = 'claude' | 'exec';
+export type AgentType = 'claude' | 'exec' | 'built-in';
 export type AgentLifetime = 'scheduled' | 'daemon';
 
 /** Reserved launch ids the supervisor maps to specific roles. */
@@ -207,6 +208,8 @@ export interface ConfigFile {
 	jiraProjectKey: string | null;
 	staleWorkerMinutes: number | null;
 	trustMode: TrustMode | null;
+	/** Identities allowed to drive the agent (flattened from trust.operators). */
+	trustOperators: string[];
 }
 
 /**

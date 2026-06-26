@@ -12,6 +12,11 @@ export class FakeSpawner {
 	kills = 0;
 	/** When set, the next spawn throws (spawn-failure path). */
 	failNext: Error | null = null;
+	/** When non-null, kill() fires onExit(code) SYNCHRONOUSLY — mirroring the
+	 *  in-process built-in spawner, whose kill() settles the runner inline rather
+	 *  than via a later async 'exit'. Default null = inert kill (the usual async
+	 *  process; the test fires exitLast() to land the kill). */
+	killExitCode: number | null = null;
 
 	readonly spawn: Spawner = (request, events) => {
 		if (this.failNext) {
@@ -24,6 +29,7 @@ export class FakeSpawner {
 		return {
 			kill: () => {
 				this.kills += 1;
+				if (this.killExitCode !== null) events.onExit(this.killExitCode);
 			},
 		};
 	};

@@ -425,6 +425,30 @@ describe('protocol/parse', () => {
 			assert.strictEqual(ok(parseLaunchFile(raw)).agents[0].command, 'claude');
 		});
 
+		it('accepts a built-in tick entry with no command/args', () => {
+			const raw = '{"schemaVersion":1,"agents":[{"id":"tick","type":"built-in"}]}';
+			const agent = ok(parseLaunchFile(raw)).agents[0];
+			assert.strictEqual(agent.type, 'built-in');
+			assert.strictEqual(agent.command, '');
+			assert.deepStrictEqual(agent.args, []);
+			assert.strictEqual(agent.lifetime, 'scheduled');
+		});
+
+		it('drops a built-in entry on any id other than the reserved tick', () => {
+			const raw = JSON.stringify({
+				schemaVersion: 1,
+				agents: [
+					{ id: 'tick', type: 'built-in' },
+					{ id: 'other', type: 'built-in' },
+				],
+			});
+			const value = ok(parseLaunchFile(raw));
+			assert.deepStrictEqual(
+				value.agents.map((a) => a.id),
+				['tick'],
+			);
+		});
+
 		it('filters env to string values only', () => {
 			const raw = JSON.stringify({
 				schemaVersion: 1,
@@ -464,6 +488,7 @@ describe('protocol/parse', () => {
 				jiraProjectKey: null,
 				staleWorkerMinutes: null,
 				trustMode: null,
+				trustOperators: [],
 			});
 		});
 
@@ -474,7 +499,7 @@ describe('protocol/parse', () => {
 				inventory: { label: 'queue', assignees: ['ekohlwey', 'ed-irl'] },
 				tickets: { source: 'jira-cloud', jira: { siteUrl: 'https://irl.atlassian.net', projectKey: 'PROJ' } },
 				staleWorkerMinutes: 45,
-				trust: { mode: 'single-maintainer' },
+				trust: { mode: 'multi-maintainer', operators: ['ekohlwey', 'ed-irl'] },
 			});
 			assert.deepStrictEqual(ok(parseConfigFile(raw)), {
 				schemaVersion: 1,
@@ -485,8 +510,17 @@ describe('protocol/parse', () => {
 				jiraSiteUrl: 'https://irl.atlassian.net',
 				jiraProjectKey: 'PROJ',
 				staleWorkerMinutes: 45,
-				trustMode: 'single-maintainer',
+				trustMode: 'multi-maintainer',
+				trustOperators: ['ekohlwey', 'ed-irl'],
 			});
+		});
+
+		it('flattens the per-channel object form of trust.operators', () => {
+			const raw = JSON.stringify({
+				schemaVersion: 1,
+				trust: { mode: 'multi-maintainer', operators: { bitbucket: ['{uuid}'], jira: ['acct-1'] } },
+			});
+			assert.deepStrictEqual(ok(parseConfigFile(raw)).trustOperators, ['{uuid}', 'acct-1']);
 		});
 
 		it('flattens the per-channel object form of inventory.assignees', () => {

@@ -20,7 +20,7 @@ import { fillGitCredential, hostOfUrl } from '../forge/gitCredential';
 import { GithubForge } from '../forge/github';
 import { RateListener, fetchHttpClient } from '../forge/http';
 import { resolveForge } from '../forge/registry';
-import { Forge, ForgeAuth, ForgeRepository, RepositoryId } from '../forge/types';
+import { Forge, ForgeAuth, ForgeInventory, ForgeRepository, RepositoryId } from '../forge/types';
 import { ConfigFile } from '../protocol/types';
 
 export const BITBUCKET_TOKEN_SECRET = 'statusPipe.bitbucket.token';
@@ -29,6 +29,8 @@ export interface ForgeConnection {
 	forge: Forge;
 	id: RepositoryId;
 	repository: ForgeRepository;
+	/** Issue inventory for the in-process planner; null when the forge has none. */
+	inventory: ForgeInventory | null;
 }
 
 function settings(context: RepoContext): vscode.WorkspaceConfiguration {
@@ -66,7 +68,8 @@ export async function connectRepo(
 	const auth = await resolveAuth(resolved.forge, cfg, secrets);
 	if (!auth) return null;
 	const repository = resolved.forge.openRepository(resolved.id, auth);
-	return { forge: resolved.forge, id: resolved.id, repository };
+	const inventory = resolved.forge.openInventory(resolved.id, auth);
+	return { forge: resolved.forge, id: resolved.id, repository, inventory };
 }
 
 async function resolveAuth(

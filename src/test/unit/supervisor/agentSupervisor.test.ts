@@ -406,4 +406,44 @@ describe('supervisor/agentSupervisor', () => {
 			);
 		});
 	});
+
+	describe('built-in routing', () => {
+		it('runs a built-in entry through builtInSpawn and others through the process spawner', () => {
+			const clock = new ManualClock();
+			const proc = new FakeSpawner();
+			const builtIn = new FakeSpawner();
+			const supervisor = new AgentSupervisor(
+				{
+					spawn: proc.spawn,
+					builtInSpawn: builtIn.spawn,
+					now: () => clock.now,
+					schedule: clock.schedule,
+					log: () => undefined,
+					onStateChange: () => undefined,
+				},
+				{ enabled: true, pauseWhenIdle: false, maxRestarts: 3 },
+			);
+			supervisor.setAgents(REPO, [
+				agent({ id: 'tick', type: 'built-in', command: '', args: [] }),
+				agent({ id: 'orc' }),
+			]);
+			supervisor.control(REPO, 'tick', 'start');
+			supervisor.control(REPO, 'orc', 'start');
+			assert.equal(builtIn.requests.length, 1, 'built-in tick must spawn through builtInSpawn');
+			assert.equal(proc.requests.length, 1, 'the exec agent must spawn through the process spawner');
+		});
+
+		it('fails a built-in entry loudly when no in-process spawner is wired (no cryptic ENOENT)', () => {
+			const h = makeSupervisor(); // harness provides no builtInSpawn
+			h.supervisor.setAgents(REPO, [agent({ id: 'tick', type: 'built-in', command: '', args: [] })]);
+			h.supervisor.control(REPO, 'tick', 'start');
+			// The stand-in runs instead of the process spawner: the empty command
+			// is never spawned, and the failure is a clear logged line.
+			assert.equal(h.spawner.requests.length, 0, 'must not spawn the empty built-in command');
+			assert.ok(
+				h.logs.some((l) => l.includes('no in-process planner spawner')),
+				h.logs.join('\n'),
+			);
+		});
+	});
 });

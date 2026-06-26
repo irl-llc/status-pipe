@@ -95,5 +95,11 @@ describe('supervisor/trustGate', () => {
 			assert.doesNotMatch(text, /stdin:/);
 			assert.doesNotMatch(text, /env:/);
 		});
+
+		it('describes a built-in entry as the in-process planner, not a blank command', () => {
+			const text = describeLaunchEntry(agent({ type: 'built-in', command: '', args: [] }));
+			assert.match(text, /in-process planner \(no external command\)/);
+			assert.doesNotMatch(text, /^command:/m); // no empty "command:" line
+		});
 	});
 });

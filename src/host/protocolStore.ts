@@ -33,6 +33,21 @@ export interface RepoProtocolState {
 
 const RETRY_DELAY_MS = 200;
 
+/** PR numbers whose ticket's `updatedAt` advanced between two loads — the enricher's refresh set. */
+export function changedPrNumbers(prev: RepoProtocolState | null, next: RepoProtocolState): number[] {
+	const prevByKey = new Map(prev?.tickets.map((t) => [t.key, t]) ?? []);
+	const changed: number[] = [];
+	for (const entry of next.tickets) {
+		if (!entry.parsed.ok) continue;
+		const before = prevByKey.get(entry.key);
+		const beforeUpdated = before?.parsed.ok ? before.parsed.value.updatedAt : null;
+		if (beforeUpdated !== entry.parsed.value.updatedAt) {
+			changed.push(...entry.parsed.value.prs.map((pr) => pr.number));
+		}
+	}
+	return [...new Set(changed)];
+}
+
 export async function loadRepoProtocol(context: RepoContext): Promise<RepoProtocolState> {
 	const dir = context.protocolDir;
 	const [orchestrator, config, launchRaw, tickets, acksOnDisk] = await Promise.all([
