@@ -5,7 +5,7 @@
  * logging, and focus state.
  */
 
-import { DispatchItem, DispatchPlan, LaunchAgent, OrchestratorFile, ParkedState } from '../protocol/types';
+import { DispatchItem, DispatchPlan, LaunchAgent, OrchestratorFile, ParkedState, WORKER_ID } from '../protocol/types';
 import { AgentProcessState, WorkerProcessState } from '../queue/queueInputs';
 import { AgentRunner, Spawner, launchAgentToRequest } from './agentRunner';
 import { resolveWorkerRequest } from './launchTemplate';
@@ -30,7 +30,8 @@ export interface SupervisorSettings {
 
 interface RepoSupervision {
 	runners: Map<string, AgentRunner>;
-	/** The mode:'worker' launch template (first wins); null if none declared. */
+	/** The worker launch template (the entry with reserved id 'worker'; first
+	 *  wins); null if none declared. */
 	workerTemplate: LaunchAgent | null;
 	/** Live worker processes, keyed by dispatch item key (≤1 per key). */
 	workers: Map<string, WorkerRunner>;
@@ -102,14 +103,14 @@ export class AgentSupervisor {
 		for (const runner of repo.runners.values()) runner.dispose();
 		repo.runners.clear();
 		// The worker template is not scheduled — it is instantiated on demand
-		// per dispatch item (design/09). First mode:'worker' entry wins.
-		repo.workerTemplate = agents.find((a) => a.mode === 'worker') ?? null;
+		// per dispatch item (design/09). The reserved id 'worker' marks it.
+		repo.workerTemplate = agents.find((a) => a.id === WORKER_ID) ?? null;
 		if (!this.settings.enabled) {
 			this.stopWorkers(repo);
 			return;
 		}
 		for (const agent of agents) {
-			if (agent.mode === 'worker') continue;
+			if (agent.id === WORKER_ID) continue;
 			repo.runners.set(agent.id, this.buildRunner(repoRoot, agent, repo));
 		}
 		this.deps.onStateChange();
@@ -127,12 +128,12 @@ export class AgentSupervisor {
 			// Log the gap to the shared 'worker' channel (where worker output lands)
 			// so the operator finds it, not a tick channel that may not exist.
 			// "no APPROVED": the supervisor only ever sees approved entries, so a
-			// committed-but-unapproved mode:'worker' entry also lands here — the fix
-			// is approval, not adding an entry. (Absent entries are unapproved too.)
+			// committed-but-unapproved worker entry also lands here — the fix is
+			// approval, not adding an entry. (Absent entries are unapproved too.)
 			this.deps.log(
 				repoRoot,
 				'worker',
-				`[supervisor] ${plan.items.length} workers planned but no approved mode:'worker' launch entry — none spawned`,
+				`[supervisor] ${plan.items.length} workers planned but no approved launch entry with id '${WORKER_ID}' — none spawned`,
 			);
 			return;
 		}

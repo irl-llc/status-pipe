@@ -8,7 +8,7 @@ import { ChecksInfo, ForgeCapabilities, PullRequestInfo, TicketRef } from '../fo
 import { AgentActivity } from '../output/claudeStream';
 import {
 	AckFile,
-	AgentMode,
+	AgentLifetime,
 	ConfigFile,
 	LaunchFile,
 	OrchestratorFile,
@@ -67,7 +67,7 @@ export interface AgentProcessState {
 	repoRoot: string;
 	agentId: string;
 	title: string;
-	mode: AgentMode;
+	lifetime: AgentLifetime;
 	state: AgentRunState;
 	nextTickAt: number | null;
 	runningSince: number | null;

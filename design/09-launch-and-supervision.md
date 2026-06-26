@@ -34,41 +34,31 @@ arg vector, stdin payload), not a Claude invocation. JSON Schema ships at
     {
       "id": "tick",
       "title": "Planner loop",
-      "command": "claude",
-      "args": [
-        "-p", "/status-pipe:tick --max-concurrent 3",
-        "--output-format", "stream-json", "--verbose",
-        "--permission-mode", "auto"
-      ],
-      "stdin": "",
+      "type": "claude",
       "cwd": ".",
-      "env": {},
-      "mode": "tick",
       "intervalMinutes": 10,
       "timeoutMinutes": 45
     },
     {
       "id": "worker",
       "title": "Work-item worker",
-      "command": "claude",
-      "args": [
-        "-p", "%prompt%",
-        "--output-format", "stream-json", "--verbose",
-        "--permission-mode", "auto"
-      ],
-      "stdin": "",
+      "type": "claude",
       "cwd": "%worktree%",
-      "env": {},
-      "mode": "worker",
       "timeoutMinutes": 45
     }
   ]
 }
 ```
 
-- `agents[]` allows more than one loop per repo (rare; usually one), plus at
-  most one `mode:"worker"` template (below).
-- **`mode:"worker"`** is a *template*, not a scheduled loop. The supervisor
+A launch entry has three orthogonal fields — `id` (role), `type` (mechanism),
+`lifetime` (supervision style) — that were formerly conflated in a single
+`mode`.
+
+- **`id` — role / lookup key.** Unique within the file; supervisor state is
+  keyed `(repo, id)`. Two ids are **reserved**: `tick` (the planner) and
+  `worker` (the dispatch template). Any other id is a generic supervised agent.
+  `agents[]` allows more than one entry per repo (rare; usually just these two).
+- **The `worker` entry is a *template*, not a scheduled loop.** The supervisor
   never ticks it; instead it instantiates the template once per item the planner
   writes to `orchestrator.json.dispatch`, resolving two worker-only tokens:
   `%prompt%` (the worker's `claude -p` argument — e.g.
@@ -76,11 +66,21 @@ arg vector, stdin payload), not a Claude invocation. JSON Schema ships at
   (the worker's cwd). This gives each worker the SAME auth/env/permission posture
   as the planner while running as its own full `claude` process — own context,
   skills, and the ability to spawn its own subagents (the comment-gate reviewer
-  the protocol requires). A repo with no worker template plans but never
+  the protocol requires). A repo with no `worker` entry plans but never
   dispatches: the supervisor logs the gap and spawns nothing.
-- `command` + `args` + `stdin`: the process contract. `stdin` (string, may be
-  empty) is written to the child's stdin then closed — supports backends that
-  take their prompt on stdin rather than argv.
+- **`type` — process mechanism.**
+  - **`claude`** — the process is `claude`; `command` defaults to `claude` and
+    `args` default to the canonical invocation for the reserved role (the
+    `worker` gets `-p %prompt%`, the `tick` gets `-p /status-pipe:tick
+    --max-concurrent 3`, both plus the stream-json / verbose /
+    `--permission-mode auto` flags). Override
+    `args` to customize. This is the ergonomic default — a worker entry is just
+    `id` + `type` + `cwd` + `env`.
+  - **`exec`** — an explicit `command` + `args` + `stdin`: the backend-agnostic
+    process contract. `stdin` (string, may be empty) is written to the child's
+    stdin then closed — supports backends that take their prompt on stdin rather
+    than argv. A missing `type` on a committed entry that carries a `command`
+    reads as `exec` (legacy compatibility).
 - `cwd` relative to the repo root; `env` merged over the inherited environment.
 - **`%home%` substitution**: the token `%home%` in `command`, `args`, `cwd`, and
   `env` values expands to the user's home directory at spawn time, so a
@@ -88,20 +88,22 @@ arg vector, stdin payload), not a Claude invocation. JSON Schema ships at
   `"GH_CONFIG_DIR": "%home%/.config/claude-gh"`). It is the *only* substitution
   and is deliberately **not** shell-style `${...}` — a bare `%home%` can't be
   mistaken for shell expansion, so no one expects `${VAR}`, `${VAR:-default}`, or
-  command substitution. Resolution happens **after** trust approval, which
-  hashes the raw committed form (below), so an approval stays valid across
-  machines.
-- `mode`:
-  - **`tick`** — the process performs one orchestration pass and exits;
-    the extension re-launches `intervalMinutes` **after the previous tick
-    exits** (no overlap, ever — at most one orchestrator process per repo, the
-    invariant the ticket-file write-ownership model in
-    [02-protocol.md](02-protocol.md) depends on). Preferred: process exit
-    is an unambiguous health signal (exit 0 = healthy pass), there is no
-    long-lived process to leak, and the cadence is visible and adjustable.
+  command substitution. `%home%` resolution happens **after** trust approval —
+  the hash covers the committed form with `%home%` still a literal token — so an
+  approval stays valid across machines regardless of whose home it resolves to.
+- **`lifetime` — how a single supervised process is managed.** Applies to any
+  scheduled agent regardless of mechanism; the `worker` template ignores it
+  (on-demand by role). Default `scheduled`.
+  - **`scheduled`** — the process performs one pass and exits; the extension
+    re-launches `intervalMinutes` **after the previous pass exits** (no overlap,
+    ever — at most one planner process per repo, the invariant the ticket-file
+    write-ownership model in [02-protocol.md](02-protocol.md) depends on).
+    Preferred for the planner: process exit is an unambiguous health signal
+    (exit 0 = healthy pass), there is no long-lived process to leak, and the
+    cadence is visible and adjustable.
   - **`daemon`** — long-running process (e.g. a loop that self-schedules);
     the extension restarts it if it dies.
-- `timeoutMinutes`: a hard wall-clock cap — for a `tick` planner pass, and
+- `timeoutMinutes`: a hard wall-clock cap — for a `scheduled` planner pass, and
   (separately, per process) for each worker the supervisor spawns. A pass or
   worker still running after its cap is killed and recorded as a failure; a hung
   process must not silently stop the cadence. (Output-silence is surfaced as a
@@ -119,7 +121,7 @@ exits. It spawns no workers and waits for none. **Writing the plan IS the
 dispatch.**
 
 The **supervisor** reads `dispatch` and spawns one real `claude -p` worker
-process per item (substituting `prompt`/`worktree` into the `mode:"worker"`
+process per item (substituting `prompt`/`worktree` into the `worker`
 template), supervising each like any process: liveness, `timeoutMinutes`,
 reap-on-exit. This is the load-bearing change from the earlier "workers run
 inside the tick" model — workers are full agents (own context window, skills,
@@ -153,11 +155,14 @@ A committed file that causes process execution is an attack surface, so:
 - launches require VS Code **workspace trust**, and
 - the **exact content** of the launch entry must be approved once by the user:
   on first launch (and again whenever the file's hash changes) the extension
-  shows the **complete entry — command, args, stdin, `cwd`, and `env`** — and
-  asks for confirmation; approvals are stored per content-hash in
-  `workspaceState`. Showing only the command line would let an `env` override
-  (`NODE_OPTIONS`, `PATH`) ride through review unseen; the dialog displays
-  everything the hash covers.
+  shows the **complete resolved entry — `id`, `type`, command, args, stdin,
+  `cwd`, `env`, and `lifetime`** — and asks for confirmation; approvals are
+  stored per content-hash in `workspaceState`. Showing only the command line
+  would let an `env` override (`NODE_OPTIONS`, `PATH`) — or an `id` change that
+  flips a worker template into a scheduled planner — ride through review unseen;
+  the dialog displays everything the hash covers. `claude`-type defaults are
+  resolved into command/args before hashing, so the operator sees the actual
+  invocation.
 - nothing ever auto-starts unless `statusPipe.launch.autoStart` is enabled
   *and* the current hash was previously approved. Defaults: launching enabled,
   auto-start off.
@@ -198,8 +203,9 @@ same contract: run, write logs to stdout, exit nonzero on failure.
 
 ## Supervisor design (`agentSupervisor` module)
 
-The supervisor runs two kinds of process. **Scheduled agents** (`tick`/`daemon`)
-each get a per-`(repo, agent.id)` state machine (`AgentRunner`):
+The supervisor runs two kinds of process. **Scheduled agents** (`lifetime`
+`scheduled`/`daemon`) each get a per-`(repo, agent.id)` state machine
+(`AgentRunner`):
 
 ```
 disabled → idle → scheduled(nextTickAt) → launching → running(pid, since, lastOutputAt)
@@ -212,7 +218,7 @@ disabled → idle → scheduled(nextTickAt) → launching → running(pid, since
 **Workers** are different: not scheduled, not retried. When a repo's
 `orchestrator.json.dispatch` changes, the supervisor reconciles a per-repo
 worker pool (keyed by item `key`) — spawning a one-shot `WorkerRunner` per new
-item from the `mode:"worker"` template (`%prompt%`/`%worktree%` resolved),
+item from the `worker` template (`%prompt%`/`%worktree%` resolved),
 capped at the plan's `maxConcurrent`, deduplicated against live workers. A
 worker runs one pass and exits; the supervisor reaps it (no backoff, no
 relaunch) and the *next* planner pass decides whether to re-dispatch. A worker

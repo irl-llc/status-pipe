@@ -8,7 +8,7 @@
 import { CheckStatus, ForgeCapabilities } from '../forge/types';
 import { AgentActivity } from '../output/claudeStream';
 import {
-	AgentMode,
+	AgentLifetime,
 	Health,
 	HistoryEntry,
 	ParkedState,
@@ -160,8 +160,8 @@ export interface AgentDisplay {
 	repoName: string;
 	agentId: string;
 	title: string;
-	mode: AgentMode;
-	/** Tick cadence in minutes; null for daemon mode or orphaned runners. */
+	lifetime: AgentLifetime;
+	/** Tick cadence in minutes; null for a daemon or an orphaned runner. */
 	intervalMinutes: number | null;
 	/** True once the supervisor holds a runner for this config (approved). */
 	installed: boolean;

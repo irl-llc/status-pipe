@@ -159,11 +159,23 @@ describe('protocol/schema contract (schemas/ vs fixtures and writers)', () => {
 			{
 				schemaVersion: 1,
 				agents: [
-					{ id: 'orc', title: 'Orchestrator', command: 'claude', args: ['-p'], stdin: 'tick', mode: 'tick' },
-					{ command: 'claude', mode: 'daemon' },
+					{ id: 'tick', title: 'Orchestrator', type: 'exec', command: 'claude', args: ['-p'], stdin: 'tick' },
+					{ command: 'claude', lifetime: 'daemon' },
 				],
 			},
-			'launch example (second agent omits the optional id)',
+			'launch example (second agent omits the optional id and type)',
 		);
+	});
+
+	it('requires args on a generic claude entry, but exempts the reserved roles', () => {
+		const launch = (agent: object): unknown => ({ schemaVersion: 1, agents: [agent] });
+		// Reserved roles carry built-in default args, so they validate without args…
+		assertValid(launchSchema, launch({ id: 'tick', type: 'claude' }), 'tick role needs no args');
+		assertValid(launchSchema, launch({ id: 'worker', type: 'claude' }), 'worker role needs no args');
+		// …but a generic claude entry with missing OR EMPTY args is dropped by the
+		// parser, so the contract rejects both rather than letting them silently vanish.
+		assert.ok(!launchSchema(launch({ id: 'custom', type: 'claude' })), 'generic claude must supply args');
+		assert.ok(!launchSchema(launch({ id: 'custom', type: 'claude', args: [] })), 'empty args is still dropped');
+		assertValid(launchSchema, launch({ id: 'custom', type: 'claude', args: ['-p', 'do X'] }), 'generic claude + args');
 	});
 });

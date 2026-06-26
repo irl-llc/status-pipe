@@ -83,9 +83,9 @@ function makeAgent(overrides: Partial<AgentDisplay> = {}): AgentDisplay {
 	return {
 		repoRoot: '/repo',
 		repoName: 'repo',
-		agentId: 'orc',
+		agentId: 'tick',
 		title: 'Orchestrator',
-		mode: 'tick',
+		lifetime: 'scheduled',
 		intervalMinutes: 10,
 		installed: true,
 		state: 'running',
@@ -446,7 +446,7 @@ describe('queueView/components', () => {
 			fireEvent.click(result.getByTitle('Stop'));
 			fireEvent.click(result.getByTitle('Retry'));
 			assert.deepEqual(messages, [
-				{ type: 'agentControl', repoRoot: '/repo', agentId: 'orc', action: 'stop' },
+				{ type: 'agentControl', repoRoot: '/repo', agentId: 'tick', action: 'stop' },
 				{ type: 'agentControl', repoRoot: '/repo', agentId: 'b', action: 'retry' },
 			]);
 		});
@@ -460,7 +460,7 @@ describe('queueView/components', () => {
 			assert.equal(result.queryByTitle('Tick now'), null); // not installed → no immediate tick
 			assert.equal(result.queryByTitle('Open log'), null); // no channel yet
 			fireEvent.click(result.getByTitle('Run'));
-			assert.deepEqual(messages, [{ type: 'agentControl', repoRoot: '/repo', agentId: 'orc', action: 'start' }]);
+			assert.deepEqual(messages, [{ type: 'agentControl', repoRoot: '/repo', agentId: 'tick', action: 'start' }]);
 		});
 
 		it('offers Tick now and Open log for an installed but idle config', () => {

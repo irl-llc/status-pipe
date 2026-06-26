@@ -5,13 +5,36 @@
 
 import assert from 'node:assert/strict';
 
+import { LaunchAgent } from '../../../protocol/types';
 import { SpawnRequest } from '../../../supervisor/agentRunner';
-import { resolveLaunchTemplates, resolveWorkerRequest, substituteHome } from '../../../supervisor/launchTemplate';
+import {
+	resolveAgentCwd,
+	resolveLaunchTemplates,
+	resolveWorkerRequest,
+	substituteHome,
+} from '../../../supervisor/launchTemplate';
 
 const HOME = '/Users/octocat';
 
 function request(overrides: Partial<SpawnRequest> = {}): SpawnRequest {
 	return { command: 'claude', args: [], cwd: '.', env: {}, stdin: '', ...overrides };
+}
+
+function agent(overrides: Partial<LaunchAgent> = {}): LaunchAgent {
+	return {
+		id: 'orc',
+		title: 'Orchestrator',
+		type: 'claude',
+		command: 'claude',
+		args: [],
+		stdin: '',
+		cwd: '.',
+		env: {},
+		lifetime: 'scheduled',
+		intervalMinutes: 10,
+		timeoutMinutes: 45,
+		...overrides,
+	};
 }
 
 describe('launchTemplate', () => {
@@ -109,6 +132,27 @@ describe('launchTemplate', () => {
 		it('leaves a %home%-anchored cwd for the spawner (does not resolve against worktree)', () => {
 			const resolved = resolveWorkerRequest(request({ cwd: '%home%/work' }), PROMPT, WORKTREE);
 			assert.equal(resolved.cwd, '%home%/work');
+		});
+	});
+
+	describe('resolveAgentCwd (install-time cwd for scheduled agents)', () => {
+		const ROOT = '/work/repo';
+
+		it('resolves a relative cwd against the repo root', () => {
+			assert.equal(resolveAgentCwd(ROOT, agent({ id: 'tick', cwd: 'sub' })), `${ROOT}/sub`);
+			assert.equal(resolveAgentCwd(ROOT, agent({ id: 'tick', cwd: '.' })), ROOT);
+		});
+
+		it('leaves a %home%-anchored cwd for the spawner (joining onto root would corrupt it)', () => {
+			assert.equal(resolveAgentCwd(ROOT, agent({ id: 'tick', cwd: '%home%/.cfg' })), '%home%/.cfg');
+		});
+
+		it('leaves the worker template cwd raw (%worktree% is resolved per dispatched item)', () => {
+			assert.equal(resolveAgentCwd(ROOT, agent({ id: 'worker', cwd: '%worktree%' })), '%worktree%');
+		});
+
+		it('leaves an absolute cwd untouched', () => {
+			assert.equal(resolveAgentCwd(ROOT, agent({ id: 'tick', cwd: '/srv/x' })), '/srv/x');
 		});
 	});
 });

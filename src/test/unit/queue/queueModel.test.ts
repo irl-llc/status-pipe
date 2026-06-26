@@ -677,7 +677,7 @@ describe('queue/queueModel buildDisplayState', () => {
 			const state = buildDisplayState(makeInput([repo], []));
 			assert.strictEqual(state.agents.length, 1);
 			const row = state.agents[0];
-			assert.strictEqual(row.agentId, 'orchestrator');
+			assert.strictEqual(row.agentId, 'tick');
 			assert.strictEqual(row.state, 'stopped');
 			assert.strictEqual(row.installed, false);
 			assert.strictEqual(row.intervalMinutes, 15);
@@ -711,10 +711,10 @@ describe('queue/queueModel buildDisplayState', () => {
 		it('reports null intervalMinutes for a declared daemon config', () => {
 			const launch: LaunchFile = {
 				schemaVersion: 1,
-				agents: [{ ...makeLaunch().agents[0], id: 'd', mode: 'daemon' }],
+				agents: [{ ...makeLaunch().agents[0], id: 'd', lifetime: 'daemon' }],
 			};
 			const row = buildDisplayState(makeInput([makeRepo({ launch })], [])).agents[0];
-			assert.strictEqual(row.mode, 'daemon');
+			assert.strictEqual(row.lifetime, 'daemon');
 			assert.strictEqual(row.intervalMinutes, null);
 		});
 	});

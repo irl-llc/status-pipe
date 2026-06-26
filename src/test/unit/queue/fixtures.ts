@@ -130,14 +130,15 @@ export function makeLaunch(intervalMinutes = 10): LaunchFile {
 		schemaVersion: 1,
 		agents: [
 			{
-				id: 'orchestrator',
+				id: 'tick',
 				title: 'Orchestrator',
+				type: 'exec',
 				command: 'node',
 				args: [],
 				stdin: '',
 				cwd: '.',
 				env: {},
-				mode: 'tick',
+				lifetime: 'scheduled',
 				intervalMinutes,
 				timeoutMinutes: 45,
 			},
@@ -148,9 +149,9 @@ export function makeLaunch(intervalMinutes = 10): LaunchFile {
 export function makeAgent(overrides: Partial<AgentProcessState> = {}): AgentProcessState {
 	return {
 		repoRoot: '/work/app',
-		agentId: 'orchestrator',
+		agentId: 'tick',
 		title: 'Orchestrator',
-		mode: 'tick',
+		lifetime: 'scheduled',
 		state: 'scheduled',
 		nextTickAt: null,
 		runningSince: null,

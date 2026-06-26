@@ -9,7 +9,8 @@
 import {
 	AckFile,
 	AckTarget,
-	AgentMode,
+	AgentLifetime,
+	AgentType,
 	ConfigFile,
 	DispatchItem,
 	HistoryEntry,
@@ -20,6 +21,8 @@ import {
 	TicketFile,
 	TicketPr,
 	WaitingOn,
+	WORKER_ID,
+	PLANNER_ID,
 	WorkerState,
 } from './types';
 
@@ -289,27 +292,55 @@ export function parseAckFile(raw: string): ParseResult<AckFile> {
 	return { ok: true, value: ackFromJson(versioned.value, identity) };
 }
 
-const AGENT_MODES = new Set<AgentMode>(['tick', 'daemon', 'worker']);
+/** Missing/unknown type ⇒ `exec` (the untyped legacy form carried a command). */
+function agentTypeFromJson(v: unknown): AgentType {
+	return str(v) === 'claude' ? 'claude' : 'exec';
+}
 
-function agentModeFromJson(v: unknown): AgentMode | null {
-	const m = str(v);
-	return m !== null && AGENT_MODES.has(m as AgentMode) ? (m as AgentMode) : null;
+/** Missing/unknown lifetime ⇒ `scheduled` (the common run-then-relaunch case). */
+function agentLifetimeFromJson(v: unknown): AgentLifetime {
+	return str(v) === 'daemon' ? 'daemon' : 'scheduled';
+}
+
+/** The flags every status-pipe `claude` invocation carries (activity stream + auto-approve). */
+const CLAUDE_FLAGS = ['--output-format', 'stream-json', '--verbose', '--permission-mode', 'auto'];
+
+/** Canonical `claude` args for a reserved role; null for a generic id (must supply args). */
+function claudeRoleArgs(id: string): string[] | null {
+	if (id === WORKER_ID) return ['-p', '%prompt%', ...CLAUDE_FLAGS];
+	if (id === PLANNER_ID) return ['-p', '/status-pipe:tick --max-concurrent 3', ...CLAUDE_FLAGS];
+	return null;
+}
+
+/** Resolve command/args per type: `claude` supplies defaults, `exec` requires them. */
+function resolveCommand(type: AgentType, id: string, a: Json): Pick<LaunchAgent, 'command' | 'args'> | null {
+	const userArgs = strArray(a.args);
+	if (type === 'claude') {
+		const args = userArgs.length > 0 ? userArgs : claudeRoleArgs(id);
+		// `|| 'claude'` (not `??`): an explicit empty command falls back to the
+		// default too, matching the exec branch's truthiness — otherwise `""` would
+		// reach spawn() as a broken command (ENOENT) instead of the `claude` default.
+		return args ? { command: str(a.command) || 'claude', args } : null;
+	}
+	const command = str(a.command);
+	return command ? { command, args: userArgs } : null;
 }
 
 function launchAgentFromJson(a: Json, index: number): LaunchAgent | null {
-	const command = str(a.command);
-	const mode = agentModeFromJson(a.mode);
-	if (!command || !mode) return null;
 	const id = str(a.id) ?? `agent-${index}`;
+	const type = agentTypeFromJson(a.type);
+	const resolved = resolveCommand(type, id, a);
+	if (!resolved) return null;
 	return {
 		id,
 		title: str(a.title) ?? id,
-		command,
-		args: strArray(a.args),
+		type,
+		command: resolved.command,
+		args: resolved.args,
 		stdin: str(a.stdin) ?? '',
 		cwd: str(a.cwd) ?? '.',
 		env: envFromJson(a.env),
-		mode,
+		lifetime: agentLifetimeFromJson(a.lifetime),
 		intervalMinutes: num(a.intervalMinutes) ?? 10,
 		timeoutMinutes: num(a.timeoutMinutes) ?? 45,
 	};

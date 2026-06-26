@@ -127,7 +127,7 @@ function AgentActions({ agent }: { agent: AgentDisplay }): JSX.Element {
 	// to Run rendered two near-identical play triangles.
 	const canTickNow =
 		agent.installed &&
-		agent.mode === 'tick' &&
+		agent.lifetime === 'scheduled' &&
 		(agent.state === 'scheduled' || agent.state === 'backoff' || agent.state === 'parked');
 	return (
 		<span className="agent-actions">
@@ -190,7 +190,7 @@ function agentMeta(agent: AgentDisplay, now: number): string {
 
 /** A declared-but-not-installed config: show its cadence, not a runner state. */
 function stoppedConfigMeta(agent: AgentDisplay): string {
-	if (agent.mode === 'daemon') return 'daemon · not started';
+	if (agent.lifetime === 'daemon') return 'daemon · not started';
 	const cadence = agent.intervalMinutes !== null ? `every ${agent.intervalMinutes}m` : 'tick';
 	return `${cadence} · not started`;
 }

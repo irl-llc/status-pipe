@@ -15,12 +15,13 @@ function agent(overrides: Partial<LaunchAgent> = {}): LaunchAgent {
 	return {
 		id: 'orc',
 		title: 'Orchestrator',
+		type: 'exec',
 		command: 'claude',
 		args: ['-p'],
 		stdin: 'tick',
 		cwd: '/work/repo',
 		env: { KEY: 'v' },
-		mode: 'tick',
+		lifetime: 'scheduled',
 		intervalMinutes: 10,
 		timeoutMinutes: 5,
 		...overrides,
@@ -130,7 +131,7 @@ describe('supervisor/agentRunner', () => {
 		const snap = h.runner.snapshot();
 		assert.equal(snap.state, 'backoff');
 		assert.equal(snap.consecutiveFailures, 1);
-		assert.equal(snap.detail, 'tick exceeded 5m — killed');
+		assert.equal(snap.detail, 'pass exceeded 5m — killed');
 	});
 
 	it('operator stop kills, reports stopped, and never reschedules on exit', async () => {
@@ -180,7 +181,7 @@ describe('supervisor/agentRunner', () => {
 
 	describe('daemon mode', () => {
 		it('restarts ~1s after an exit with healthy (>60s) uptime, without failure', async () => {
-			const h = makeRunner({ mode: 'daemon' });
+			const h = makeRunner({ lifetime: 'daemon' });
 			h.runner.start();
 			await h.clock.advance(61_000);
 			h.spawner.exitLast(1);
@@ -193,7 +194,7 @@ describe('supervisor/agentRunner', () => {
 		});
 
 		it('takes the backoff path when the daemon dies within a minute', async () => {
-			const h = makeRunner({ mode: 'daemon' });
+			const h = makeRunner({ lifetime: 'daemon' });
 			h.runner.start();
 			await h.clock.advance(30_000);
 			h.spawner.exitLast(1);
@@ -203,7 +204,7 @@ describe('supervisor/agentRunner', () => {
 		});
 
 		it('checkDaemonWedged kills when progress is older than 2× the interval', async () => {
-			const h = makeRunner({ mode: 'daemon', intervalMinutes: 10 });
+			const h = makeRunner({ lifetime: 'daemon', intervalMinutes: 10 });
 			h.runner.start();
 			await h.clock.advance(2 * 10 * 60_000 + 1);
 			h.runner.checkDaemonWedged(null);
@@ -212,7 +213,7 @@ describe('supervisor/agentRunner', () => {
 			assert.match(h.runner.snapshot().detail ?? '', /wedged/);
 
 			// A recent lastPassFinishedAt keeps a long-running daemon alive.
-			const fresh = makeRunner({ mode: 'daemon', intervalMinutes: 10 });
+			const fresh = makeRunner({ lifetime: 'daemon', intervalMinutes: 10 });
 			fresh.runner.start();
 			await fresh.clock.advance(2 * 10 * 60_000 + 1);
 			fresh.runner.checkDaemonWedged(fresh.clock.now - 1_000);
@@ -249,7 +250,7 @@ describe('supervisor/agentRunner', () => {
 		});
 
 		it('parkDaemon stops a running daemon without failure accounting and wakes cleanly', async () => {
-			const h = makeRunner({ mode: 'daemon' });
+			const h = makeRunner({ lifetime: 'daemon' });
 			h.runner.start();
 			await h.clock.advance(5_000); // even an unhealthy-uptime park is not a failure
 			h.parked.value = PARKED;
@@ -279,7 +280,7 @@ describe('supervisor/agentRunner', () => {
 			assert.equal(tick.spawner.kills, 0);
 			assert.equal(tick.runner.snapshot().state, 'running');
 
-			const idleDaemon = makeRunner({ mode: 'daemon' });
+			const idleDaemon = makeRunner({ lifetime: 'daemon' });
 			idleDaemon.runner.parkDaemon();
 			assert.equal(idleDaemon.runner.snapshot().state, 'stopped');
 		});

@@ -100,8 +100,9 @@ export interface ParkedState {
  * One worker the planner has stamped and wants the supervisor to spawn this
  * pass. `prompt` is the fully-formed `claude -p` argument the planner built
  * (e.g. `/status-pipe:work-ticket 19`, ack note already appended); `worktree`
- * is the worker's cwd. The supervisor substitutes these into the `worker`-mode
- * launch template and never constructs them itself (design/09).
+ * is the worker's cwd. The supervisor substitutes these into the `worker`
+ * launch template (the entry with id `worker`) and never constructs them
+ * itself (design/09).
  */
 export interface DispatchItem {
 	key: string;
@@ -154,21 +155,37 @@ export interface AckFile {
 }
 
 /**
- * `tick`/`daemon` are scheduled by the supervisor; `worker` is NOT scheduled —
- * it is a template the supervisor instantiates on demand, once per dispatched
- * item, with `%prompt%`/`%worktree%` resolved from the dispatch plan.
+ * The launch entry's three orthogonal concerns, each its own field (they were
+ * formerly conflated in a single `mode`):
+ *
+ * - **`id`** — role / lookup key. Two ids are reserved: `tick` (the planner)
+ *   and `worker` (the dispatch template the supervisor instantiates per
+ *   `orchestrator.json.dispatch` item, resolving `%prompt%`/`%worktree%`).
+ *   Any other id is a generic supervised agent.
+ * - **`type`** — how the process is produced: `claude` (the CLI with default
+ *   prompt/args supplied) or `exec` (an explicit command/args). `built-in`
+ *   (the in-process planner) is added with its runner.
+ * - **`lifetime`** — how a single supervised process is managed: `scheduled`
+ *   (run → exit → relaunch after `intervalMinutes`) or `daemon` (long-running,
+ *   restarted on death). The `worker` template ignores it (on-demand by role).
  */
-export type AgentMode = 'tick' | 'daemon' | 'worker';
+export type AgentType = 'claude' | 'exec';
+export type AgentLifetime = 'scheduled' | 'daemon';
+
+/** Reserved launch ids the supervisor maps to specific roles. */
+export const PLANNER_ID = 'tick';
+export const WORKER_ID = 'worker';
 
 export interface LaunchAgent {
 	id: string;
 	title: string;
+	type: AgentType;
 	command: string;
 	args: string[];
 	stdin: string;
 	cwd: string;
 	env: Record<string, string>;
-	mode: AgentMode;
+	lifetime: AgentLifetime;
 	intervalMinutes: number;
 	timeoutMinutes: number;
 }

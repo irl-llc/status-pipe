@@ -17,12 +17,13 @@ function agent(overrides: Partial<LaunchAgent> = {}): LaunchAgent {
 	return {
 		id: 'orc',
 		title: 'Orchestrator',
+		type: 'exec',
 		command: 'claude',
 		args: [],
 		stdin: '',
 		cwd: REPO,
 		env: {},
-		mode: 'tick',
+		lifetime: 'scheduled',
 		intervalMinutes: 10,
 		timeoutMinutes: 5,
 		...overrides,
@@ -141,7 +142,7 @@ describe('supervisor/agentSupervisor', () => {
 
 		it('noteOrchestrator parked stops a RUNNING daemon and an ack relaunches it', () => {
 			const h = makeSupervisor();
-			h.supervisor.setAgents(REPO, [agent({ id: 'daemon', mode: 'daemon' })]);
+			h.supervisor.setAgents(REPO, [agent({ id: 'daemon', lifetime: 'daemon' })]);
 			h.supervisor.control(REPO, 'daemon', 'start');
 			assert.equal(h.supervisor.states()[0].state, 'running');
 
@@ -233,7 +234,7 @@ describe('supervisor/agentSupervisor', () => {
 
 	it('wedge-checks running daemons against lastPassFinishedAt', async () => {
 		const h = makeSupervisor();
-		h.supervisor.setAgents(REPO, [agent({ id: 'daemon', mode: 'daemon', intervalMinutes: 1 })]);
+		h.supervisor.setAgents(REPO, [agent({ id: 'daemon', lifetime: 'daemon', intervalMinutes: 1 })]);
 		h.supervisor.control(REPO, 'daemon', 'start');
 		// The periodic wedge check (every 60s) kills once progress is older
 		// than 2× the interval: at t=180s, now − runningSince(0) > 120s.
@@ -257,7 +258,6 @@ describe('supervisor/agentSupervisor', () => {
 			return agent({
 				id: 'worker',
 				title: 'Worker',
-				mode: 'worker',
 				args: ['-p', '%prompt%'],
 				cwd: '%worktree%',
 				...overrides,
@@ -342,7 +342,9 @@ describe('supervisor/agentSupervisor', () => {
 			h.supervisor.noteOrchestrator(REPO, dispatched(['19']));
 			assert.equal(h.spawner.requests.length, 0);
 			// Logged to the 'worker' channel (findable), not a tick channel.
-			assert.ok(h.logs.some((l) => l.startsWith(`${REPO}:worker:`) && l.includes("no approved mode:'worker'")));
+			assert.ok(
+				h.logs.some((l) => l.startsWith(`${REPO}:worker:`) && l.includes("no approved launch entry with id 'worker'")),
+			);
 		});
 
 		it('does not spawn workers when the supervisor is disabled', () => {

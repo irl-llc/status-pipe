@@ -5,7 +5,7 @@
  */
 
 import { ackMatchesTicket, ackTargetFor } from '../protocol/ackId';
-import { LaunchFile, OrchestratorFile, TicketFile } from '../protocol/types';
+import { LaunchFile, OrchestratorFile, PLANNER_ID, TicketFile } from '../protocol/types';
 import { AckChipDisplay, AckChipState, AckControlDisplay } from './displayTypes';
 import { KnownAck } from './queueInputs';
 
@@ -39,7 +39,7 @@ function passCompletedSince(createdMs: number, orchestrator: OrchestratorFile | 
 }
 
 function expectedTickIntervalMs(ctx: AckContext): number {
-	const tickAgent = ctx.launch?.agents.find((a) => a.mode === 'tick');
+	const tickAgent = ctx.launch?.agents.find((a) => a.id === PLANNER_ID);
 	const minutes = tickAgent ? tickAgent.intervalMinutes : ctx.staleWorkerMinutes;
 	return minutes * 60_000;
 }
