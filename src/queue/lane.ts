@@ -6,9 +6,15 @@
  * staleness score was deliberately rejected as unauditable.
  */
 
-import { TicketFile, WorkerState } from '../protocol/types';
+import { TicketFile } from '../protocol/types';
+import { isWorkerStale } from '../protocol/worker';
 import { Lane, NeedsYouReason, PrRowDisplay } from './displayTypes';
 import { RepoEnrichment } from './queueInputs';
+
+// Re-export the shared worker-liveness predicate so existing queue consumers
+// (queueModel) keep importing it from here; the canonical definition — shared
+// with the planner's reconcile — lives in src/protocol/worker.ts.
+export { isWorkerStale };
 
 /** Rank within NEEDS YOU; lower sorts first. Launcher cards are rank 0. */
 export const REASON_RANK: Record<NeedsYouReason, number> = {
@@ -37,16 +43,6 @@ export interface LaneContext {
 export interface LaneAssignment {
 	lane: Lane;
 	reason: NeedsYouReason | null;
-}
-
-export function isWorkerStale(worker: WorkerState | null, staleWorkerMinutes: number, now: number): boolean {
-	if (!worker || worker.status !== 'running') return false;
-	const beat = worker.heartbeatAt ?? worker.startedAt;
-	if (!beat) return true; // running with no evidence of life
-	const beatMs = Date.parse(beat);
-	if (Number.isNaN(beatMs)) return true;
-	// Clamp clock skew: a heartbeat from the "future" is fresh, not negative-age.
-	return Math.max(0, now - beatMs) > staleWorkerMinutes * 60_000;
 }
 
 function isQuiet(ticket: TicketFile): boolean {

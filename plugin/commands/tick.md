@@ -1,6 +1,6 @@
 ---
 description: One status-pipe orchestration tick — worktree preflight, trust-filtered inventory, ack-inbox consumption, staleness reconcile, fair-schedule dispatch of work-ticket/work-epic workers, orchestrator.json wrap (incl. parked). Idempotent, zero-prompt; loop it with /status-pipe:launch or the extension supervisor.
-argument-hint: "[--max-concurrent N] [--dry-run]"
+argument-hint: '[--max-concurrent N] [--dry-run]'
 ---
 
 **STATUS-PIPE TICK — one orchestration pass (runs in the MAIN agent)**
@@ -17,7 +17,7 @@ its own subagents. Load the `protocol` skill first; its rules are binding. This
 command is **idempotent and zero-prompt**: ask the user nothing; surface
 everything in the report. Defaults: `--max-concurrent 3`. `--dry-run` does
 everything EXCEPT creating tickets/worktrees, writing the dispatch plan, or
-consuming (deleting) acks — it reports what it *would* do.
+consuming (deleting) acks — it reports what it _would_ do.
 
 You **plan**, the supervisor **executes** (design/09): you never spawn a worker
 and never wait for one — the pass ends as soon as the plan is written. A ticket
@@ -108,15 +108,15 @@ read `{ticket, ackId, target:{waitingKind, waitingSince}, note}` and the
 ticket file `"$PROTO/tickets/<ticket>.json"`:
 
 - **Match** — `target.waitingKind == waitingOn.kind && target.waitingSince ==
-  waitingOn.since`, or (blockers ack: `waitingKind == "blockers"`)
+waitingOn.since`, or (blockers ack: `waitingKind == "blockers"`)
   `blockers[]` still non-empty and `updatedAt == target.waitingSince`:
   append to `history[]` `{at: NOW, phase: <current>, note: "owner ack <ackId>
-  consumed: <note or 'ready-for-look'>", runId: null}` via atomic rewrite,
+consumed: <note or 'ready-for-look'>", runId: null}` via atomic rewrite,
   **then** delete the ack file. This ticket becomes a **highest-priority
   dispatch candidate** this tick, with the operator's `note` passed to the
   worker as fresh operator input.
 - **Superseded** (no match): append `"ack <ackId> superseded (state advanced
-  before pickup)"`, delete the file. No error.
+before pickup)"`, delete the file. No error.
 - Ack for a ticket with no ticket file: delete the orphan, note it in the
   report.
 
@@ -151,15 +151,16 @@ For each selected item, BEFORE adding it to the plan (skip all of this under
 
 1. **Stamp the ticket file** so a concurrent/next pass can't double-dispatch —
    atomic rewrite (create the file with required fields `schemaVersion: 1,
-   repo, ticket, title, phase: "planning", health: "ok", updatedAt` if
+repo, ticket, title, phase: "planning", health: "ok", updatedAt` if
    absent): `worker = {status: "running", taskId: null, startedAt: NOW,
-   heartbeatAt: NOW}`, `updatedAt = NOW`.
+heartbeatAt: NOW}`, `updatedAt = NOW`.
 2. **Ensure the work-item worktree**: `git worktree list`; if absent
    `git worktree add "$ROOT/.claude/worktrees/<slug>" <stack tip | main>`
    (slug = epic slug or `ticket-<key>`).
 3. **Add the worker to the dispatch plan** (you do NOT spawn it). Its entry:
    - `kind`: `"ticket"` or `"epic"`.
-   - `key`: the ticket key or epic slug (the dispatch identity).
+   - `key`: the ticket key — for an epic, its **tracking-ticket** key, not the
+     slug (the dispatch identity; one writer per key, matching design/09).
    - `prompt`: `/status-pipe:work-ticket <key>` (ticket) or
      `/status-pipe:work-epic <abs-epic-path>` (epic). If an ack was consumed for
      it, append ` Operator ack note: "<note>"`.
@@ -182,18 +183,20 @@ spawns one worker process per item. (Under `--dry-run`, report the plan but
 write nothing.)
 
 **Parked declaration** (protocol skill §9): if (a) nothing was dispatchable
-this pass, (b) every active item has `waitingOn.kind ∈ {owner, review, merge}`
-or is blocked, and (c) the inbox is empty — set
+this pass, (b) every active item has `waitingOn.kind ∈ {owner, review, merge,
+comment}` or is blocked, and (c) the inbox is empty — set
 `parked = {since: <finish time>, reason: "<one line, e.g. '4 active items all
-waiting on owner; no dispatchable work'>", recheckAfter: <finish time + 6h>}`.
-An empty backlog parks too ("backlog empty — nothing tracked"). On any pass
-that found work, set `parked = null`.
+waiting on you; no dispatchable work'>", recheckAfter: <finish time + 6h>}`.
+An item waiting on the world (`waitingOn.kind == "build"`, i.e. CI) is NOT
+operator-blocked — it keeps ticking, so it does not satisfy (b). An empty
+backlog parks too ("backlog empty — nothing tracked"). On any pass that found
+work, set `parked = null`.
 
 Then report, grouped so the operator can act (every PR/ticket number as a
 markdown link):
 
 - **Needs you (top)**: blocked items and `waitingOn.kind ∈ {owner, review,
-  merge}` — the decision needed, deep link first.
+merge, comment}` — the decision needed, deep link first.
 - **Ready to merge**: PRs `draft: false, ci: "passing"` / phase
   `awaiting-merge`.
 - **In flight / waiting**: per item `phase` + `headline` + `waitingOn`.

@@ -272,7 +272,10 @@ responsibility splits along the existing ownership line:
 **The orchestrator declares.** The tick wrap step writes an optional,
 additive field to `orchestrator.json` when (a) no tranche or ticket is dispatchable, (b)
 every active item is waiting on the operator (`waitingOn.kind ∈ {owner,
-review, merge}` or blocked), and (c) the inbox has no unconsumed acks:
+review, merge, comment}` — the NEEDS-YOU kinds per [02-protocol.md](02-protocol.md) —
+or blocked), and (c) the inbox has no unconsumed acks. An item waiting on the
+world (`build`/CI) is *not* operator-blocked, so the loop keeps ticking to catch
+the out-of-band flip rather than parking:
 
 ```json
 "parked": {
