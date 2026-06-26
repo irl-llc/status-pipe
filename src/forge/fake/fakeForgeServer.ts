@@ -12,13 +12,17 @@ import { createHash } from 'crypto';
 import * as http from 'http';
 import { AddressInfo } from 'net';
 
+import { safeParse } from '../../utils/json';
 import {
+	FakeIssue,
 	FakeRepoData,
 	renderBitbucketComments,
 	renderBitbucketPr,
 	renderBitbucketStatuses,
 	renderBitbucketTasks,
+	renderGithubIssueNode,
 	renderGithubPrNode,
+	renderRestIssue,
 } from './fakeForgeData';
 
 export class FakeForgeServer {
@@ -29,6 +33,8 @@ export class FakeForgeServer {
 	/** GETs answered 304 from the client's If-None-Match. */
 	notModifiedCount = 0;
 	requestLog: string[] = [];
+	/** Issues minted via the create-issue endpoint, in call order. */
+	createdIssues: FakeIssue[] = [];
 
 	constructor(data: FakeRepoData) {
 		this.data = data;
@@ -61,14 +67,31 @@ export class FakeForgeServer {
 	private route(req: http.IncomingMessage, res: http.ServerResponse, body: string): void {
 		const url = req.url ?? '';
 		if (req.method === 'POST' && url.endsWith('/graphql')) return this.handleGraphQL(res, body);
+		if (req.method === 'POST' && url.endsWith('/issues')) return this.handleCreateIssue(res, body);
 		if (url.includes('/pullrequests/')) return this.handleBitbucketPr(req, res, url);
 		if (url.split('?')[0].endsWith('/user')) return this.json(req, res, { uuid: `{${this.data.viewerLogin}}` });
 		this.json(req, res, { error: 'unknown route' }, 404);
 	}
 
-	/** Parses the aliased query shape github.ts builds: `prN: pullRequest(number: X)`. */
+	/** Routes the GraphQL POST to PR-alias, issue-inventory, search, or visibility shapes. */
 	private handleGraphQL(res: http.ServerResponse, body: string): void {
-		const query = String(JSON.parse(body)?.query ?? '');
+		const parsed = (safeParse(body) ?? {}) as { query?: string; variables?: Record<string, unknown> };
+		const query = String(parsed?.query ?? '');
+		const variables = parsed?.variables ?? {};
+		// Route on the query's VARIABLE shape, not a substring of the whole query.
+		// The PR-bundle and viewer queries inline everything and send no variables,
+		// while each inventory query carries a distinct one ($q search, $labels
+		// labeled, $o/$n visibility). Substring-matching the body would silently
+		// mis-route a PR request if PR_FIELDS ever gained an `issues(`/`search(`/
+		// `visibility` token (closingIssuesReferences only dodges it by casing today).
+		if (Object.keys(variables).length === 0) return this.handlePrAliases(res, query);
+		if ('q' in variables) return this.handleIssueSearch(res, variables);
+		if ('labels' in variables) return this.handleLabeledIssues(res, variables);
+		this.handleVisibility(res);
+	}
+
+	/** Parses the aliased query shape github.ts builds: `prN: pullRequest(number: X)`. */
+	private handlePrAliases(res: http.ServerResponse, query: string): void {
 		const repository: Record<string, unknown> = {};
 		for (const match of query.matchAll(/(pr\d+):\s*pullRequest\(number:\s*(\d+)\)/g)) {
 			const pr = this.data.prs.find((p) => p.number === Number(match[2]));
@@ -76,6 +99,64 @@ export class FakeForgeServer {
 		}
 		// GraphQL is POST — no ETag semantics, mirroring GitHub.
 		plainJson(res, { data: { viewer: { login: this.data.viewerLogin }, repository } });
+	}
+
+	private handleVisibility(res: http.ServerResponse): void {
+		if (this.data.repoMissing) return plainJson(res, { data: { repository: null } });
+		// repoVisibilityAbsent models a present repo whose visibility field is null
+		// (the real fail-closed path) — distinct from the fake's 'private' default.
+		if (this.data.repoVisibilityAbsent) return plainJson(res, { data: { repository: {} } });
+		const visibility = (this.data.visibility ?? 'private').toUpperCase();
+		plainJson(res, { data: { repository: { visibility } } });
+	}
+
+	private handleLabeledIssues(res: http.ServerResponse, variables: Record<string, unknown>): void {
+		if (this.data.repoMissing) return plainJson(res, { data: { repository: null } });
+		const labels = asStringArray(variables.labels);
+		const nodes = this.openIssues()
+			.filter((i) => i.labels.some((l) => labels.includes(l)))
+			.map((i) => renderGithubIssueNode(i, this.data.slug));
+		plainJson(res, { data: { repository: { issues: { nodes } } } });
+	}
+
+	private handleIssueSearch(res: http.ServerResponse, variables: Record<string, unknown>): void {
+		// Model GitHub's `in:title "phrase"` fuzzy match: return every open issue
+		// whose title CONTAINS the searched phrase (so a `…(v2)` title still comes
+		// back), forcing findIssueByTitle's exact-title post-filter to do the work.
+		const phrase = quotedPhrase(String(variables.q ?? ''));
+		const nodes = this.openIssues()
+			.filter((i) => phrase !== null && i.title.includes(phrase))
+			.map((i) => renderGithubIssueNode(i, this.data.slug));
+		plainJson(res, { data: { search: { nodes } } });
+	}
+
+	private handleCreateIssue(res: http.ServerResponse, body: string): void {
+		if (this.data.createIssueStatus) {
+			return plainJson(res, { message: 'create-issue failed' }, this.data.createIssueStatus);
+		}
+		const payload = (safeParse(body) ?? {}) as { title?: string; labels?: string[] };
+		const issue: FakeIssue = {
+			number: this.nextIssueNumber(),
+			title: String(payload.title ?? ''),
+			state: 'open',
+			labels: Array.isArray(payload.labels) ? payload.labels.map(String) : [],
+			author: this.data.viewerLogin,
+			assignees: [],
+		};
+		(this.data.issues ??= []).push(issue);
+		this.createdIssues.push(issue);
+		// Malformed: a 201 whose body omits `number` — the parse guard must reject it.
+		const rendered = this.data.createIssueMalformed ? { title: issue.title } : renderRestIssue(issue, this.data.slug);
+		plainJson(res, rendered, 201);
+	}
+
+	private openIssues(): FakeIssue[] {
+		return (this.data.issues ?? []).filter((i) => i.state === 'open');
+	}
+
+	private nextIssueNumber(): number {
+		const max = (this.data.issues ?? []).reduce((m, i) => Math.max(m, i.number), this.data.prs.length);
+		return max + 1;
 	}
 
 	private handleBitbucketPr(req: http.IncomingMessage, res: http.ServerResponse, url: string): void {
@@ -128,8 +209,19 @@ export class FakeForgeServer {
 	}
 }
 
-function plainJson(res: http.ServerResponse, payload: unknown): void {
+function plainJson(res: http.ServerResponse, payload: unknown, status = 200): void {
 	const body = JSON.stringify(payload);
-	res.writeHead(200, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) });
+	res.writeHead(status, { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) });
 	res.end(body);
+}
+
+function asStringArray(v: unknown): string[] {
+	return Array.isArray(v) ? v.map(String) : [];
+}
+
+/** The `in:title "phrase"` term githubInventory builds via JSON.stringify(title). */
+function quotedPhrase(q: string): string | null {
+	const m = q.match(/"(?:\\.|[^"\\])*"/);
+	if (!m) return null;
+	return safeParse(m[0]) as string | null;
 }

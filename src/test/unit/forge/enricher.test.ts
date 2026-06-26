@@ -28,6 +28,7 @@ const FAKE_FORGE: Forge = {
 	openRepository: () => {
 		throw new Error('unused');
 	},
+	openInventory: () => null,
 };
 
 const FAKE_ID: RepositoryId = {

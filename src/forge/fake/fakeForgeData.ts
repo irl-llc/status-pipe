@@ -37,10 +37,58 @@ export interface FakePr {
 	tasks?: { total: number; unresolved: number };
 }
 
+export interface FakeIssue {
+	number: number;
+	title: string;
+	state: 'open' | 'closed';
+	labels: string[];
+	author: string | null;
+	assignees: string[];
+	url?: string;
+}
+
 export interface FakeRepoData {
 	slug: string;
 	viewerLogin: string;
 	prs: FakePr[];
+	/** Repo visibility for the inventory trust gate; defaults to private. */
+	visibility?: 'public' | 'private' | 'internal';
+	/** Open/closed issues for the inventory queries; defaults to none. */
+	issues?: FakeIssue[];
+	/** When set, repository-scoped GraphQL resolves `repository: null` (bad
+	 * creds / typo / deleted repo) so not-found handling can be exercised. */
+	repoMissing?: boolean;
+	/** When set, the repo is present but its `visibility` field is null, to
+	 * exercise the fail-closed (→ 'public') mapping for an unknown visibility. */
+	repoVisibilityAbsent?: boolean;
+	/** When set, the create-issue endpoint replies with this HTTP status (instead
+	 * of 201) so createLabeledIssue's statusToForgeError mapping can be exercised. */
+	createIssueStatus?: number;
+	/** When set, the create-issue endpoint returns 201 with a body lacking
+	 * `number`, exercising the malformed-response guard in parseCreatedIssue. */
+	createIssueMalformed?: boolean;
+}
+
+/** GraphQL Issue node shape (`issues { nodes }` and `search { nodes }`). */
+export function renderGithubIssueNode(issue: FakeIssue, slug: string): Record<string, unknown> {
+	return {
+		number: issue.number,
+		title: issue.title,
+		url: issue.url ?? `https://github.com/${slug}/issues/${issue.number}`,
+		author: issue.author === null ? null : { login: issue.author },
+		assignees: { nodes: issue.assignees.map((login) => ({ login })) },
+	};
+}
+
+/** REST issue shape (the create-issue response). */
+export function renderRestIssue(issue: FakeIssue, slug: string): Record<string, unknown> {
+	return {
+		number: issue.number,
+		title: issue.title,
+		html_url: issue.url ?? `https://github.com/${slug}/issues/${issue.number}`,
+		user: issue.author === null ? null : { login: issue.author },
+		assignees: issue.assignees.map((login) => ({ login })),
+	};
 }
 
 function githubThreadNodes(pr: FakePr): Record<string, unknown> {

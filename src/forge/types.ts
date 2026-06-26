@@ -43,6 +43,12 @@ export interface Forge {
 	matchRemoteUrl(remoteUrl: string): RepositoryId | null;
 	/** Open an authenticated repository handle. */
 	openRepository(id: RepositoryId, auth: ForgeAuth): ForgeRepository;
+	/**
+	 * Open the issue/ticket inventory for this repo, or null when the forge
+	 * hosts no first-class inventory the planner can read (e.g. Bitbucket,
+	 * whose tracking tickets live in a separately-configured Jira).
+	 */
+	openInventory(id: RepositoryId, auth: ForgeAuth): ForgeInventory | null;
 }
 
 export interface CommentCounts {
@@ -125,6 +131,39 @@ export class ForgeError extends Error {
 		super(message);
 		this.name = 'ForgeError';
 	}
+}
+
+/**
+ * An open issue discovered in the forge inventory — a labeled work ticket or an
+ * epic's tracking ticket. `key` is the forge-native id ("91" / "PROJ-91").
+ */
+export interface InventoryIssue {
+	key: string;
+	title: string;
+	url: string | null;
+	/** Issue author login; null when the forge doesn't report it. */
+	author: string | null;
+	/** Assignee logins (may be empty). */
+	assignees: string[];
+}
+
+/**
+ * The issue-inventory surface the planner reconciles against: discover labeled
+ * work, find-or-create epic tracking tickets, and read repo visibility for the
+ * trust gate. Read-only except `createLabeledIssue` — the one mutation, used to
+ * mint an epic's tracking ticket. Separate from the PR-centric ForgeRepository.
+ */
+export interface ForgeInventory {
+	/** Repo visibility for the trust gate. */
+	visibility(): Promise<'public' | 'private'>;
+	/** The authenticated operator login (private-repo single-maintainer default). */
+	viewerLogin(): Promise<string | null>;
+	/** Open issues carrying `label`. */
+	listLabeledIssues(label: string): Promise<InventoryIssue[]>;
+	/** An existing open issue whose title matches exactly, or null. */
+	findIssueByTitle(title: string): Promise<InventoryIssue | null>;
+	/** Create an issue carrying `label`; returns its key/url. */
+	createLabeledIssue(title: string, label: string): Promise<InventoryIssue>;
 }
 
 /**

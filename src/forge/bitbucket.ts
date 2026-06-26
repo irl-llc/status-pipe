@@ -4,7 +4,7 @@
  * concurrency pool.
  */
 
-import { Json, asArr, asObj, asStr } from '../utils/json';
+import { Json, asArr, asObj, asStr, safeParse } from '../utils/json';
 import { HttpClient, HttpResponse, RateListener, RequestPool, statusToForgeError } from './http';
 import {
 	mapBitbucketComments,
@@ -65,6 +65,13 @@ export class BitbucketForge implements Forge {
 
 	openRepository(id: RepositoryId, auth: ForgeAuth): ForgeRepository {
 		return new BitbucketRepository(this, id, { auth, apiUrl: this.apiUrl, options: this.options });
+	}
+
+	// Bitbucket's tracking tickets live in a separately-configured Jira, not in
+	// the repo — there is no first-class inventory to read through this forge.
+	// Params mirror the Forge interface but go unused (underscored for tsc).
+	openInventory(_id: RepositoryId, _auth: ForgeAuth): null {
+		return null;
 	}
 }
 
@@ -184,13 +191,5 @@ class BitbucketRepository implements ForgeRepository {
 	private cachedBody(url: string): Json | null {
 		const cached = this.etags.get(url);
 		return cached ? asObj(safeParse(cached.body)) : null;
-	}
-}
-
-function safeParse(body: string): unknown {
-	try {
-		return JSON.parse(body);
-	} catch {
-		return null;
 	}
 }
