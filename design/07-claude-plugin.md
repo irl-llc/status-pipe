@@ -18,10 +18,10 @@ location is not).
 plugin/
 ├── .claude-plugin/plugin.json     # name: status-pipe
 ├── commands/
-│   ├── launch.md                  # /status-pipe:launch [interval]
-│   ├── tick.md                    # /status-pipe:tick [--max-concurrent N] [--dry-run]
-│   ├── work-ticket.md             # /status-pipe:work-ticket <ticket-key>
-│   ├── work-epic.md               # /status-pipe:work-epic <path-to-epic.md>
+│   ├── launch.md                  # /status-pipe:launch [interval] (planner loop)
+│   ├── tick.md                    # /status-pipe:tick — planner: plan+stamp, write dispatch, exit
+│   ├── work-ticket.md             # /status-pipe:work-ticket <ticket-key> (worker process)
+│   ├── work-epic.md               # /status-pipe:work-epic <path-to-epic.md> (worker process)
 │   ├── split.md                   # /status-pipe:split <ticket> <topic>  (sub-ticket carve-out)
 │   └── ack-check.md               # /status-pipe:ack-check  (inbox consume, standalone)
 ├── bin/
@@ -259,10 +259,13 @@ above, so a missing or spoofed marker can embarrass but never escalate.
 3. **Reconcile staleness**: `worker.status=running` with heartbeat older than
    `staleWorkerMinutes` ⇒ treat as crashed, mark `worker.status=error` with a
    history note (the card escalates in the extension), eligible for relaunch.
-4. **Fair-schedule**: oldest `updatedAt` first, ack-consumers first,
-   `--max-concurrent` cap; dispatch `work-ticket`/`work-epic` loops as
-   background tasks in per-work-item git worktrees.
-5. **Write `orchestrator.json`** (passCount, timestamps) and report: needs-you items,
+4. **Fair-schedule (plan, don't spawn)**: oldest `updatedAt` first, ack-consumers
+   first, `--max-concurrent` cap; for each selected item create its worktree,
+   stamp `worker.status=running`, and add a `work-ticket`/`work-epic` entry to
+   the dispatch plan. The planner never spawns workers — the supervisor reads
+   the plan and spawns one `claude -p` worker process per item
+   ([09-launch-and-supervision.md](09-launch-and-supervision.md)).
+5. **Write `orchestrator.json`** (passCount, timestamps, `dispatch` plan) and report: needs-you items,
    ready-to-merge PRs, in-flight work. If nothing was dispatchable and every
    active item is parked on the operator with an empty inbox, set
    `orchestrator.json.parked` (`{since, reason, recheckAfter}`) so the extension's

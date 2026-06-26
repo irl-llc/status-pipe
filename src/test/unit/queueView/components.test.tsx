@@ -20,6 +20,7 @@ import {
 	CommentBadge,
 	DisplayState,
 	PrRowDisplay,
+	WorkerProcessDisplay,
 } from '../../../queue/displayTypes';
 import { AckControl } from '../../../queueView/components/AckControl';
 import { AgentsStrip } from '../../../queueView/components/AgentsStrip';
@@ -70,6 +71,7 @@ function makeState(overrides: Partial<DisplayState> = {}): DisplayState {
 		multiRepo: false,
 		repos: [],
 		agents: [],
+		workers: [],
 		cards: [],
 		counts: { needsYou: 0, waiting: 0, quiet: 0 },
 		activity: { state: 'idle', detail: null, oldestDataAgeMs: null },
@@ -92,6 +94,18 @@ function makeAgent(overrides: Partial<AgentDisplay> = {}): AgentDisplay {
 		lastOutputAt: null,
 		consecutiveFailures: 0,
 		detail: null,
+		activity: emptyActivity(),
+		...overrides,
+	};
+}
+
+function makeWorker(overrides: Partial<WorkerProcessDisplay> = {}): WorkerProcessDisplay {
+	return {
+		repoRoot: '/repo',
+		repoName: 'repo',
+		key: '19',
+		runningSince: GENERATED_AT - 120_000,
+		lastOutputAt: null,
 		activity: emptyActivity(),
 		...overrides,
 	};
@@ -459,6 +473,53 @@ describe('queueView/components', () => {
 			assert.ok(result.getByTitle('Stop')); // scheduled is "active" → Stop
 			assert.ok(result.getByTitle('Tick now'));
 			assert.ok(result.getByTitle('Open log'));
+		});
+
+		// Coverage boundary for the live-worker rows: these jsdom assertions are the
+		// agreed floor (structure, summary text, prefix-drop, read-only, activity meta).
+		// The Playwright strip snapshot — the project's no-layout-shift oracle — does NOT
+		// exercise worker rows: `state.workers` comes from in-memory supervisor state
+		// (workerStates()), which the e2e harness (driven from on-disk fixtures) can't
+		// populate without spawning real `claude` workers. So the 30px row indent has no
+		// pixel guard; if a live-worker injection seam is added later, capture a baseline.
+		it('appends a worker count to the summary and renders a row per live worker', () => {
+			const state = makeState({
+				agents: [makeAgent({ state: 'scheduled', runningSince: null, nextTickAt: GENERATED_AT + 5 * 60_000 })],
+				workers: [makeWorker({ key: '19' }), makeWorker({ key: '20' })],
+			});
+			const { result } = renderWithPost(<AgentsStrip state={state} />);
+			assert.ok(result.getByText('1 launch config: 1 scheduled (5m) · 2 workers running'));
+			const workerRows = result.container.querySelectorAll('.worker-row');
+			assert.equal(workerRows.length, 2);
+			assert.ok(result.getByText('19'));
+			assert.ok(result.getByText('20'));
+		});
+
+		it('drops the "N launch configs" prefix when only workers are live', () => {
+			const state = makeState({ agents: [], workers: [makeWorker({ key: '19' }), makeWorker({ key: '20' })] });
+			const { result } = renderWithPost(<AgentsStrip state={state} />);
+			assert.ok(result.getByText('2 workers running')); // not "0 launch configs: 2 workers running"
+			assert.equal(result.container.querySelectorAll('.worker-row').length, 2);
+		});
+
+		it('worker rows are read-only (no Run/Stop/Tick controls)', () => {
+			const state = makeState({ agents: [makeAgent()], workers: [makeWorker({ key: '19' })] });
+			const { result } = renderWithPost(<AgentsStrip state={state} />);
+			const row = result.container.querySelector('.worker-row');
+			assert.ok(row);
+			assert.equal(row?.querySelector('.agent-actions'), null);
+		});
+
+		it('shows what a worker is doing from its stream-json activity', () => {
+			const activity = {
+				...emptyActivity(),
+				phase: 'working' as const,
+				currentTool: 'Edit',
+				currentToolDetail: 'lane.ts',
+			};
+			const state = makeState({ agents: [makeAgent()], workers: [makeWorker({ key: '19', activity })] });
+			const { result } = renderWithPost(<AgentsStrip state={state} />);
+			assert.ok(result.getByText('running · Edit: lane.ts'));
 		});
 
 		it('shows the current tool and target in a running agent meta (from stream-json)', () => {

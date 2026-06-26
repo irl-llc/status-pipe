@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict';
 
-import { LaunchAgent, OrchestratorFile, ParkedState } from '../../../protocol/types';
+import { DispatchItem, LaunchAgent, OrchestratorFile, ParkedState } from '../../../protocol/types';
 import { AgentSupervisor, SupervisorSettings } from '../../../supervisor/agentSupervisor';
 import { FakeSpawner } from '../helpers/fakeSpawner';
 import { ManualClock } from '../helpers/manualClock';
@@ -38,6 +38,7 @@ function orchestratorFile(parked: ParkedState | null, lastPassFinishedAt: string
 		lastPassFinishedAt,
 		staleWorkerMinutes: null,
 		parked,
+		dispatch: null,
 		note: null,
 	};
 }
@@ -249,5 +250,158 @@ describe('supervisor/agentSupervisor', () => {
 		h.supervisor.dispose();
 		assert.equal(h.spawner.kills, 1);
 		assert.equal(h.clock.pendingCount(), 0);
+	});
+
+	describe('worker dispatch', () => {
+		function workerAgent(overrides: Partial<LaunchAgent> = {}): LaunchAgent {
+			return agent({
+				id: 'worker',
+				title: 'Worker',
+				mode: 'worker',
+				args: ['-p', '%prompt%'],
+				cwd: '%worktree%',
+				...overrides,
+			});
+		}
+
+		function item(key: string): DispatchItem {
+			return { kind: 'ticket', key, prompt: `/status-pipe:work-ticket ${key}`, worktree: `/wt/${key}` };
+		}
+
+		function dispatched(keys: string[], maxConcurrent = keys.length, passCount: number | null = 1): OrchestratorFile {
+			return { ...orchestratorFile(null), passCount, dispatch: { maxConcurrent, items: keys.map(item) } };
+		}
+
+		it('spawns one worker process per dispatch item, resolving prompt/worktree', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [agent(), workerAgent()]);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19', '20']));
+			assert.equal(h.spawner.requests.length, 2);
+			assert.deepEqual(h.spawner.requests[0].args, ['-p', '/status-pipe:work-ticket 19']);
+			assert.equal(h.spawner.requests[0].cwd, '/wt/19');
+		});
+
+		it('dedups by key while a worker is still alive (even across a new pass)', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [workerAgent()]);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19'], 1, 1));
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19'], 1, 2)); // next pass, worker still alive
+			assert.equal(h.spawner.requests.length, 1);
+		});
+
+		it('caps live workers at the plan maxConcurrent', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [workerAgent()]);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19', '20', '21'], 2));
+			assert.equal(h.spawner.requests.length, 2);
+		});
+
+		it('re-dispatches a key after its worker exits when a NEW pass re-lists it', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [workerAgent()]);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19'], 1, 1));
+			h.spawner.exitLast(0);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19'], 1, 2)); // next pass re-lists 19
+			assert.equal(h.spawner.requests.length, 2);
+		});
+
+		it('does NOT re-spawn an exited key on a stale re-read of the same dispatch plan', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [workerAgent()]);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19'], 1, 1));
+			h.spawner.exitLast(0); // worker 19 finishes and writes its ticket…
+			// …which the host watcher re-feeds as the SAME pass's orchestrator file.
+			// Without a per-pass guard this would re-spawn the already-done worker.
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19'], 1, 1));
+			assert.equal(h.spawner.requests.length, 1);
+		});
+
+		it('acts once on a passCount-less plan (never-reconciled ≠ reconciled-null)', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [workerAgent()]);
+			// A corrupt/hand-edited orchestrator with no passCount must still spawn
+			// once (not be silently dropped by colliding with the null initializer)…
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19'], 1, null));
+			assert.equal(h.spawner.requests.length, 1);
+			// …and a re-read of that same passCount-less plan must not re-spawn it.
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19'], 1, null));
+			assert.equal(h.spawner.requests.length, 1);
+		});
+
+		it('kills a worker that exceeds its timeout', async () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [workerAgent({ timeoutMinutes: 5 })]);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19']));
+			await h.clock.advance(5 * 60_000);
+			assert.equal(h.spawner.kills, 1);
+		});
+
+		it('logs and spawns nothing when no worker template is declared', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [agent()]);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19']));
+			assert.equal(h.spawner.requests.length, 0);
+			// Logged to the 'worker' channel (findable), not a tick channel.
+			assert.ok(h.logs.some((l) => l.startsWith(`${REPO}:worker:`) && l.includes("no approved mode:'worker'")));
+		});
+
+		it('does not spawn workers when the supervisor is disabled', () => {
+			const h = makeSupervisor({ enabled: false });
+			h.supervisor.setAgents(REPO, [workerAgent()]);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19']));
+			assert.equal(h.spawner.requests.length, 0);
+		});
+
+		it('reconciles a dispatch fed while DISABLED once enabled and re-fed (not stranded as done)', () => {
+			const h = makeSupervisor({ enabled: false });
+			h.supervisor.setAgents(REPO, [workerAgent()]); // worker template recorded even while disabled
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19']));
+			assert.equal(h.spawner.requests.length, 0); // disabled: nothing spawns — and the pass is NOT marked reconciled
+			h.supervisor.updateSettings({ enabled: true, pauseWhenIdle: false, maxRestarts: 3 });
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19'])); // host re-feeds the SAME pass on enable
+			assert.equal(h.spawner.requests.length, 1); // the pending plan now reconciles, exactly once
+		});
+
+		it('reconciles a dispatch fed with NO worker template once the template is approved and re-fed', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [agent()]); // planner only — worker entry not yet approved
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19']));
+			assert.equal(h.spawner.requests.length, 0); // no template: logs the gap, spawns nothing, pass NOT marked reconciled
+			h.supervisor.setAgents(REPO, [agent(), workerAgent()]); // worker entry approved later
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19'])); // host re-feeds the SAME pass
+			assert.equal(h.spawner.requests.length, 1); // the pending plan now reconciles, exactly once
+		});
+
+		it('stops live workers on stopAll', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [workerAgent()]);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19', '20']));
+			h.supervisor.stopAll();
+			assert.equal(h.spawner.kills, 2);
+		});
+
+		it('keeps worker templates out of the scheduled-agent states', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [agent(), workerAgent()]);
+			assert.deepEqual(
+				h.supervisor.states().map((s) => s.agentId),
+				['orc'],
+			);
+		});
+
+		it('workerStates reports live workers with repoRoot, dropping exited ones', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [workerAgent()]);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19', '20']));
+			assert.deepEqual(
+				h.supervisor.workerStates().map((w) => `${w.repoRoot}:${w.key}`),
+				[`${REPO}:19`, `${REPO}:20`],
+			);
+			h.spawner.events[0].onExit(0); // worker 19 exits
+			assert.deepEqual(
+				h.supervisor.workerStates().map((w) => w.key),
+				['20'],
+			);
+		});
 	});
 });

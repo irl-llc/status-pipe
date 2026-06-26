@@ -36,6 +36,38 @@
 			],
 			"description": "Declared when nothing is dispatchable and every active item waits on the operator with an empty inbox; cleared on any pass that finds work. The supervisor suspends ticks while set."
 		},
+		"dispatch": {
+			"oneOf": [
+				{ "type": "null" },
+				{
+					"type": "object",
+					"required": ["items"],
+					"additionalProperties": true,
+					"properties": {
+						"maxConcurrent": {
+							"type": ["number", "null"],
+							"description": "Planner's declared ceiling; the executor caps live workers at this on top of the already-capped item list. Defaults to items.length when omitted."
+						},
+						"items": {
+							"type": "array",
+							"description": "Workers the planner stamped this pass for the supervisor to spawn. Each item already has its worktree created and worker.status=running stamped in the ticket file.",
+							"items": {
+								"type": "object",
+								"required": ["key", "kind", "prompt", "worktree"],
+								"additionalProperties": true,
+								"properties": {
+									"key": { "type": "string", "description": "Ticket key / epic slug — the dispatch identity (one live worker per key)" },
+									"kind": { "enum": ["ticket", "epic"] },
+									"prompt": { "type": "string", "description": "Fully-formed claude -p argument (e.g. /status-pipe:work-ticket 19), ack note already appended" },
+									"worktree": { "type": "string", "description": "Worker cwd — the per-item git worktree path" }
+								}
+							}
+						}
+					}
+				}
+			],
+			"description": "Planner→executor channel: workers to spawn this pass. The supervisor substitutes prompt/worktree into the mode:'worker' launch template. Cleared (null/omitted) on a pass that dispatches nothing."
+		},
 		"note": { "type": ["string", "null"] }
 	}
 }

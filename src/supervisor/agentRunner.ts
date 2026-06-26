@@ -22,6 +22,11 @@ export interface SpawnRequest {
 	stdin: string;
 }
 
+/** Map a launch entry's process fields onto a SpawnRequest (the spawner's input). */
+export function launchAgentToRequest(agent: LaunchAgent): SpawnRequest {
+	return { command: agent.command, args: agent.args, cwd: agent.cwd, env: agent.env, stdin: agent.stdin };
+}
+
 export interface ProcessEvents {
 	onOutput(chunk: string): void;
 	onExit(code: number | null): void;
@@ -224,13 +229,7 @@ export class AgentRunner {
 	}
 
 	private spawnRequest(): SpawnRequest {
-		return {
-			command: this.agent.command,
-			args: this.agent.args,
-			cwd: this.agent.cwd,
-			env: this.agent.env,
-			stdin: this.agent.stdin,
-		};
+		return launchAgentToRequest(this.agent);
 	}
 
 	private armTimeout(): void {

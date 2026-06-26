@@ -5,9 +5,11 @@
  * logging, and focus state.
  */
 
-import { LaunchAgent, OrchestratorFile, ParkedState } from '../protocol/types';
-import { AgentProcessState } from '../queue/queueInputs';
-import { AgentRunner, Spawner } from './agentRunner';
+import { DispatchItem, DispatchPlan, LaunchAgent, OrchestratorFile, ParkedState } from '../protocol/types';
+import { AgentProcessState, WorkerProcessState } from '../queue/queueInputs';
+import { AgentRunner, Spawner, launchAgentToRequest } from './agentRunner';
+import { resolveWorkerRequest } from './launchTemplate';
+import { WorkerRunner } from './workerRunner';
 
 const WEDGE_CHECK_MS = 60_000;
 const IDLE_PAUSE_MS = 30 * 60_000;
@@ -28,8 +30,19 @@ export interface SupervisorSettings {
 
 interface RepoSupervision {
 	runners: Map<string, AgentRunner>;
+	/** The mode:'worker' launch template (first wins); null if none declared. */
+	workerTemplate: LaunchAgent | null;
+	/** Live worker processes, keyed by dispatch item key (≤1 per key). */
+	workers: Map<string, WorkerRunner>;
 	parked: ParkedState | null;
 	lastPassFinishedAt: number | null;
+	/** passCount of the dispatch plan last reconciled — the host re-feeds the
+	 *  orchestrator on every .status-pipe/ write, so a plan is acted on once.
+	 *  `reconciledAny` distinguishes "never reconciled" from "reconciled a plan
+	 *  whose passCount was null", so a passCount-less plan is acted on once, not
+	 *  dropped (null === null would otherwise collide with the initial value). */
+	reconciledDispatchPass: number | null;
+	reconciledAny: boolean;
 	cancelRecheck: (() => void) | null;
 }
 
@@ -64,7 +77,16 @@ export class AgentSupervisor {
 	private repo(repoRoot: string): RepoSupervision {
 		let repo = this.repos.get(repoRoot);
 		if (!repo) {
-			repo = { runners: new Map(), parked: null, lastPassFinishedAt: null, cancelRecheck: null };
+			repo = {
+				runners: new Map(),
+				workerTemplate: null,
+				workers: new Map(),
+				parked: null,
+				lastPassFinishedAt: null,
+				reconciledDispatchPass: null,
+				reconciledAny: false,
+				cancelRecheck: null,
+			};
 			this.repos.set(repoRoot, repo);
 		}
 		return repo;
@@ -79,11 +101,77 @@ export class AgentSupervisor {
 		const repo = this.repo(repoRoot);
 		for (const runner of repo.runners.values()) runner.dispose();
 		repo.runners.clear();
-		if (!this.settings.enabled) return;
+		// The worker template is not scheduled — it is instantiated on demand
+		// per dispatch item (design/09). First mode:'worker' entry wins.
+		repo.workerTemplate = agents.find((a) => a.mode === 'worker') ?? null;
+		if (!this.settings.enabled) {
+			this.stopWorkers(repo);
+			return;
+		}
 		for (const agent of agents) {
+			if (agent.mode === 'worker') continue;
 			repo.runners.set(agent.id, this.buildRunner(repoRoot, agent, repo));
 		}
 		this.deps.onStateChange();
+	}
+
+	/**
+	 * Spawn the workers the planner stamped this pass (orchestrator.json
+	 * dispatch). One live worker per key; total capped at the plan's
+	 * maxConcurrent. Workers already running for a key are left to finish — the
+	 * planner only re-lists a key once its worker has exited.
+	 */
+	private reconcileWorkers(repoRoot: string, repo: RepoSupervision, plan: DispatchPlan | null): void {
+		if (!this.settings.enabled || !plan || plan.items.length === 0) return;
+		if (!repo.workerTemplate) {
+			// Log the gap to the shared 'worker' channel (where worker output lands)
+			// so the operator finds it, not a tick channel that may not exist.
+			// "no APPROVED": the supervisor only ever sees approved entries, so a
+			// committed-but-unapproved mode:'worker' entry also lands here — the fix
+			// is approval, not adding an entry. (Absent entries are unapproved too.)
+			this.deps.log(
+				repoRoot,
+				'worker',
+				`[supervisor] ${plan.items.length} workers planned but no approved mode:'worker' launch entry — none spawned`,
+			);
+			return;
+		}
+		const cap = Math.max(0, plan.maxConcurrent);
+		for (const item of plan.items) {
+			if (repo.workers.size >= cap) break;
+			if (repo.workers.has(item.key)) continue;
+			this.spawnWorker(repoRoot, repo, item);
+		}
+	}
+
+	private spawnWorker(repoRoot: string, repo: RepoSupervision, item: DispatchItem): void {
+		const template = repo.workerTemplate;
+		if (!template) return;
+		const request = resolveWorkerRequest(launchAgentToRequest(template), item.prompt, item.worktree);
+		// All workers share one OutputChannel per repo. A per-key channel would
+		// never be disposed (channels live until controller teardown), leaking
+		// one channel per ticket ever dispatched and cluttering the Output
+		// dropdown; the per-worker start/end banners delimit the interleaved
+		// streams, and the operator monitors workers from the agents strip.
+		const channel = 'worker';
+		const runner = new WorkerRunner(item.key, request, template.timeoutMinutes, {
+			spawn: this.deps.spawn,
+			now: () => this.deps.now(),
+			schedule: (fn, ms) => this.deps.schedule(fn, ms),
+			log: (line) => this.deps.log(repoRoot, channel, line),
+			onDone: () => {
+				repo.workers.delete(item.key);
+				this.deps.onStateChange();
+			},
+		});
+		repo.workers.set(item.key, runner);
+		runner.start();
+		this.deps.onStateChange();
+	}
+
+	private stopWorkers(repo: RepoSupervision): void {
+		for (const worker of repo.workers.values()) worker.dispose();
+		repo.workers.clear();
 	}
 
 	private buildRunner(repoRoot: string, agent: LaunchAgent, repo: RepoSupervision): AgentRunner {
@@ -99,17 +187,51 @@ export class AgentSupervisor {
 		});
 	}
 
-	/** Orchestrator file changed: parking + pass progress feed in here. */
+	/** Orchestrator file changed: parking, pass progress, and dispatch feed in here. */
 	noteOrchestrator(repoRoot: string, file: OrchestratorFile | null): void {
 		const repo = this.repo(repoRoot);
 		repo.parked = file?.parked ?? null;
-		const finished = file?.lastPassFinishedAt ? Date.parse(file.lastPassFinishedAt) : NaN;
-		repo.lastPassFinishedAt = Number.isNaN(finished) ? repo.lastPassFinishedAt : finished;
+		this.noteLastPassFinished(repo, file?.lastPassFinishedAt ?? null);
 		// A parked daemon is stopped, not left running (design/09) — ticks
 		// park themselves at the next timer, daemons need the supervisor.
 		if (repo.parked) for (const runner of repo.runners.values()) runner.parkDaemon();
+		this.maybeReconcileDispatch(repoRoot, repo, file);
 		this.armParkedRecheck(repo);
 		this.deps.onStateChange();
+	}
+
+	private noteLastPassFinished(repo: RepoSupervision, iso: string | null): void {
+		const finished = iso ? Date.parse(iso) : NaN;
+		if (!Number.isNaN(finished)) repo.lastPassFinishedAt = finished;
+	}
+
+	/**
+	 * Reconcile a dispatch plan at most once per planner pass. The host re-feeds
+	 * orchestrator.json on EVERY .status-pipe/ write (worker heartbeats, acks,
+	 * ticket writes) and the plan persists on disk until the next pass overwrites
+	 * it, so without this guard a stale re-read would re-spawn a key whose worker
+	 * already exited (design/09: the NEXT pass decides re-dispatch, not a re-read).
+	 */
+	private maybeReconcileDispatch(repoRoot: string, repo: RepoSupervision, file: OrchestratorFile | null): void {
+		if (!file?.dispatch) return;
+		// While disabled, leave the guard UNTOUCHED so the plan stays eligible:
+		// reconcileWorkers no-ops when disabled, so advancing the guard here would
+		// mark the pass done-without-spawning and the host's re-feed on enable would
+		// then skip it — planned work stranded until the next pass or staleness.
+		if (!this.settings.enabled) return;
+		// Same strand for an unapproved worker template: reconcileWorkers logs the
+		// gap (so the operator knows to approve) but spawns nothing, so DON'T advance
+		// the guard — once the worker entry is approved and the host re-feeds, this
+		// pass must still reconcile, not be marked done.
+		if (!repo.workerTemplate) {
+			this.reconcileWorkers(repoRoot, repo, file.dispatch);
+			return;
+		}
+		const pass = file.passCount ?? null;
+		if (repo.reconciledAny && pass === repo.reconciledDispatchPass) return;
+		repo.reconciledAny = true;
+		repo.reconciledDispatchPass = pass;
+		this.reconcileWorkers(repoRoot, repo, file.dispatch);
 	}
 
 	/** recheckAfter elapsing is a wake trigger — parking can never strand the loop. */
@@ -166,6 +288,7 @@ export class AgentSupervisor {
 
 	stopAll(): void {
 		this.forEachRunner((r) => r.stop());
+		for (const repo of this.repos.values()) this.stopWorkers(repo);
 	}
 
 	tickNow(repoRoot?: string): void {
@@ -186,11 +309,21 @@ export class AgentSupervisor {
 		return out;
 	}
 
+	/** Live worker processes across all repos, for the agents strip. */
+	workerStates(): WorkerProcessState[] {
+		const out: WorkerProcessState[] = [];
+		for (const [repoRoot, repo] of this.repos) {
+			for (const worker of repo.workers.values()) out.push({ repoRoot, ...worker.snapshot() });
+		}
+		return out;
+	}
+
 	dispose(): void {
 		this.cancelWedgeTimer?.();
 		for (const repo of this.repos.values()) {
 			repo.cancelRecheck?.();
 			for (const runner of repo.runners.values()) runner.dispose();
+			this.stopWorkers(repo);
 		}
 		this.repos.clear();
 	}

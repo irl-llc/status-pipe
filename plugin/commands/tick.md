@@ -7,20 +7,24 @@ argument-hint: "[--max-concurrent N] [--dry-run]"
 
 $ARGUMENTS
 
-You are the orchestrator for ONE pass. You do NOT do work-item work yourself —
-you reconcile state, consume operator signals, fan out workers, wait for them,
-write `orchestrator.json`, report, and exit. Load the `protocol` skill first;
-its rules are binding. This command is **idempotent and zero-prompt**: ask the
-user nothing; surface everything in the report. Defaults: `--max-concurrent 3`.
-`--dry-run` does everything EXCEPT creating tickets/worktrees, launching
-workers, or consuming (deleting) acks — it reports what it *would* do.
+You are the **planner** for ONE pass. You do NOT do work-item work and you do
+NOT spawn workers yourself — you reconcile state, consume operator signals,
+decide which workers should run, stamp + worktree them, **write a dispatch plan
+to `orchestrator.json`**, report, and exit. The supervisor (the status-pipe
+extension) reads the plan and spawns one real `claude -p` worker process per
+item — each a full agent with its own context, skills, and the ability to spawn
+its own subagents. Load the `protocol` skill first; its rules are binding. This
+command is **idempotent and zero-prompt**: ask the user nothing; surface
+everything in the report. Defaults: `--max-concurrent 3`. `--dry-run` does
+everything EXCEPT creating tickets/worktrees, writing the dispatch plan, or
+consuming (deleting) acks — it reports what it *would* do.
 
-Workers run INSIDE the tick: dispatch them as background tasks, then **wait
-for all of them to finish before wrapping** — nothing outlives the tick
-(design/09: the supervisor's process model and the single-writer invariant
-depend on it). Worker failures are NOT tick failures: record them in the
-ticket file and still exit cleanly; a nonzero exit is reserved for
-orchestrator-level fatals (auth gone, crash).
+You **plan**, the supervisor **executes** (design/09): you never spawn a worker
+and never wait for one — the pass ends as soon as the plan is written. A ticket
+you stamp but the supervisor hasn't spawned yet is recovered by the next pass's
+staleness reconcile. Worker failures are NOT planner failures: a worker records
+its own failure in its ticket file; a nonzero exit here is reserved for
+planner-level fatals (auth gone, crash).
 
 ## Step 0 — Worktree preflight (refuse to orchestrate from a worktree)
 
@@ -138,12 +142,14 @@ with a fresh heartbeat). No ticket file yet = `planning`, oldest.
 
 Order: **ack-consumers first**, then oldest `updatedAt` first (missing file =
 oldest) so nothing starves. Free slots = `max-concurrent − (live workers
-now)`; take the first `freeSlots`. NEVER launch a second worker for a ticket
-that already has a live one.
+now)`; take the first `freeSlots`. NEVER plan a second worker for a ticket that
+already has a live one — the supervisor also dedups by `key`, but the planner is
+the first guard.
 
-For each selected item, BEFORE launching (skip all of this under `--dry-run`):
+For each selected item, BEFORE adding it to the plan (skip all of this under
+`--dry-run`):
 
-1. **Stamp the ticket file** so a concurrent/next pass can't double-launch —
+1. **Stamp the ticket file** so a concurrent/next pass can't double-dispatch —
    atomic rewrite (create the file with required fields `schemaVersion: 1,
    repo, ticket, title, phase: "planning", health: "ok", updatedAt` if
    absent): `worker = {status: "running", taskId: null, startedAt: NOW,
@@ -151,23 +157,29 @@ For each selected item, BEFORE launching (skip all of this under `--dry-run`):
 2. **Ensure the work-item worktree**: `git worktree list`; if absent
    `git worktree add "$ROOT/.claude/worktrees/<slug>" <stack tip | main>`
    (slug = epic slug or `ticket-<key>`).
-3. **Launch the worker as a background task** whose prompt is
-   `/status-pipe:work-epic <abs-epic-path>` (epic) or
-   `/status-pipe:work-ticket <key>` (ticket), run with cwd = the worktree.
-   If an ack was consumed for it, append the operator's note to the prompt:
-   `Operator ack note: "<note>"`.
+3. **Add the worker to the dispatch plan** (you do NOT spawn it). Its entry:
+   - `kind`: `"ticket"` or `"epic"`.
+   - `key`: the ticket key or epic slug (the dispatch identity).
+   - `prompt`: `/status-pipe:work-ticket <key>` (ticket) or
+     `/status-pipe:work-epic <abs-epic-path>` (epic). If an ack was consumed for
+     it, append ` Operator ack note: "<note>"`.
+   - `worktree`: the **absolute** worktree path from step 2.
 
-Emit all launch calls in a SINGLE message so they run concurrently. Then
-**wait for every launched worker to complete** before Step 5 (workers rewrite
-their own ticket files, setting `worker.status` back to `idle` at wrap). Note
-items deferred by the cap.
+Collect the selected items into the dispatch plan written in Step 5:
+`{maxConcurrent: <the cap you used>, items: [...]}`. Do NOT spawn workers and do
+NOT wait — the supervisor reads the plan and spawns one `claude -p` worker
+process per item, deduplicated by `key`. Note items deferred by the cap.
 
 ## Step 5 — Wrap: orchestrator.json + report
 
-After all workers finish, atomic-rewrite `"$PROTO"/orchestrator.json`:
-`schemaVersion: 1`, `repo`, `passCount` (previous + 1), `lastPassStartedAt =
-NOW`, `lastPassFinishedAt = date -u` (fresh), `staleWorkerMinutes` (echoed
-from config).
+Atomic-rewrite `"$PROTO"/orchestrator.json`: `schemaVersion: 1`, `repo`,
+`passCount` (previous + 1), `lastPassStartedAt = NOW`, `lastPassFinishedAt =
+date -u` (fresh), `staleWorkerMinutes` (echoed from config), and **`dispatch`**
+— the plan from Step 4 (`{maxConcurrent, items: [{kind, key, prompt,
+worktree}]}`) when any worker was scheduled this pass, else `null`. This is the
+planner→supervisor handoff: writing the plan IS the dispatch; the supervisor
+spawns one worker process per item. (Under `--dry-run`, report the plan but
+write nothing.)
 
 **Parked declaration** (protocol skill §9): if (a) nothing was dispatchable
 this pass, (b) every active item has `waitingOn.kind ∈ {owner, review, merge}`
@@ -186,7 +198,8 @@ markdown link):
   `awaiting-merge`.
 - **In flight / waiting**: per item `phase` + `headline` + `waitingOn`.
 - **This pass**: acks consumed/superseded, stale workers reconciled, workers
-  launched, deferred by cap, parked or not (and why).
+  dispatched (planned for the supervisor to spawn), deferred by cap, parked or
+  not (and why).
 
 Then stop. Do not loop, do not schedule anything — `/status-pipe:launch` or
 the extension supervisor owns cadence.

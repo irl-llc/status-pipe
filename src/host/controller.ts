@@ -192,11 +192,15 @@ export class StatusPipeController implements vscode.Disposable {
 	private feedSupervisor(repo: ManagedRepo): void {
 		if (!repo.state || repo.context.role === 'worktree') return; // never supervise worktrees
 		const root = repo.context.repoRoot;
-		this.supervisor.noteOrchestrator(root, repo.state.orchestrator);
+		// Install agents (sets the worker template) BEFORE feeding the orchestrator:
+		// noteOrchestrator reconciles the dispatch plan and the supervisor records
+		// each plan once, so a cold-start feed that ran before the template was
+		// installed would drop that pass's dispatch until the next pass.
 		if (repo.state.launchRaw !== repo.installedLaunchRaw) {
 			repo.installedLaunchRaw = repo.state.launchRaw;
 			this.installApprovedAgents(repo, false);
 		}
+		this.supervisor.noteOrchestrator(root, repo.state.orchestrator);
 	}
 
 	/** Install already-approved agents; optionally prompt for the rest. */
@@ -204,7 +208,9 @@ export class StatusPipeController implements vscode.Disposable {
 		const agents = repo.state?.launch?.agents ?? [];
 		const root = repo.context.repoRoot;
 		const install = (list: LaunchAgent[]): LaunchAgent[] => {
-			const resolved = list.map((a) => ({ ...a, cwd: path.resolve(root, a.cwd) }));
+			// Worker templates keep their raw cwd (%worktree%) — the supervisor
+			// resolves it per dispatched item; only scheduled agents resolve now.
+			const resolved = list.map((a) => ({ ...a, cwd: a.mode === 'worker' ? a.cwd : path.resolve(root, a.cwd) }));
 			this.supervisor.setAgents(root, resolved);
 			return resolved;
 		};
@@ -271,6 +277,7 @@ export class StatusPipeController implements vscode.Disposable {
 		const input: QueueModelInput = {
 			repos: [...this.repos.values()].filter((r) => r.state !== null).map((r) => this.repoState(r)),
 			agents: this.supervisor.states(),
+			workers: this.supervisor.workerStates(),
 			activity: this.enricher.activity(),
 			now: Date.now(),
 			settings: settings.queueSettings(),

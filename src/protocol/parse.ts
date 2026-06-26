@@ -9,7 +9,9 @@
 import {
 	AckFile,
 	AckTarget,
+	AgentMode,
 	ConfigFile,
+	DispatchItem,
 	HistoryEntry,
 	LaunchAgent,
 	LaunchFile,
@@ -196,6 +198,25 @@ function parkedFromJson(v: unknown): OrchestratorFile['parked'] {
 	return { since, reason, recheckAfter: str(p.recheckAfter) };
 }
 
+function dispatchItemFromJson(v: Json): DispatchItem | null {
+	const key = str(v.key);
+	const kind = str(v.kind);
+	const prompt = str(v.prompt);
+	const worktree = str(v.worktree);
+	if (!key || (kind !== 'ticket' && kind !== 'epic') || !prompt || !worktree) return null;
+	return { key, kind, prompt, worktree };
+}
+
+function dispatchFromJson(v: unknown): OrchestratorFile['dispatch'] {
+	const d = obj(v);
+	if (!d) return null;
+	const items = objArray(d.items)
+		.map(dispatchItemFromJson)
+		.filter((i): i is DispatchItem => i !== null);
+	if (items.length === 0) return null;
+	return { maxConcurrent: num(d.maxConcurrent) ?? items.length, items };
+}
+
 export function parseOrchestratorFile(raw: string): ParseResult<OrchestratorFile> {
 	const versioned = parseVersioned(raw);
 	if (!versioned.ok) return versioned;
@@ -210,6 +231,7 @@ export function parseOrchestratorFile(raw: string): ParseResult<OrchestratorFile
 			lastPassFinishedAt: str(json.lastPassFinishedAt),
 			staleWorkerMinutes: num(json.staleWorkerMinutes),
 			parked: parkedFromJson(json.parked),
+			dispatch: dispatchFromJson(json.dispatch),
 			note: str(json.note),
 		},
 	};
@@ -267,10 +289,17 @@ export function parseAckFile(raw: string): ParseResult<AckFile> {
 	return { ok: true, value: ackFromJson(versioned.value, identity) };
 }
 
+const AGENT_MODES = new Set<AgentMode>(['tick', 'daemon', 'worker']);
+
+function agentModeFromJson(v: unknown): AgentMode | null {
+	const m = str(v);
+	return m !== null && AGENT_MODES.has(m as AgentMode) ? (m as AgentMode) : null;
+}
+
 function launchAgentFromJson(a: Json, index: number): LaunchAgent | null {
 	const command = str(a.command);
-	const mode = str(a.mode);
-	if (!command || (mode !== 'tick' && mode !== 'daemon')) return null;
+	const mode = agentModeFromJson(a.mode);
+	if (!command || !mode) return null;
 	const id = str(a.id) ?? `agent-${index}`;
 	return {
 		id,

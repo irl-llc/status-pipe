@@ -37,8 +37,8 @@ not orchestrate.
 | File | Owner | Notes |
 |---|---|---|
 | `config.json`, `launch.json` | operator (committed) | read-only for agents |
-| `orchestrator.json` | orchestrator | pass metadata + `parked` |
-| `tickets/<key>.json` | orchestrator/worker (one process tree at a time) | the card |
+| `orchestrator.json` | planner | pass metadata + `parked` + `dispatch` |
+| `tickets/<key>.json` | planner stamps, then worker owns (one process tree at a time) | the card |
 | `inbox/<ticket>/ack-<ackId>.json` | extension/operator writes; orchestrator consumes (deletes) | |
 
 The extension never writes anything except inbox acks. Never write a file the
@@ -384,4 +384,15 @@ appearing, a backlog edit, or `recheckAfter` elapsing wakes the loop.
 Written at every tick wrap (atomic rewrite): `schemaVersion: 1`, `repo`,
 `passCount` (incremented), `lastPassStartedAt`, `lastPassFinishedAt`,
 `staleWorkerMinutes` (echoed from `config.json`, default 30), `parked`
-(rule 9), optional `note`.
+(rule 9), `dispatch`, optional `note`.
+
+`dispatch` is the **planner→supervisor handoff**: the workers the planner
+stamped this pass for the supervisor to spawn —
+`{maxConcurrent, items: [{kind, key, prompt, worktree}]}`, or `null` when none.
+The planner writes the plan and exits; it never spawns workers and never waits
+for them. The supervisor (status-pipe extension) reads `dispatch`, substitutes
+each item's `prompt`/`worktree` into the `launch.json` `worker` template, and
+spawns one `claude -p` worker process per item — deduplicated by `key`, capped
+at `maxConcurrent`. Workers are real agents (own context, skills, subagents); a
+worker the supervisor hasn't spawned yet is recovered by the next pass's
+staleness reconcile (rule 4).

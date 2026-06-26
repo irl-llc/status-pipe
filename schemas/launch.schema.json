@@ -2,7 +2,7 @@
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"$id": "https://github.com/irl-llc/status-pipe/schemas/launch.schema.json",
 	"title": "status-pipe launch file",
-	"description": "Committed at .status-pipe/launch.json: how to launch this repo's agent loop. Backend-agnostic process contract. The token %home% in command/args/cwd/env values expands to the user's home directory at spawn time (the only substitution — deliberately not shell-style ${...}), so a committed file need not hard-code an absolute path. Execution is trust-gated: workspace trust plus per-content-hash approval of the complete entry (command, args, stdin, cwd, env), hashed in its committed %home% form. Never launched from a linked worktree.",
+	"description": "Committed at .status-pipe/launch.json: how to launch this repo's agent loop. Backend-agnostic process contract. The token %home% in command/args/cwd/env values expands to the user's home directory at spawn time (deliberately not shell-style ${...}), so a committed file need not hard-code an absolute path. A mode:'worker' entry is a TEMPLATE the supervisor instantiates on demand — once per item the planner (mode:'tick') writes to orchestrator.json.dispatch — never scheduled; in a worker entry two extra tokens resolve per dispatched item: %prompt% (the worker's `claude -p` argument) and %worktree% (the worker's cwd). Execution is trust-gated: workspace trust plus per-content-hash approval of the complete entry (command, args, stdin, cwd, env), hashed in its committed token form. Never launched from a linked worktree.",
 	"type": "object",
 	"required": ["schemaVersion", "agents"],
 	"additionalProperties": true,
@@ -45,8 +45,8 @@
 						"description": "Merged over the inherited environment. Values support %home% (the user's home directory)."
 					},
 					"mode": {
-						"enum": ["tick", "daemon"],
-						"description": "tick: one pass then exit, relaunched intervalMinutes after exit. daemon: long-running, restarted on death."
+						"enum": ["tick", "daemon", "worker"],
+						"description": "tick: one pass then exit, relaunched intervalMinutes after exit. daemon: long-running, restarted on death. worker: not scheduled — a template the supervisor instantiates per orchestrator.json.dispatch item, resolving %prompt% (the work-ticket/work-epic argument) and %worktree% (cwd)."
 					},
 					"intervalMinutes": {
 						"type": "number",

@@ -153,6 +153,12 @@ git-spice extension.
     "reason": "4 active tickets all waiting on owner; no dispatchable tranches",
     "recheckAfter": "2026-06-12T09:40:00Z"
   },
+  "dispatch": {
+    "maxConcurrent": 3,
+    "items": [
+      { "kind": "ticket", "key": "19", "prompt": "/status-pipe:work-ticket 19", "worktree": "/repo/.claude/worktrees/ticket-19" }
+    ]
+  },
   "note": "..."
 }
 ```
@@ -169,6 +175,14 @@ git-spice extension.
   event or `recheckAfter`. Full semantics in
   [09-launch-and-supervision.md](09-launch-and-supervision.md). Orchestrators
   that never write it are simply never parked.
+- `dispatch` (optional): the **planner→supervisor handoff** — the workers the
+  planner stamped this pass for the supervisor to spawn, each
+  `{kind, key, prompt, worktree}`, capped at `maxConcurrent`; `null`/omitted
+  when none. The planner writes the plan and exits without spawning anything;
+  the supervisor reads it and launches one `claude -p` worker process per item
+  (one per `key`). This is why the tick is a *planner*, not the whole unit of
+  work — full semantics in
+  [09-launch-and-supervision.md](09-launch-and-supervision.md).
 
 ## <a name="feedback-signal"></a>The ack inbox (operator-owned)
 

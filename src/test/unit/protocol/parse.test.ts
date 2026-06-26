@@ -207,6 +207,10 @@ describe('protocol/parse', () => {
 					reason: '4 active tickets all waiting on owner',
 					recheckAfter: '2026-06-12T09:40:00Z',
 				},
+				dispatch: {
+					maxConcurrent: 3,
+					items: [{ kind: 'ticket', key: '19', prompt: '/status-pipe:work-ticket 19', worktree: '/wt/19' }],
+				},
 				note: 'all quiet',
 			});
 			assert.deepStrictEqual(ok(parseOrchestratorFile(raw)), {
@@ -221,8 +225,35 @@ describe('protocol/parse', () => {
 					reason: '4 active tickets all waiting on owner',
 					recheckAfter: '2026-06-12T09:40:00Z',
 				},
+				dispatch: {
+					maxConcurrent: 3,
+					items: [{ kind: 'ticket', key: '19', prompt: '/status-pipe:work-ticket 19', worktree: '/wt/19' }],
+				},
 				note: 'all quiet',
 			});
+		});
+
+		it('defaults maxConcurrent to item count and drops malformed items', () => {
+			const raw = JSON.stringify({
+				schemaVersion: 1,
+				dispatch: {
+					items: [
+						{ kind: 'epic', key: 'auth', prompt: '/status-pipe:work-epic /e/auth.md', worktree: '/wt/auth' },
+						{ kind: 'ticket', key: '20' }, // missing prompt/worktree → dropped
+						{ kind: 'bogus', key: '21', prompt: 'p', worktree: '/wt/21' }, // bad kind → dropped
+					],
+				},
+			});
+			const dispatch = ok(parseOrchestratorFile(raw)).dispatch;
+			assert.strictEqual(dispatch?.items.length, 1);
+			assert.strictEqual(dispatch?.maxConcurrent, 1);
+			assert.strictEqual(dispatch?.items[0].key, 'auth');
+		});
+
+		it('nulls dispatch when absent or with no valid items', () => {
+			assert.strictEqual(ok(parseOrchestratorFile('{"schemaVersion": 1}')).dispatch, null);
+			const empty = JSON.stringify({ schemaVersion: 1, dispatch: { items: [{ key: 'x' }] } });
+			assert.strictEqual(ok(parseOrchestratorFile(empty)).dispatch, null);
 		});
 
 		it('parses parked without recheckAfter as recheckAfter null', () => {
@@ -352,6 +383,20 @@ describe('protocol/parse', () => {
 				intervalMinutes: 10,
 				timeoutMinutes: 45,
 			});
+		});
+
+		it('accepts a mode:worker template entry (tokens kept verbatim)', () => {
+			const raw = JSON.stringify({
+				schemaVersion: 1,
+				agents: [
+					{ command: 'claude', mode: 'tick' },
+					{ id: 'worker', command: 'claude', args: ['-p', '%prompt%'], cwd: '%worktree%', mode: 'worker' },
+				],
+			});
+			const value = ok(parseLaunchFile(raw));
+			const worker = value.agents.find((a) => a.mode === 'worker');
+			assert.deepStrictEqual(worker?.args, ['-p', '%prompt%']);
+			assert.strictEqual(worker?.cwd, '%worktree%');
 		});
 
 		it('filters env to string values only', () => {

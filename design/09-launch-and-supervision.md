@@ -33,7 +33,7 @@ arg vector, stdin payload), not a Claude invocation. JSON Schema ships at
   "agents": [
     {
       "id": "tick",
-      "title": "Orchestrator loop",
+      "title": "Planner loop",
       "command": "claude",
       "args": [
         "-p", "/status-pipe:tick --max-concurrent 3",
@@ -46,12 +46,38 @@ arg vector, stdin payload), not a Claude invocation. JSON Schema ships at
       "mode": "tick",
       "intervalMinutes": 10,
       "timeoutMinutes": 45
+    },
+    {
+      "id": "worker",
+      "title": "Work-item worker",
+      "command": "claude",
+      "args": [
+        "-p", "%prompt%",
+        "--output-format", "stream-json", "--verbose",
+        "--permission-mode", "auto"
+      ],
+      "stdin": "",
+      "cwd": "%worktree%",
+      "env": {},
+      "mode": "worker",
+      "timeoutMinutes": 45
     }
   ]
 }
 ```
 
-- `agents[]` allows more than one loop per repo (rare; usually one).
+- `agents[]` allows more than one loop per repo (rare; usually one), plus at
+  most one `mode:"worker"` template (below).
+- **`mode:"worker"`** is a *template*, not a scheduled loop. The supervisor
+  never ticks it; instead it instantiates the template once per item the planner
+  writes to `orchestrator.json.dispatch`, resolving two worker-only tokens:
+  `%prompt%` (the worker's `claude -p` argument — e.g.
+  `/status-pipe:work-ticket 19`, ack note already appended) and `%worktree%`
+  (the worker's cwd). This gives each worker the SAME auth/env/permission posture
+  as the planner while running as its own full `claude` process — own context,
+  skills, and the ability to spawn its own subagents (the comment-gate reviewer
+  the protocol requires). A repo with no worker template plans but never
+  dispatches: the supervisor logs the gap and spawns nothing.
 - `command` + `args` + `stdin`: the process contract. `stdin` (string, may be
   empty) is written to the child's stdin then closed — supports backends that
   take their prompt on stdin rather than argv.
@@ -75,28 +101,50 @@ arg vector, stdin payload), not a Claude invocation. JSON Schema ships at
     long-lived process to leak, and the cadence is visible and adjustable.
   - **`daemon`** — long-running process (e.g. a loop that self-schedules);
     the extension restarts it if it dies.
-- `timeoutMinutes` (tick mode): a hard wall-clock cap per tick — a pass still
-  running after this is killed and recorded as a failure. This is the single
-  timeout; a hung tick must not silently stop the cadence. (Output-silence is
-  surfaced as a liveness *display*, not a kill rule — a tick blocking on a
-  long worker is quiet and healthy.)
+- `timeoutMinutes`: a hard wall-clock cap — for a `tick` planner pass, and
+  (separately, per process) for each worker the supervisor spawns. A pass or
+  worker still running after its cap is killed and recorded as a failure; a hung
+  process must not silently stop the cadence. (Output-silence is surfaced as a
+  liveness *display*, not a kill rule.)
 
-### Tick anatomy: workers run inside the tick
+### Tick anatomy: the planner plans, the supervisor executes
 
-One pass is the *whole* pass: the orchestrator dispatches workers (subagents /
-child processes) and **waits for them** before wrapping and exiting. This is
-load-bearing for three reasons: (a) nothing outlives the tick, so the
-supervisor's process model stays honest (background children of an exited
-`claude -p` would be orphans); (b) `intervalMinutes` measured from exit can
-never overlap a still-running worker; (c) ticket files have one writing
-process tree at a time. Consequently a tick's duration is bounded by
-`timeoutMinutes` (default 45), which is expected to exceed `intervalMinutes`
-(default 10) on busy passes — the cadence is "10 minutes of quiet between
-passes", not "a pass every 10 minutes". **Worker failures are not tick
-failures**: a worker that errors is recorded in its ticket file
-(`worker.status=error`, history note) and the tick still exits 0; a nonzero
-exit is reserved for orchestrator-level fatals (auth gone, crash), which is
-what the supervisor's backoff/`failed` escalation is for.
+A tick is a **planner** pass, not the whole unit of work. The planner
+reconciles state, consumes acks, reconciles staleness, decides which workers
+should run (trust filter, fairness, `max-concurrent`, ack-priority), creates
+each worker's worktree, stamps `worker.status=running` in its ticket file, and
+writes a **dispatch plan** to `orchestrator.json` —
+`dispatch: {maxConcurrent, items: [{kind, key, prompt, worktree}]}` — then
+exits. It spawns no workers and waits for none. **Writing the plan IS the
+dispatch.**
+
+The **supervisor** reads `dispatch` and spawns one real `claude -p` worker
+process per item (substituting `prompt`/`worktree` into the `mode:"worker"`
+template), supervising each like any process: liveness, `timeoutMinutes`,
+reap-on-exit. This is the load-bearing change from the earlier "workers run
+inside the tick" model — workers are full agents (own context window, skills,
+and *their own* subagents, which a Task-tool subagent cannot have), instead of
+subagents stuck inside the orchestrator's process and context.
+
+The invariants the old model got from "nothing outlives the tick" still hold,
+relocated:
+
+- **One writer per ticket file.** The planner only plans tickets with no live
+  worker, and stamps before the worker starts; the supervisor guarantees ≤1
+  live worker per `key`. Planner passes never overlap (still one planner process
+  per repo, `intervalMinutes` from exit). So a ticket file has at most one
+  writing process tree at a time — planner *then* worker, never both at once.
+- **No orphans.** Workers are supervised processes with explicit lifecycle, not
+  background children of an exited `claude -p`.
+- **Recovery.** A ticket stamped `running` whose worker the supervisor never
+  spawned (extension down, crash between stamp and spawn) is reclaimed by the
+  next planner pass's staleness reconcile (heartbeat stale ⇒ `error`, eligible
+  for relaunch).
+
+**Worker failures are not planner failures**: a worker that errors records it
+in its own ticket file (`worker.status=error`, history note); the planner pass
+still exits 0. A nonzero planner exit is reserved for planner-level fatals (auth
+gone, crash), which is what the supervisor's backoff/`failed` escalation covers.
 
 ### Trust gating (this file executes commands)
 
@@ -150,7 +198,8 @@ same contract: run, write logs to stdout, exit nonzero on failure.
 
 ## Supervisor design (`agentSupervisor` module)
 
-Per `(repo, agent.id)` a small state machine:
+The supervisor runs two kinds of process. **Scheduled agents** (`tick`/`daemon`)
+each get a per-`(repo, agent.id)` state machine (`AgentRunner`):
 
 ```
 disabled → idle → scheduled(nextTickAt) → launching → running(pid, since, lastOutputAt)
@@ -159,6 +208,16 @@ disabled → idle → scheduled(nextTickAt) → launching → running(pid, since
                                    │          ├─ exit ≠0 / timeout → backoff(n) ─ retries left ─→ scheduled
                                    └──────────┴─ backoff exhausted → failed
 ```
+
+**Workers** are different: not scheduled, not retried. When a repo's
+`orchestrator.json.dispatch` changes, the supervisor reconciles a per-repo
+worker pool (keyed by item `key`) — spawning a one-shot `WorkerRunner` per new
+item from the `mode:"worker"` template (`%prompt%`/`%worktree%` resolved),
+capped at the plan's `maxConcurrent`, deduplicated against live workers. A
+worker runs one pass and exits; the supervisor reaps it (no backoff, no
+relaunch) and the *next* planner pass decides whether to re-dispatch. A worker
+that exceeds `timeoutMinutes` is killed. The worker pool does not gate or
+escalate the planner's `failed` state — worker outcomes live in ticket files.
 
 - Child processes via `child_process.spawn` (not the integrated terminal):
   stdout/stderr go to a per-agent **OutputChannel** ("Status Pipe: fleet-api ·
@@ -254,9 +313,14 @@ a launch file it falls back to the original behavior: run
 ## UI
 
 - **Agents strip** at the top of the tray: one collapsed summary row —
-  `agents: 2 running · 1 scheduled (3m) · 1 failed` — expanding to one row per
-  (repo, agent): status icon, repo name, next/elapsed time, start/stop and
-  open-log buttons on hover. In single-repo mode the collapsed row is just
+  `1 launch config: 1 scheduled (3m) · 2 workers running` — expanding to one row
+  per declared launch config (status icon, repo name, next/elapsed time,
+  start/stop and open-log buttons) **plus one row per live worker** beneath
+  them. Worker rows are read-only (indented, no Run/Stop — a worker's lifecycle
+  belongs to the planner that dispatched it): they show the ticket key and, from
+  the worker's stream-json, what it's doing right now (`running · Edit: lane.ts`).
+  They appear while the worker runs and vanish on exit; the operator acts on the
+  ticket card, not the worker row. In single-repo mode the collapsed row is just
   `agent: scheduled · next tick 3m`.
 - Commands: `statusPipe.agents.startAll/stopAll/tickNow/openLog`, plus per-row
   buttons.

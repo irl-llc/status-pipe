@@ -16,6 +16,7 @@ import {
 	RepoDisplay,
 	WaitingDisplay,
 	WorkerDisplay,
+	WorkerProcessDisplay,
 } from './displayTypes';
 import { LaneContext, REASON_RANK, assignLane, isWorkerStale } from './lane';
 import { buildPrRows } from './prRows';
@@ -33,10 +34,26 @@ export function buildDisplayState(input: QueueModelInput): DisplayState {
 		multiRepo: input.repos.length > 1,
 		repos: input.repos.map(repoDisplay),
 		agents: input.repos.flatMap((repo) => repoLaunchers(repo, input.agents)),
+		workers: workerDisplays(input),
 		cards,
 		counts: countLanes(cards),
 		activity: input.activity,
 	};
+}
+
+/** Live workers joined with repo names; worktree-only repos are monitor-only. */
+function workerDisplays(input: QueueModelInput): WorkerProcessDisplay[] {
+	const names = new Map(input.repos.map((r) => [r.repoRoot, r.name]));
+	return input.workers
+		.filter((w) => names.has(w.repoRoot))
+		.map((w) => ({
+			repoRoot: w.repoRoot,
+			repoName: names.get(w.repoRoot) ?? w.repoRoot,
+			key: w.key,
+			runningSince: w.runningSince,
+			lastOutputAt: w.lastOutputAt,
+			activity: w.activity,
+		}));
 }
 
 function repoCards(repo: RepoState, input: QueueModelInput): CardDisplay[] {
@@ -334,7 +351,9 @@ function repoLaunchers(repo: RepoState, allLive: AgentProcessState[]): AgentDisp
 	// disabled, so offering Run/Stop controls there would be a lie.
 	if (repo.monitorOnly) return [];
 	const live = allLive.filter((a) => a.repoRoot === repo.repoRoot);
-	const declared = repo.launch?.agents ?? [];
+	// Worker entries are templates, not runnable rows — the supervisor
+	// instantiates them per dispatch item (design/09); they never get a strip row.
+	const declared = (repo.launch?.agents ?? []).filter((d) => d.mode !== 'worker');
 	const declaredIds = new Set(declared.map((d) => d.id));
 	const fromDeclared = declared.map((d) => launcherDisplay(repo, d, live.find((a) => a.agentId === d.id) ?? null));
 	const orphans = live.filter((a) => !declaredIds.has(a.agentId)).map((a) => orphanLauncher(repo, a));

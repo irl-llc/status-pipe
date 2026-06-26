@@ -9,11 +9,19 @@ $ARGUMENTS
 
 Start the autonomous driver: run `/status-pipe:tick` repeatedly so the
 backlog keeps advancing with no per-tick interaction. This is the
-*interactive* way to run the loop (one repo, Claude pane open). In fleet
-mode prefer the status-pipe VS Code extension's supervisor, which launches
-headless ticks (`claude -p "/status-pipe:tick" --output-format stream-json`)
-per `.status-pipe/launch.json` — it also works in single-repo mode and adds
-liveness tracking, backoff, and park/wake handling. Mention this to the user.
+*interactive* way to run the **planner** loop (one repo, Claude pane open).
+
+**Important — the planner alone does not run workers.** As of the
+planner/executor split (design/09), `/status-pipe:tick` only *plans*: it
+stamps work, writes a dispatch plan to `orchestrator.json`, and exits. The
+worker processes that actually advance tickets are spawned by the **status-pipe
+VS Code extension supervisor**, which reads the dispatch plan and launches one
+`claude -p "/status-pipe:work-ticket <key>"` per item. So this loop keeps the
+backlog *planned*, but you need the extension supervisor enabled (with the
+`launch.json` `worker` entry approved) for work to get done. The supervisor
+works in single-repo mode too and adds liveness, backoff, and park/wake — tell
+the user to enable it; a bare planner loop with no supervisor will plan the same
+items every pass and never clear them.
 
 ## What to do
 
@@ -25,8 +33,9 @@ liveness tracking, backoff, and park/wake handling. Mention this to the user.
      (e.g. `/loop`), invoke it as `<interval> /status-pipe:tick` and confirm
      to the user.
    - Otherwise print the equivalent shell loop, ready to paste into a
-     terminal at the repo root, and tell the user the extension supervisor
-     is the better long-term answer:
+     terminal at the repo root, and tell the user **this drives the planner
+     only** — the extension supervisor must be running to spawn the planned
+     workers:
 
      ```bash
      while true; do claude -p "/status-pipe:tick"; sleep 600; done
