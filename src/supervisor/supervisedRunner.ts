@@ -1,10 +1,17 @@
 /**
- * One (repo, agent) state machine (design/09-launch-and-supervision.md):
+ * One (repo, launch-entry) supervision state machine
+ * (design/09-launch-and-supervision.md):
  *
  *   stopped → scheduled(nextTickAt) → launching → running
  *                    ↑                    ├─ exit 0 (tick) → scheduled
  *                    │                    ├─ exit ≠0 / timeout → backoff(n)
  *                    └────── backoff ─────┴─ exhausted → failed
+ *
+ * The unit of work is whatever the injected `Spawner` produces — an external
+ * process (claude/exec entries) or the in-process planner pass (`built-in`),
+ * which presents itself as a one-shot "process" that streams its report and
+ * exits 0/non-zero. The lifetime/parking/backoff machinery is identical either
+ * way, which is why this is one runner rather than a per-mechanism fork.
  *
  * vscode-free: process spawning, clock, and timers are injected.
  */
@@ -56,7 +63,7 @@ const BACKOFF_CAP_MS = 15 * 60_000;
 const DAEMON_HEALTHY_UPTIME_MS = 60_000;
 const PARKED_RECHECK_MS = 60_000;
 
-export class AgentRunner {
+export class SupervisedRunner {
 	private state: AgentRunState = 'stopped';
 	private nextTickAt: number | null = null;
 	private runningSince: number | null = null;

@@ -1,7 +1,7 @@
 /**
  * One worker process: a single `claude -p /status-pipe:work-ticket <key>` (or
  * work-epic) child the supervisor spawns from an orchestrator.json.dispatch
- * item (design/09-launch-and-supervision.md). Unlike AgentRunner this is
+ * item (design/09-launch-and-supervision.md). Unlike SupervisedRunner this is
  * one-shot — no interval, no backoff, no parking: it runs one pass and exits,
  * and the NEXT planner pass decides whether to re-dispatch. A worker failure is
  * recorded in its ticket file by the worker (or staleness reconcile), never an
@@ -10,7 +10,7 @@
 
 import { ClaudeActivityReducer } from '../output/claudeStream';
 import { WorkerProcessState } from '../queue/queueInputs';
-import { ProcessHandle, SpawnRequest, Spawner } from './agentRunner';
+import { ProcessHandle, SpawnRequest, Spawner } from './supervisedRunner';
 
 export interface WorkerRunnerDeps {
 	spawn: Spawner;

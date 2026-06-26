@@ -16,7 +16,7 @@
 import * as path from 'path';
 
 import { LaunchAgent, WORKER_ID } from '../protocol/types';
-import { SpawnRequest } from './agentRunner';
+import { SpawnRequest } from './supervisedRunner';
 
 export function substituteHome(value: string, home: string): string {
 	return value.replaceAll('%home%', home);

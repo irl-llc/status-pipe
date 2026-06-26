@@ -204,8 +204,8 @@ same contract: run, write logs to stdout, exit nonzero on failure.
 ## Supervisor design (`agentSupervisor` module)
 
 The supervisor runs two kinds of process. **Scheduled agents** (`lifetime`
-`scheduled`/`daemon`) each get a per-`(repo, agent.id)` state machine
-(`AgentRunner`):
+`scheduled`/`daemon`) each get a per-`(repo, launch-entry)` state machine
+(`SupervisedRunner`):
 
 ```
 disabled → idle → scheduled(nextTickAt) → launching → running(pid, since, lastOutputAt)

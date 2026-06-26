@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 
 import { LaunchAgent } from '../../../protocol/types';
-import { SpawnRequest } from '../../../supervisor/agentRunner';
+import { SpawnRequest } from '../../../supervisor/supervisedRunner';
 import {
 	resolveAgentCwd,
 	resolveLaunchTemplates,

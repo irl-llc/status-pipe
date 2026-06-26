@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict';
 
-import { SpawnRequest } from '../../../supervisor/agentRunner';
+import { SpawnRequest } from '../../../supervisor/supervisedRunner';
 import { WorkerRunner, WorkerRunnerDeps } from '../../../supervisor/workerRunner';
 import { FakeSpawner } from '../helpers/fakeSpawner';
 import { ManualClock } from '../helpers/manualClock';
