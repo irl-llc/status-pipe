@@ -4,8 +4,10 @@
  * tickets, viewer — so cost scales with refreshes, not PR count.
  */
 
-import { Json, asArr, asObj, asStr, dig } from '../utils/json';
-import { HttpClient, RateListener, readRateInfo, statusToForgeError } from './http';
+import { Json, asObj, asStr, dig } from '../utils/json';
+import { executeGraphQL } from './graphql';
+import { GithubInventory } from './githubInventory';
+import { HttpClient, RateListener } from './http';
 import { mapGithubChecks, mapGithubLinkedTickets, mapGithubPr } from './githubMapping';
 import { hostMatches, hostOf, parseRemote } from './remote';
 import {
@@ -14,6 +16,7 @@ import {
 	ForgeAuth,
 	ForgeCapabilities,
 	ForgeError,
+	ForgeInventory,
 	ForgeRepository,
 	PullRequestInfo,
 	RepositoryId,
@@ -69,6 +72,16 @@ export class GithubForge implements Forge {
 
 	openRepository(id: RepositoryId, auth: ForgeAuth): ForgeRepository {
 		return new GithubRepository(this, id, { auth, apiUrl: this.apiUrl, options: this.options });
+	}
+
+	openInventory(id: RepositoryId, auth: ForgeAuth): ForgeInventory {
+		return new GithubInventory({
+			apiUrl: this.apiUrl,
+			slug: id.slug,
+			token: auth.token,
+			http: this.options.http,
+			onRateInfo: this.options.onRateInfo,
+		});
 	}
 }
 
@@ -151,45 +164,15 @@ class GithubRepository implements ForgeRepository {
 		});
 	}
 
-	private async executeGraphQL(query: string): Promise<Json> {
-		const response = await this.config.options.http({
-			url: `${this.config.apiUrl}/graphql`,
-			method: 'POST',
-			headers: {
-				authorization: `Bearer ${this.config.auth.token}`,
-				'content-type': 'application/json',
-				'user-agent': 'status-pipe',
+	private executeGraphQL(query: string): Promise<Json> {
+		return executeGraphQL(
+			{
+				apiUrl: this.config.apiUrl,
+				token: this.config.auth.token,
+				http: this.config.options.http,
+				onRateInfo: this.config.options.onRateInfo,
 			},
-			body: JSON.stringify({ query }),
-		});
-		this.config.options.onRateInfo?.(readRateInfo(response));
-		const httpError = statusToForgeError(response);
-		if (httpError) throw httpError;
-		return extractGraphQLData(response.body);
-	}
-}
-
-function extractGraphQLData(body: string): Json {
-	const parsed = asObj(safeParse(body));
-	const errors = asArr(parsed?.errors);
-	const data = asObj(parsed?.data);
-	if (!data) {
-		const message = asStr(dig(asObj(errors[0]), 'message')) ?? 'malformed GraphQL response';
-		throw new ForgeError(classifyGraphQLError(message), message);
-	}
-	return data;
-}
-
-function classifyGraphQLError(message: string): 'auth' | 'rate-limit' | 'network' {
-	if (/rate limit/i.test(message)) return 'rate-limit';
-	if (/credentials|token|authorization/i.test(message)) return 'auth';
-	return 'network';
-}
-
-function safeParse(body: string): unknown {
-	try {
-		return JSON.parse(body);
-	} catch {
-		return null;
+			query,
+		);
 	}
 }

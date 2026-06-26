@@ -25,6 +25,15 @@ export function asBool(v: unknown): boolean {
 	return v === true;
 }
 
+/** Parse JSON without throwing — null on empty or malformed input. */
+export function safeParse(body: string): unknown {
+	try {
+		return JSON.parse(body);
+	} catch {
+		return null;
+	}
+}
+
 /** Walks a path of keys through nested objects; null on any miss. */
 export function dig(v: unknown, ...path: string[]): unknown {
 	let cur: unknown = v;
