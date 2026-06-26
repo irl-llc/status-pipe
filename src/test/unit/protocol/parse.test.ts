@@ -357,16 +357,17 @@ describe('protocol/parse', () => {
 					{
 						id: 'orc',
 						title: 'Orchestrator',
+						type: 'exec',
 						command: 'claude',
 						args: ['-p'],
 						stdin: 'tick',
 						cwd: 'sub',
 						env: { FOO: 'bar' },
-						mode: 'tick',
+						lifetime: 'scheduled',
 						intervalMinutes: 5,
 						timeoutMinutes: 20,
 					},
-					{ command: 'node', mode: 'daemon' },
+					{ command: 'node', lifetime: 'daemon' },
 				],
 			});
 			const value = ok(parseLaunchFile(raw));
@@ -374,43 +375,68 @@ describe('protocol/parse', () => {
 			assert.deepStrictEqual(value.agents[1], {
 				id: 'agent-1',
 				title: 'agent-1',
+				type: 'exec',
 				command: 'node',
 				args: [],
 				stdin: '',
 				cwd: '.',
 				env: {},
-				mode: 'daemon',
+				lifetime: 'daemon',
 				intervalMinutes: 10,
 				timeoutMinutes: 45,
 			});
 		});
 
-		it('accepts a mode:worker template entry (tokens kept verbatim)', () => {
+		it('defaults an untyped entry with a command to exec / scheduled (back-compat)', () => {
+			const agent = ok(parseLaunchFile('{"schemaVersion":1,"agents":[{"command":"node"}]}')).agents[0];
+			assert.strictEqual(agent.type, 'exec');
+			assert.strictEqual(agent.lifetime, 'scheduled');
+		});
+
+		it('supplies the claude command + role default args for reserved ids', () => {
 			const raw = JSON.stringify({
 				schemaVersion: 1,
 				agents: [
-					{ command: 'claude', mode: 'tick' },
-					{ id: 'worker', command: 'claude', args: ['-p', '%prompt%'], cwd: '%worktree%', mode: 'worker' },
+					{ id: 'tick', type: 'claude' },
+					{ id: 'worker', type: 'claude', cwd: '%worktree%' },
 				],
 			});
 			const value = ok(parseLaunchFile(raw));
-			const worker = value.agents.find((a) => a.mode === 'worker');
-			assert.deepStrictEqual(worker?.args, ['-p', '%prompt%']);
+			const tick = value.agents.find((a) => a.id === 'tick');
+			const worker = value.agents.find((a) => a.id === 'worker');
+			assert.strictEqual(tick?.command, 'claude');
+			// Assert the FULL resolved args, including the stream-json/verbose/auto
+			// tail the supervisor relies on for liveness parsing and unattended runs.
+			const tail = ['--output-format', 'stream-json', '--verbose', '--permission-mode', 'auto'];
+			assert.deepStrictEqual(tick?.args, ['-p', '/status-pipe:tick --max-concurrent 3', ...tail]);
+			assert.deepStrictEqual(worker?.args, ['-p', '%prompt%', ...tail]);
 			assert.strictEqual(worker?.cwd, '%worktree%');
+		});
+
+		it('lets a claude entry override the default args', () => {
+			const raw = '{"schemaVersion":1,"agents":[{"id":"tick","type":"claude","args":["-p","custom"]}]}';
+			assert.deepStrictEqual(ok(parseLaunchFile(raw)).agents[0].args, ['-p', 'custom']);
+		});
+
+		it('falls back to the `claude` command when a claude entry blanks it (no ENOENT spawn)', () => {
+			// An explicit empty command must default to `claude`, not reach spawn() as
+			// `""`; `??` would have leaked the empty string through. (Reserved id supplies args.)
+			const raw = '{"schemaVersion":1,"agents":[{"id":"tick","type":"claude","command":""}]}';
+			assert.strictEqual(ok(parseLaunchFile(raw)).agents[0].command, 'claude');
 		});
 
 		it('filters env to string values only', () => {
 			const raw = JSON.stringify({
 				schemaVersion: 1,
-				agents: [{ command: 'node', mode: 'tick', env: { A: 'x', B: 5, C: null, D: { nested: true } } }],
+				agents: [{ command: 'node', env: { A: 'x', B: 5, C: null, D: { nested: true } } }],
 			});
 			assert.deepStrictEqual(ok(parseLaunchFile(raw)).agents[0].env, { A: 'x' });
 		});
 
-		it('drops agents with a missing command or unknown mode', () => {
+		it('drops exec entries with no command and claude entries lacking a role default or args', () => {
 			const raw = JSON.stringify({
 				schemaVersion: 1,
-				agents: [{ mode: 'tick' }, { command: 'node', mode: 'cron' }, { command: 'node', mode: 'tick' }],
+				agents: [{ type: 'exec' }, { id: 'custom', type: 'claude' }, { command: 'node' }],
 			});
 			const value = ok(parseLaunchFile(raw));
 			assert.strictEqual(value.agents.length, 1);
@@ -418,7 +444,7 @@ describe('protocol/parse', () => {
 		});
 
 		it('reports a launch file with no valid agents as corrupt', () => {
-			for (const raw of ['{"schemaVersion": 1}', '{"schemaVersion": 1, "agents": [{"mode": "tick"}]}']) {
+			for (const raw of ['{"schemaVersion": 1}', '{"schemaVersion": 1, "agents": [{"type": "exec"}]}']) {
 				const result = failure(parseLaunchFile(raw));
 				assert.strictEqual(result.reason, 'corrupt');
 				assert.strictEqual(result.detail, 'no valid agents[] entries');

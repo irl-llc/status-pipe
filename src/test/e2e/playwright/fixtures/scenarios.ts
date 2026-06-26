@@ -238,14 +238,15 @@ export function launchConfigsRepo(): FixtureRepoSpec {
 			schemaVersion: 1,
 			agents: [
 				{
-					id: 'orchestrator',
+					id: 'tick',
 					title: 'Orchestrator',
+					type: 'exec',
 					command: 'claude',
 					args: ['-p'],
-					mode: 'tick',
+					lifetime: 'scheduled',
 					intervalMinutes: 10,
 				},
-				{ id: 'watcher', title: 'CI watcher', command: 'claude', args: ['-p'], mode: 'daemon' },
+				{ id: 'watcher', title: 'CI watcher', type: 'exec', command: 'claude', args: ['-p'], lifetime: 'daemon' },
 			],
 		},
 		tickets: [

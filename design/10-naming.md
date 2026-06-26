@@ -101,6 +101,27 @@ Kept deliberately:
 - Lane names **NEEDS YOU / WAITING ON WORLD / QUIET**; **epic**; **tranche**;
   **forge** (git-spice heritage — it is the right word).
 
+## Launch entry fields
+
+A launch entry (`launch.json` `agents[]`) once carried a single `mode` field
+that conflated three independent concerns. It is split into three, each named
+for exactly one concern (see [09-launch-and-supervision.md](09-launch-and-supervision.md)):
+
+| Field | Concern | Values |
+|---|---|---|
+| **`id`** | role / lookup key | reserved `tick` (planner) and `worker` (dispatch template); any other id is a generic supervised agent |
+| **`type`** | process mechanism | `claude` (the CLI with default prompt/args) · `exec` (explicit command/args). `built-in` (in-process planner) is added with its runner. |
+| **`lifetime`** | supervision style of a single supervised process | `scheduled` (run → exit → relaunch) · `daemon` (long-running, restarted on death) |
+
+`mode` is **removed**, not migrated automatically — readers derive role and
+lifetime only from `id`/`lifetime`, never from a leftover `mode`. A pre-release
+entry is re-authored into the new fields: `mode:"tick"` → `id:"tick"` (lifetime
+defaults to `scheduled`); `mode:"worker"` → `id:"worker"` (lifetime N/A,
+on-demand by role); `mode:"daemon"` → `lifetime:"daemon"`. The role is the `id`
+because the supervisor looks up the planner and worker template by their
+reserved ids; the lifetime is independent of mechanism, so a generic `exec`
+agent can be a `daemon`.
+
 ## UI wording
 
 - The card action for a crashed/stale worker is **Restart worker** (it

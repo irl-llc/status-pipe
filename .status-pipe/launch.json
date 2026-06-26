@@ -4,17 +4,7 @@
 		{
 			"id": "tick",
 			"title": "status-pipe planner loop",
-			"command": "claude",
-			"args": [
-				"-p",
-				"/status-pipe:tick --max-concurrent 3",
-				"--output-format",
-				"stream-json",
-				"--verbose",
-				"--permission-mode",
-				"auto"
-			],
-			"stdin": "",
+			"type": "claude",
 			"cwd": ".",
 			"env": {
 				"GH_CONFIG_DIR": "%home%/.config/claude-gh",
@@ -24,24 +14,13 @@
 				"GIT_CONFIG_KEY_1": "credential.https://github.com.helper",
 				"GIT_CONFIG_VALUE_1": "!gh auth git-credential"
 			},
-			"mode": "tick",
 			"intervalMinutes": 10,
 			"timeoutMinutes": 45
 		},
 		{
 			"id": "worker",
 			"title": "status-pipe work-item worker",
-			"command": "claude",
-			"args": [
-				"-p",
-				"%prompt%",
-				"--output-format",
-				"stream-json",
-				"--verbose",
-				"--permission-mode",
-				"auto"
-			],
-			"stdin": "",
+			"type": "claude",
 			"cwd": "%worktree%",
 			"env": {
 				"GH_CONFIG_DIR": "%home%/.config/claude-gh",
@@ -51,7 +30,6 @@
 				"GIT_CONFIG_KEY_1": "credential.https://github.com.helper",
 				"GIT_CONFIG_VALUE_1": "!gh auth git-credential"
 			},
-			"mode": "worker",
 			"timeoutMinutes": 45
 		}
 	]

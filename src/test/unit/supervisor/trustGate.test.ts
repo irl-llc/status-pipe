@@ -11,14 +11,15 @@ import { describeLaunchEntry, launchEntryHash } from '../../../supervisor/trustG
 
 function agent(overrides: Partial<LaunchAgent> = {}): LaunchAgent {
 	return {
-		id: 'orchestrator',
+		id: 'tick',
 		title: 'Orchestrator',
+		type: 'exec',
 		command: 'claude',
 		args: ['-p', 'tick'],
 		stdin: 'run the pass',
 		cwd: '/work/repo',
 		env: { NODE_OPTIONS: '--max-old-space-size=4096', PATH: '/usr/bin' },
-		mode: 'tick',
+		lifetime: 'scheduled',
 		intervalMinutes: 10,
 		timeoutMinutes: 30,
 		...overrides,
@@ -31,14 +32,15 @@ describe('supervisor/trustGate', () => {
 			const reordered: LaunchAgent = {
 				timeoutMinutes: 30,
 				intervalMinutes: 10,
-				mode: 'tick',
+				lifetime: 'scheduled',
 				env: { NODE_OPTIONS: '--max-old-space-size=4096', PATH: '/usr/bin' },
 				cwd: '/work/repo',
 				stdin: 'run the pass',
 				args: ['-p', 'tick'],
 				command: 'claude',
+				type: 'exec',
 				title: 'Orchestrator',
-				id: 'orchestrator',
+				id: 'tick',
 			};
 			assert.equal(launchEntryHash(agent()), launchEntryHash(reordered));
 		});
@@ -55,7 +57,9 @@ describe('supervisor/trustGate', () => {
 			['cwd', { cwd: '/work/other' }],
 			['env value', { env: { NODE_OPTIONS: '--inspect', PATH: '/usr/bin' } }],
 			['added env var', { env: { NODE_OPTIONS: '--max-old-space-size=4096', PATH: '/usr/bin', LD_PRELOAD: '/x.so' } }],
-			['mode', { mode: 'daemon' }],
+			['id (role)', { id: 'worker' }],
+			['type', { type: 'claude' }],
+			['lifetime', { lifetime: 'daemon' }],
 			['intervalMinutes', { intervalMinutes: 11 }],
 			['timeoutMinutes', { timeoutMinutes: 31 }],
 		];
@@ -65,16 +69,17 @@ describe('supervisor/trustGate', () => {
 			});
 		}
 
-		it('ignores display-only fields (id, title)', () => {
-			assert.equal(launchEntryHash(agent()), launchEntryHash(agent({ id: 'other', title: 'Other' })));
+		it('ignores the display-only title', () => {
+			assert.equal(launchEntryHash(agent()), launchEntryHash(agent({ title: 'Other' })));
 		});
 	});
 
 	describe('describeLaunchEntry', () => {
-		it('includes command with args, mode/intervals, cwd, and stdin', () => {
+		it('includes the role/type/lifetime, command with args, intervals, cwd, and stdin', () => {
 			const text = describeLaunchEntry(agent());
+			assert.match(text, /tick — type exec, lifetime scheduled/);
 			assert.match(text, /command: claude -p tick/);
-			assert.match(text, /mode: tick \(interval 10m, timeout 30m\)/);
+			assert.match(text, /interval 10m, timeout 30m/);
 			assert.match(text, /cwd: \/work\/repo/);
 			assert.match(text, /stdin: run the pass/);
 		});

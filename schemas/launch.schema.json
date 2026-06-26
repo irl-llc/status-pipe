@@ -2,7 +2,7 @@
 	"$schema": "http://json-schema.org/draft-07/schema#",
 	"$id": "https://github.com/irl-llc/status-pipe/schemas/launch.schema.json",
 	"title": "status-pipe launch file",
-	"description": "Committed at .status-pipe/launch.json: how to launch this repo's agent loop. Backend-agnostic process contract. The token %home% in command/args/cwd/env values expands to the user's home directory at spawn time (deliberately not shell-style ${...}), so a committed file need not hard-code an absolute path. A mode:'worker' entry is a TEMPLATE the supervisor instantiates on demand — once per item the planner (mode:'tick') writes to orchestrator.json.dispatch — never scheduled; in a worker entry two extra tokens resolve per dispatched item: %prompt% (the worker's `claude -p` argument) and %worktree% (the worker's cwd). Execution is trust-gated: workspace trust plus per-content-hash approval of the complete entry (command, args, stdin, cwd, env), hashed in its committed token form. Never launched from a linked worktree.",
+	"description": "Committed at .status-pipe/launch.json: how to launch this repo's agents. A launch entry has three orthogonal fields. `id` is the role / lookup key: two ids are reserved — `tick` (the planner) and `worker` (the dispatch template the supervisor instantiates once per item the planner writes to orchestrator.json.dispatch, resolving %prompt% (the worker's `claude -p` argument) and %worktree% (its cwd)); any other id is a generic supervised agent. `type` is the process mechanism: `claude` (the CLI with default prompt/args supplied — only command/args you want to override) or `exec` (an explicit command/args). `lifetime` is how a single supervised process is managed: `scheduled` (run, exit, relaunch intervalMinutes later) or `daemon` (long-running, restarted on death); the `worker` template ignores it (on-demand by role). The token %home% in command/args/cwd/env values expands to the user's home directory at spawn time (deliberately not shell-style ${...}). Execution is trust-gated: workspace trust plus per-content-hash approval of the complete RESOLVED entry (id, type, command, args, stdin, cwd, env, lifetime). Never launched from a linked worktree.",
 	"type": "object",
 	"required": ["schemaVersion", "agents"],
 	"additionalProperties": true,
@@ -13,15 +13,35 @@
 			"minItems": 1,
 			"items": {
 				"type": "object",
-				"required": ["command", "mode"],
 				"additionalProperties": true,
+				"allOf": [
+					{
+						"$comment": "exec (the default when type is absent) needs an explicit command; claude supplies it.",
+						"if": { "properties": { "type": { "const": "claude" } }, "required": ["type"] },
+						"then": {},
+						"else": { "required": ["command"] }
+					},
+					{
+						"$comment": "Only the reserved roles (tick/worker) carry built-in default args; a generic claude entry must supply its own NON-EMPTY args, or the supervisor cannot resolve a command and drops it.",
+						"if": {
+							"properties": { "type": { "const": "claude" }, "id": { "not": { "enum": ["tick", "worker"] } } },
+							"required": ["type"]
+						},
+						"then": { "properties": { "args": { "minItems": 1 } }, "required": ["args"] }
+					}
+				],
 				"properties": {
 					"id": {
 						"type": "string",
 						"pattern": "^[A-Za-z0-9_-]+$",
-						"description": "Unique within the file; supervisor state is keyed (repo, id). When omitted, readers synthesize a positional agent-<index> — set it explicitly if the file lists more than one agent, or reordering re-keys supervisor state."
+						"description": "Role / lookup key, unique within the file; supervisor state is keyed (repo, id) and the id is part of the trust hash. Reserved: `tick` (planner) and `worker` (dispatch template). When omitted, readers synthesize a positional agent-<index> — set it explicitly when the file lists more than one agent: reordering re-keys supervisor state, and any id change invalidates the entry's trust approval."
 					},
 					"title": { "type": "string" },
+					"type": {
+						"enum": ["claude", "exec"],
+						"default": "exec",
+						"description": "Process mechanism. claude: command defaults to `claude` and args default to the canonical invocation for the reserved role (worker: `-p %prompt%` + stream-json/verbose/auto flags; tick: `-p /status-pipe:tick --max-concurrent 3`); override args to customize. exec: explicit command + args. Absent ⇒ exec (legacy untyped entries carried a command)."
+					},
 					"command": { "type": "string", "minLength": 1 },
 					"args": {
 						"type": "array",
@@ -36,7 +56,7 @@
 					"cwd": {
 						"type": "string",
 						"default": ".",
-						"description": "Relative to the repo root"
+						"description": "Relative to the repo root for a scheduled/daemon entry. For the worker template it resolves against the dispatched %worktree% — a relative or empty cwd lands inside the worktree, not the repo root."
 					},
 					"env": {
 						"type": "object",
@@ -44,19 +64,20 @@
 						"default": {},
 						"description": "Merged over the inherited environment. Values support %home% (the user's home directory)."
 					},
-					"mode": {
-						"enum": ["tick", "daemon", "worker"],
-						"description": "tick: one pass then exit, relaunched intervalMinutes after exit. daemon: long-running, restarted on death. worker: not scheduled — a template the supervisor instantiates per orchestrator.json.dispatch item, resolving %prompt% (the work-ticket/work-epic argument) and %worktree% (cwd)."
+					"lifetime": {
+						"enum": ["scheduled", "daemon"],
+						"default": "scheduled",
+						"description": "Supervision style of a single supervised process. scheduled: one pass then exit, relaunched intervalMinutes after exit. daemon: long-running, restarted on death. Ignored for the worker template (on-demand by role). Absent ⇒ scheduled."
 					},
 					"intervalMinutes": {
 						"type": "number",
 						"default": 10,
-						"description": "tick mode: minutes of quiet between passes, measured from exit (never overlapping)"
+						"description": "scheduled lifetime: minutes of quiet between passes, measured from exit (never overlapping)"
 					},
 					"timeoutMinutes": {
 						"type": "number",
 						"default": 45,
-						"description": "tick mode: hard wall-clock cap per tick; a pass still running after this is killed and recorded as a failure"
+						"description": "scheduled lifetime: hard wall-clock cap per pass; a pass still running after this is killed and recorded as a failure. Also the per-process cap for each worker the template spawns."
 					}
 				}
 			}

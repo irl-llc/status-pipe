@@ -15,6 +15,7 @@
 
 import * as path from 'path';
 
+import { LaunchAgent, WORKER_ID } from '../protocol/types';
 import { SpawnRequest } from './agentRunner';
 
 export function substituteHome(value: string, home: string): string {
@@ -54,6 +55,17 @@ export function resolveWorkerRequest(template: SpawnRequest, prompt: string, wor
 function workerCwd(cwd: string, worktree: string): string {
 	if (path.isAbsolute(cwd) || cwd.startsWith('%home%')) return cwd;
 	return path.resolve(worktree, cwd);
+}
+
+/**
+ * Resolve a launch entry's cwd at install time. A scheduled agent's relative
+ * cwd is resolved against the repo root; the worker template keeps its raw cwd
+ * (`%worktree%`, resolved per dispatched item), and a `%home%`-anchored cwd is
+ * left for the spawner — joining it onto the root would corrupt it.
+ */
+export function resolveAgentCwd(root: string, agent: LaunchAgent): string {
+	if (agent.id === WORKER_ID || agent.cwd.startsWith('%home%')) return agent.cwd;
+	return path.resolve(root, agent.cwd);
 }
 
 /** Return a copy of the request with `%home%` resolved in command/args/cwd/env. */

@@ -17,6 +17,7 @@ import { DisplayState } from '../queue/displayTypes';
 import { QueueModelInput, RepoState } from '../queue/queueInputs';
 import { buildDisplayState } from '../queue/queueModel';
 import { AgentSupervisor } from '../supervisor/agentSupervisor';
+import { resolveAgentCwd } from '../supervisor/launchTemplate';
 import { nodeSpawner } from './nodeSpawner';
 import { ForgeConnection, connectRepo } from './forgeSetup';
 import { approveAgents, isApproved } from './launchApproval';
@@ -208,9 +209,7 @@ export class StatusPipeController implements vscode.Disposable {
 		const agents = repo.state?.launch?.agents ?? [];
 		const root = repo.context.repoRoot;
 		const install = (list: LaunchAgent[]): LaunchAgent[] => {
-			// Worker templates keep their raw cwd (%worktree%) — the supervisor
-			// resolves it per dispatched item; only scheduled agents resolve now.
-			const resolved = list.map((a) => ({ ...a, cwd: a.mode === 'worker' ? a.cwd : path.resolve(root, a.cwd) }));
+			const resolved = list.map((a) => ({ ...a, cwd: resolveAgentCwd(root, a) }));
 			this.supervisor.setAgents(root, resolved);
 			return resolved;
 		};

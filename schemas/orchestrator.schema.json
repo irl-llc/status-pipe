@@ -56,9 +56,15 @@
 								"required": ["key", "kind", "prompt", "worktree"],
 								"additionalProperties": true,
 								"properties": {
-									"key": { "type": "string", "description": "Ticket key / epic slug — the dispatch identity (one live worker per key)" },
+									"key": {
+										"type": "string",
+										"description": "Dispatch identity — the ticket key, or for an epic its tracking-ticket key (one live worker per key)"
+									},
 									"kind": { "enum": ["ticket", "epic"] },
-									"prompt": { "type": "string", "description": "Fully-formed claude -p argument (e.g. /status-pipe:work-ticket 19), ack note already appended" },
+									"prompt": {
+										"type": "string",
+										"description": "Fully-formed claude -p argument (e.g. /status-pipe:work-ticket 19), ack note already appended"
+									},
 									"worktree": { "type": "string", "description": "Worker cwd — the per-item git worktree path" }
 								}
 							}
@@ -66,7 +72,7 @@
 					}
 				}
 			],
-			"description": "Planner→executor channel: workers to spawn this pass. The supervisor substitutes prompt/worktree into the mode:'worker' launch template. Cleared (null/omitted) on a pass that dispatches nothing."
+			"description": "Planner→executor channel: workers to spawn this pass. The supervisor substitutes prompt/worktree into the worker launch template (the entry with reserved id `worker`). Cleared (null/omitted) on a pass that dispatches nothing."
 		},
 		"note": { "type": ["string", "null"] }
 	}

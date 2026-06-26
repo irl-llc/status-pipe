@@ -80,7 +80,7 @@ export class AgentRunner {
 			repoRoot: this.repoRoot,
 			agentId: this.agent.id,
 			title: this.agent.title,
-			mode: this.agent.mode,
+			lifetime: this.agent.lifetime,
 			state: this.displayState(),
 			nextTickAt: this.nextTickAt,
 			runningSince: this.runningSince,
@@ -136,7 +136,7 @@ export class AgentRunner {
 	 * onTimerFired, whose parking gate keeps it suspended until a wake.
 	 */
 	parkDaemon(): void {
-		if (this.agent.mode !== 'daemon') return;
+		if (this.agent.lifetime !== 'daemon') return;
 		if (this.state !== 'running' && this.state !== 'launching') return;
 		this.clearTimers();
 		this.pendingWake = false;
@@ -165,7 +165,7 @@ export class AgentRunner {
 
 	/** Daemon wedge check: no orchestrator progress for 2× interval ⇒ restart. */
 	checkDaemonWedged(lastPassFinishedAt: number | null): void {
-		if (this.agent.mode !== 'daemon' || this.state !== 'running') return;
+		if (this.agent.lifetime !== 'daemon' || this.state !== 'running') return;
 		const started = this.runningSince ?? this.deps.now();
 		const reference = Math.max(lastPassFinishedAt ?? 0, started);
 		if (this.deps.now() - reference > 2 * this.agent.intervalMinutes * 60_000) {
@@ -233,10 +233,10 @@ export class AgentRunner {
 	}
 
 	private armTimeout(): void {
-		if (this.agent.mode !== 'tick') return;
+		if (this.agent.lifetime !== 'scheduled') return;
 		this.cancelTimeout = this.deps.schedule(() => {
 			this.timedOut = true;
-			this.detail = `tick exceeded ${this.agent.timeoutMinutes}m — killed`;
+			this.detail = `pass exceeded ${this.agent.timeoutMinutes}m — killed`;
 			this.deps.log(`[supervisor] ${this.detail}`);
 			this.handle?.kill();
 		}, this.agent.timeoutMinutes * 60_000);
@@ -267,10 +267,10 @@ export class AgentRunner {
 	}
 
 	private routeExit(code: number | null, uptimeMs: number): void {
-		const cleanTick = this.agent.mode === 'tick' && code === 0 && !this.timedOut;
+		const cleanTick = this.agent.lifetime === 'scheduled' && code === 0 && !this.timedOut;
 		// A daemon that ran a while before dying restarts cleanly; one that
 		// dies within a minute is failing and takes the backoff path.
-		const healthyDaemon = this.agent.mode === 'daemon' && uptimeMs >= DAEMON_HEALTHY_UPTIME_MS && !this.timedOut;
+		const healthyDaemon = this.agent.lifetime === 'daemon' && uptimeMs >= DAEMON_HEALTHY_UPTIME_MS && !this.timedOut;
 		if (cleanTick || healthyDaemon) {
 			this.consecutiveFailures = 0;
 			this.detail = null;
@@ -280,7 +280,7 @@ export class AgentRunner {
 				return;
 			}
 			// Interval measured from exit — no overlap, ever.
-			this.scheduleNext(this.agent.mode === 'tick' ? this.agent.intervalMinutes * 60_000 : 1_000);
+			this.scheduleNext(this.agent.lifetime === 'scheduled' ? this.agent.intervalMinutes * 60_000 : 1_000);
 			return;
 		}
 		this.recordFailure(code);

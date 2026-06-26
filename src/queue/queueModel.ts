@@ -5,7 +5,7 @@
  */
 
 import { emptyActivity } from '../output/claudeStream';
-import { LaunchAgent, TicketFile } from '../protocol/types';
+import { LaunchAgent, TicketFile, WORKER_ID } from '../protocol/types';
 import { AckContext, deriveAckControl, hasFreshPendingAck, hasStaleAck, isAcked } from './ackState';
 import {
 	AgentDisplay,
@@ -353,7 +353,7 @@ function repoLaunchers(repo: RepoState, allLive: AgentProcessState[]): AgentDisp
 	const live = allLive.filter((a) => a.repoRoot === repo.repoRoot);
 	// Worker entries are templates, not runnable rows — the supervisor
 	// instantiates them per dispatch item (design/09); they never get a strip row.
-	const declared = (repo.launch?.agents ?? []).filter((d) => d.mode !== 'worker');
+	const declared = (repo.launch?.agents ?? []).filter((d) => d.id !== WORKER_ID);
 	const declaredIds = new Set(declared.map((d) => d.id));
 	const fromDeclared = declared.map((d) => launcherDisplay(repo, d, live.find((a) => a.agentId === d.id) ?? null));
 	const orphans = live.filter((a) => !declaredIds.has(a.agentId)).map((a) => orphanLauncher(repo, a));
@@ -389,8 +389,8 @@ function launcherDisplay(repo: RepoState, declared: LaunchAgent, live: AgentProc
 		repoName: repo.name,
 		agentId: declared.id,
 		title: declared.title,
-		mode: declared.mode,
-		intervalMinutes: declared.mode === 'tick' ? declared.intervalMinutes : null,
+		lifetime: declared.lifetime,
+		intervalMinutes: declared.lifetime === 'scheduled' ? declared.intervalMinutes : null,
 		...runtimeFields(live),
 	};
 }
@@ -401,7 +401,7 @@ function orphanLauncher(repo: RepoState, live: AgentProcessState): AgentDisplay 
 		repoName: repo.name,
 		agentId: live.agentId,
 		title: live.title,
-		mode: live.mode,
+		lifetime: live.lifetime,
 		intervalMinutes: null,
 		...runtimeFields(live),
 	};
