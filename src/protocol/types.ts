@@ -9,6 +9,7 @@
 export type Phase =
 	| 'planning'
 	| 'implementation'
+	| 'hardening'
 	| 'review'
 	| 'fixing'
 	| 'merging'

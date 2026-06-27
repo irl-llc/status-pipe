@@ -331,6 +331,11 @@ describe('queue/queueModel buildDisplayState', () => {
 		it('defaults a ticket with no signals to WAITING', () => {
 			assertLane(soloCard(makeTicket()), 'waiting', null);
 		});
+
+		it('keeps a hardening ticket with a fresh worker in WAITING (active, nothing needs you)', () => {
+			const ticket = makeTicket({ phase: 'hardening', worker: runningWorker(minutesAgo(2)) });
+			assertLane(soloCard(ticket), 'waiting', null);
+		});
 	});
 
 	describe('ack suppression', () => {

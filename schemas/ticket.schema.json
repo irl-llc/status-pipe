@@ -25,6 +25,7 @@
 			"enum": [
 				"planning",
 				"implementation",
+				"hardening",
 				"review",
 				"fixing",
 				"merging",
@@ -110,6 +111,83 @@
 		"notes": {
 			"type": ["string", "null"],
 			"description": "Free-form scratchpad: the worker's mental model of the code/task worth carrying across passes but not fitting plan/deadEnds. Agent-owned; not rendered by the extension."
+		},
+		"reviewLoop": {
+			"oneOf": [
+				{ "type": "null" },
+				{
+					"type": "object",
+					"description": "State of the worker's adversarial review loop (the 'hardening' phase). One loop per ticket: each wave runs a critic (find) then a verifier/skeptic (refute), and only confirmed medium+ defects block. Converges after `cleanWavesRequired` consecutive clean waves; escalates to the operator at `capWaves`. Agent-owned working memory carried across passes for resumability; surfaced in the raw-JSON peek, not rendered directly.",
+					"required": ["status", "waves"],
+					"additionalProperties": true,
+					"properties": {
+						"status": {
+							"enum": ["running", "converged", "escalated"],
+							"description": "running = loop in progress; converged = two clean waves, cleared to submit; escalated = hit capWaves with unresolved medium+ defects, handed to the operator."
+						},
+						"consecutiveCleanWaves": {
+							"type": "integer",
+							"minimum": 0,
+							"description": "Count of consecutive most-recent waves with zero confirmed medium+ defects. Resets to 0 whenever a wave confirms a medium+ defect. Absent = 0."
+						},
+						"cleanWavesRequired": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Consecutive clean waves needed to converge (config.review.cleanWavesRequired, default 2)."
+						},
+						"capWaves": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Max waves before the loop escalates without converging (config.review.capWaves, default 6)."
+						},
+						"waves": {
+							"type": "array",
+							"description": "Append-only log of review waves, oldest first.",
+							"items": {
+								"type": "object",
+								"required": ["at", "mediumPlus"],
+								"additionalProperties": true,
+								"properties": {
+									"at": { "type": "string", "format": "date-time" },
+									"runId": { "type": ["string", "null"] },
+									"mediumPlus": {
+										"type": "integer",
+										"minimum": 0,
+										"description": "Count of CONFIRMED high+medium defects this wave (the blocking count). 0 = a clean wave."
+									},
+									"clean": {
+										"type": ["boolean", "null"],
+										"description": "True when mediumPlus == 0. Convenience mirror of the blocking count."
+									},
+									"defects": {
+										"type": "array",
+										"items": {
+											"type": "object",
+											"required": ["severity", "summary"],
+											"additionalProperties": true,
+											"properties": {
+												"severity": { "enum": ["high", "medium", "low"] },
+												"file": { "type": ["string", "null"] },
+												"line": { "type": ["number", "null"] },
+												"branch": {
+													"type": ["string", "null"],
+													"description": "Branch in the stack that owns the code; where the fix is committed."
+												},
+												"summary": { "type": "string" },
+												"verdict": {
+													"enum": ["confirmed", "refuted"],
+													"description": "The verifier/skeptic's result. Only 'confirmed' defects count toward mediumPlus and get fixed."
+												},
+												"fixed": { "type": ["boolean", "null"] }
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			]
 		},
 		"subTickets": {
 			"type": "array",

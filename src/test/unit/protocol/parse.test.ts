@@ -160,6 +160,18 @@ describe('protocol/parse', () => {
 			]);
 		});
 
+		it('keeps the hardening phase (a known phase, not coerced to planning)', () => {
+			// reviewLoop is agent-owned working memory the parser ignores (like plan/deadEnds);
+			// it survives only in the raw text the unknown-field peek renders, not the typed value.
+			const raw = JSON.stringify({
+				schemaVersion: 1,
+				phase: 'hardening',
+				reviewLoop: { status: 'running', waves: [] },
+			});
+			const value = ok(parseTicketFile(raw, '853'));
+			assert.strictEqual(value.phase, 'hardening');
+		});
+
 		it('nulls waitingOn when its kind is not a known waiting kind', () => {
 			const raw = JSON.stringify({
 				schemaVersion: 1,
