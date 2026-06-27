@@ -70,6 +70,36 @@ have missed one between ticks. Decide the real current phase from evidence,
 not from the cached file; correct the file if they disagree (history note:
 what was reconciled).
 
+**If the work has already landed, close the ticket.** The terminal check is
+part of reconciling the forge: if this ticket's PR(s) are merged (or the issue
+is closed as completed), the work is *done* — write `phase: "merged"`,
+`health: "done"`, a one-line `history[]` close note, post a closing lifecycle
+comment if the forge doesn't already carry one, and **wrap** (skip
+plan→gate). If the operator abandoned it (issue closed not-planned, or an
+explicit drop instruction), close it `phase: "abandoned"`, `health: "done"`
+with the reason. `health: "done"` moves the card to QUIET *regardless of
+`phase`*, so only ever set it together with a terminal `phase` — never at
+`awaiting-merge`, where the operator still has to merge.
+
+**A close means the forge issue is closed, and the worktree goes away.** Make
+sure the issue is actually closed (a merged PR linked with `Closes #<key>`
+auto-closes it; if it didn't, close it) so the work leaves the open queue — the
+planner treats the issue's open/closed state as the truth. Then — only *after*
+the wrap phase has written the final ticket file (this close routes through
+`wrap`, Phase 7; the worktree removal is the very last step, since nothing may
+write the ticket file once its directory is gone) — remove your own worktree so
+a merged checkout never lingers on the trunk, anchoring at the primary checkout
+because your cwd is about to vanish:
+
+```bash
+git -C "$(git rev-parse --git-common-dir)/.." worktree remove --force "$(git rev-parse --show-toplevel)"
+```
+
+This self-remove is the opportunistic "belt"; if it fails (or you have work you
+must not discard), just end the pass — the planner reclaims the worktree on a
+later tick once the issue is closed. Closing the worktree is *only* for a
+terminal close, never at `awaiting-merge`.
+
 **Trust your working memory (`plan`/`notes`/`deadEnds`), don't re-derive it.**
 The "evidence over cache" rule is about `phase` — it does **not** mean discard
 the carry-over from the last pass. Read `plan`/`notes`/`deadEnds` as your
@@ -142,7 +172,8 @@ improvise — record a `deadEnds[]` entry, set `blockers[]`/`health="blocked"`,
 post the specific ask, and end. Otherwise headline it and end.
 If CI is green and review comments are addressed: `phase: "awaiting-merge"`,
 `waitingOn = {kind: "merge", ref: <PR URL>, pr: N, since: now}`,
-`health: "waiting"` — the operator merges, never you.
+`health: "waiting"` — the operator merges, never you. This is **not** terminal:
+once the PR merges, the next pass's orient closes the ticket.
 
 ### 7. wrap
 

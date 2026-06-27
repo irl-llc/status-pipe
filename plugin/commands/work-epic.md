@@ -57,7 +57,11 @@ unchecked item in the tracking ticket's tranche checklist):
   ticket file, and the **epic spec** (re-read it — the operator may have
   edited scope). Consume inbox acks for this ticket (match/supersede →
   history → delete). The epic-level `phase` is the frontier tranche's
-  lifecycle position. **Trust your working memory** (`plan`/`notes`/
+  lifecycle position; if no unmerged tranche remains — **or** the operator
+  closed/abandoned the tracking issue on the forge directly (closed as
+  completed ⇒ `merged`; closed not-planned or an explicit drop ⇒ `abandoned`),
+  the same terminal check `work-ticket`'s orient runs — the epic is **done**:
+  close it per Epic extras and wrap. **Trust your working memory** (`plan`/`notes`/
   `deadEnds`, protocol skill §4): resume the existing tranche plan instead of
   re-deriving it, and never re-attempt a recorded dead-end unless its
   `doNotRetryWithout` condition is now met — reconcile `phase` from evidence,
@@ -94,5 +98,20 @@ unchecked item in the tracking ticket's tranche checklist):
   work item — this epic stays one card, one state file, one worker.
 - `waitingOn.ref` may deep-link into a sub-ticket comment when that is where
   the open question lives.
-- A fully merged checklist ⇒ `phase: "merged"`, `health: "done"`, final
-  lifecycle comment on the tracking ticket, wrap.
+- A fully merged checklist ⇒ close the epic: `phase: "merged"`,
+  `health: "done"`, final lifecycle comment on the tracking ticket, wrap. If
+  the epic is abandoned (operator drops it), close it `phase: "abandoned"`,
+  `health: "done"` with the reason. `health: "done"` moves the card to QUIET
+  regardless of `phase`, so only ever set it with a terminal `phase` — never
+  while a tranche is still `awaiting-merge`.
+- On a terminal close, make sure the **tracking issue is closed** (so the epic
+  leaves the open queue — the planner treats the issue state as the truth), then
+  as the **final action of the pass** remove your worktree so a finished epic
+  checkout never lingers on the trunk — anchor at the primary checkout, since
+  your cwd is about to vanish:
+  ```bash
+  git -C "$(git rev-parse --git-common-dir)/.." worktree remove --force "$(git rev-parse --show-toplevel)"
+  ```
+  The self-remove is the opportunistic "belt"; if it fails, just end the pass —
+  the planner reclaims the worktree once the tracking issue is closed. Never
+  remove the worktree while a tranche is still `awaiting-merge`.
