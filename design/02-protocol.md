@@ -184,6 +184,39 @@ git-spice extension.
   work — full semantics in
   [09-launch-and-supervision.md](09-launch-and-supervision.md).
 
+## <a name="lifecycle"></a>Ticket lifecycle: the forge issue is the truth
+
+The **forge issue's open/closed state is the source of truth** for whether a
+ticket is live; the ticket file's `phase` (terminal at `merged`/`abandoned`) is
+a cache the planner reconciles against it every pass. This makes completion and
+re-opening work without a worker running:
+
+- **Close.** When a ticket's issue has closed (a merged PR's `Closes #<key>`, or
+  an operator close) it drops out of the open-labeled inventory. The planner
+  looks up such drifted tickets and writes the terminal state — `merged`, or
+  `abandoned` when the issue was closed as not-planned — so completed work goes
+  QUIET instead of lingering at `awaiting-merge`. The worker also closes on a
+  merge it observes (the fast path), but after "merge then walk away" no worker
+  runs, so the planner is the guarantee. A forge-lookup failure closes nothing
+  (a hiccup must never abandon live work).
+- **Re-open.** A terminal ticket whose issue the forge reports **reopened** is
+  revived to `planning` and re-dispatched, resuming from its preserved
+  `plan`/`deadEnds`/`history` rather than starting over. The reopened check (not
+  merely "terminal but still labeled") is what stops a merged ticket whose PR
+  never auto-closed its issue from flip-flopping closed↔open every pass.
+- **Operator remove.** A settled (QUIET) ticket card carries a **Remove** action
+  that deletes the ticket file — the *second* write the extension makes to a
+  protocol dir (the ack inbox is the first), and only ever for a terminal
+  ticket. Nothing durable is lost: the issue stays the record, and re-opening it
+  later re-creates the ticket fresh (no file ⇒ the planner mints one on
+  dispatch). A kept file instead resumes its memory.
+- **Worktrees are a disposable cache.** Created per dispatch under
+  `.claude/worktrees/<slug>` and reclaimed when they back no live work — the
+  worker self-removes when a ticket reaches a terminal phase (belt), and the planner GCs any that
+  remain (suspenders), so a finished checkout never lingers on the trunk. Code
+  lives on branches/PRs and memory in the ticket file, so removal is free and a
+  re-opened ticket simply re-provisions its worktree (reattaching the branch).
+
 ## <a name="feedback-signal"></a>The ack inbox (operator-owned)
 
 When the worker asks for the operator (`waitingOn.kind ∈ {owner, review,
