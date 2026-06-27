@@ -1,7 +1,6 @@
 {
 	"name": "status-pipe",
 	"description": "Baseline, repo-agnostic agent workflow emitting the status-pipe protocol (.status-pipe/): orchestration ticks, per-ticket/epic workers, ack-inbox consumption, and the trust-gated comment gateway. Reference writer for the status-pipe VS Code extension.",
-	"version": "0.1.0",
 	"author": {
 		"name": "IRL AI LLC"
 	},

@@ -1,0 +1,2 @@
+kind: Changed
+body: 'The status-pipe plugin no longer pins a static version in plugin.json. Claude Code now keys updates off the git commit SHA, so /plugin update picks up command and skill changes on every commit instead of silently skipping them.'
