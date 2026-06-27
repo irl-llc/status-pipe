@@ -7,7 +7,7 @@
 import { expect, test } from '@playwright/test';
 
 import { buildFixtureWorkspace } from '../fixtures/protocolFixtures';
-import { QUIET_TOASTS, degradedRepo, lanesRepo } from './fixtures/scenarios';
+import { QUIET_TOASTS, degradedRepo, lanesRepo, overflowRepo } from './fixtures/scenarios';
 import { launchVSCode, type VSCodeInstance } from './fixtures/vscode';
 import { openQueueEditor, openQueueView, setSidebarWidth } from './fixtures/webview';
 
@@ -72,6 +72,28 @@ test.describe('queue lanes', () => {
 		await expect(frame.locator('.lane-header', { hasText: 'NEEDS YOU' })).toBeVisible();
 		await expect(frame.locator('.card').first()).toBeVisible();
 		await expect(vscode.workbench).toHaveScreenshot('lanes-tray.png', { fullPage: true });
+	});
+
+	test('long unbreakable words wrap inside the card, never scroll the pane (#19)', async () => {
+		const workspace = buildFixtureWorkspace([overflowRepo()], QUIET_TOASTS);
+		vscode = await launchVSCode(workspace);
+		await setSidebarWidth(vscode.workbench, 320);
+		const frame = await openQueueView(vscode.workbench);
+		const card = frame.locator('.card', { hasText: 'Overflowing card' });
+		await expect(card).toBeVisible();
+		// The bug: a long unbreakable token widened the card past the pane,
+		// so the document gained a horizontal scrollbar. With wrapping in
+		// place the content width must stay within the viewport width.
+		const overflow = await frame.evaluate(() => {
+			const el = document.scrollingElement ?? document.documentElement;
+			return el.scrollWidth - el.clientWidth;
+		});
+		expect(overflow).toBeLessThanOrEqual(1);
+
+		// Visual baseline: the headline, blocker, and waiting detail all carry a
+		// 120-char unbreakable token; the snapshot proves they wrap inside the
+		// narrow (320px) pane instead of overflowing it.
+		await expect(vscode.workbench).toHaveScreenshot('lanes-wrap.png', { fullPage: true });
 	});
 
 	test('unknown schema renders a degraded card, never hidden', async () => {

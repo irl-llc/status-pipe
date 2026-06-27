@@ -225,6 +225,42 @@ export function degradedRepo(): FixtureRepoSpec {
 }
 
 /**
+ * A blocked ticket whose headline, blocker, and waiting detail each carry a
+ * 120-char unbreakable token (issue #19). Drives the wrap regression: the
+ * card must wrap these inside its width, never widen the pane into a
+ * horizontal scroll.
+ */
+export function overflowRepo(): FixtureRepoSpec {
+	const longToken = 'x'.repeat(120);
+	return {
+		name: 'fleet-api',
+		remoteUrl: 'https://github.com/acme/fleet-api.git',
+		orchestrator: { schemaVersion: 1, repo: 'acme/fleet-api', passCount: 1, lastPassFinishedAt: minutesAgo(5) },
+		tickets: [
+			{
+				key: '301',
+				body: ticketBody({
+					ticket: '301',
+					title: 'Overflowing card',
+					health: 'blocked',
+					phase: 'blocked',
+					headline: `Stuck on https://example.com/a/very/long/unbreakable/path/${longToken}`,
+					blockers: [`Missing secret ${longToken}_REQUIRED`],
+					waitingOn: {
+						kind: 'owner',
+						ref: `https://example.com/${longToken}`,
+						pr: null,
+						since: minutesAgo(30),
+						detail: `decision-${longToken}`,
+					},
+					updatedAt: minutesAgo(30),
+				}),
+			},
+		],
+	};
+}
+
+/**
  * A repo whose launch.json declares two configs (one tick, one daemon).
  * Neither is approved in the test, so both render as declared-but-stopped
  * rows with Run buttons — the launch-config strip's default state.

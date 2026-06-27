@@ -54,7 +54,7 @@ export function TicketCard({ card, state, selected, onSelect }: TicketCardProps)
 			{card.blockers.map((blocker, i) => (
 				<div key={i} className="blocker-line">
 					<span className="codicon codicon-circle-slash" />
-					{blocker}
+					<span className="blocker-text">{blocker}</span>
 				</div>
 			))}
 			<PrRows card={card} />
