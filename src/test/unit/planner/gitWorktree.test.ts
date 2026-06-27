@@ -135,4 +135,68 @@ describe('planner/gitWorktree', () => {
 		// A direct child with dots is fine — git allows it, so we must too.
 		assert.ok(await dirExists(await git_.ensureWorktree('feature.auth')));
 	});
+
+	describe('removeWorktree', () => {
+		it('removes the worktree but leaves the branch, so ensureWorktree reattaches it (the re-open round-trip)', async () => {
+			const git_ = createGitPort(repo);
+			const wt = await git_.ensureWorktree('ticket-19');
+			await fs.writeFile(path.join(wt, 'scratch.txt'), 'wip', 'utf8'); // uncommitted scratch — --force handles it
+
+			await git_.removeWorktree('ticket-19');
+			assert.equal(await dirExists(wt), false);
+			assert.doesNotMatch(await git(repo, 'worktree', 'list'), /ticket-19/);
+			assert.match(await git(repo, 'branch', '--list', 'ticket-19'), /ticket-19/); // branch survives
+
+			const again = await git_.ensureWorktree('ticket-19');
+			assert.equal(again, wt);
+			assert.ok(await dirExists(wt)); // reattached to the surviving branch
+		});
+
+		it('is a no-op when the worktree is already gone (idempotent)', async () => {
+			const git_ = createGitPort(repo);
+			await git_.removeWorktree('never-made'); // must not throw
+			const wt = await git_.ensureWorktree('ticket-19');
+			await git_.removeWorktree('ticket-19');
+			await git_.removeWorktree('ticket-19'); // second remove is still a clean no-op
+			assert.equal(await dirExists(wt), false);
+		});
+
+		it('cleans up a bare stray dir (deleted by hand, registration pruned) without a git fatal', async () => {
+			const git_ = createGitPort(repo);
+			const wt = await git_.ensureWorktree('ticket-19');
+			await fs.rm(path.join(wt, '.git'), { force: true }); // break the gitlink → looks like a stray dir
+			await git_.removeWorktree('ticket-19');
+			assert.equal(await dirExists(wt), false);
+		});
+
+		it('rejects a slug that would escape the worktrees directory', async () => {
+			const git_ = createGitPort(repo);
+			await assert.rejects(git_.removeWorktree('../../evil'), /unsafe worktree slug/);
+		});
+	});
+
+	describe('listWorktrees', () => {
+		it('lists only the managed worktrees under .claude/worktrees (not the primary checkout)', async () => {
+			const git_ = createGitPort(repo);
+			await git_.ensureWorktree('ticket-19');
+			await git_.ensureWorktree('epic-search');
+			const listed = await git_.listWorktrees();
+			assert.deepEqual(listed.map((w) => w.slug).sort(), ['epic-search', 'ticket-19']);
+			const ticket = listed.find((w) => w.slug === 'ticket-19');
+			assert.equal(ticket?.branch, 'ticket-19'); // refs/heads/ prefix stripped
+			// git reports the realpath (/private/var on macOS) — assert the suffix, not the prefix.
+			assert.ok(ticket?.path.endsWith(path.join('.claude', 'worktrees', 'ticket-19')));
+		});
+
+		it('is empty before any worktree is provisioned', async () => {
+			assert.deepEqual(await createGitPort(repo).listWorktrees(), []);
+		});
+
+		it('drops a worktree from the listing once it is removed', async () => {
+			const git_ = createGitPort(repo);
+			await git_.ensureWorktree('ticket-19');
+			await git_.removeWorktree('ticket-19');
+			assert.deepEqual(await git_.listWorktrees(), []);
+		});
+	});
 });

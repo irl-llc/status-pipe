@@ -11,12 +11,16 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { promisify } from 'util';
 
-import { GitPort } from './ports';
+import { GitPort, WorktreeInfo } from './ports';
 
 const run = promisify(execFile);
 
 export function createGitPort(repoRoot: string): GitPort {
-	return { ensureWorktree: (slug) => ensureWorktree(repoRoot, slug) };
+	return {
+		ensureWorktree: (slug) => ensureWorktree(repoRoot, slug),
+		listWorktrees: () => listWorktrees(repoRoot),
+		removeWorktree: (slug) => removeWorktree(repoRoot, slug),
+	};
 }
 
 async function ensureWorktree(repoRoot: string, slug: string): Promise<string> {
@@ -49,6 +53,69 @@ async function ensureWorktree(repoRoot: string, slug: string): Promise<string> {
 		await git(repoRoot, ['worktree', 'add', '-b', slug, worktree, 'HEAD']);
 	}
 	return worktree;
+}
+
+/**
+ * Remove `slug`'s worktree, leaving the branch for reattachment. Prune first so a
+ * hand-deleted dir's stale registration can't fail the remove; a registered
+ * worktree (`.git` gitlink) goes through `worktree remove --force` (it may carry a
+ * crashed worker's scratch — the durable work is on the branch, not here), a bare
+ * stray dir is just unlinked, and a missing path is a clean no-op.
+ */
+async function removeWorktree(repoRoot: string, slug: string): Promise<void> {
+	const worktreesDir = path.join(repoRoot, '.claude', 'worktrees');
+	const worktree = path.join(worktreesDir, slug);
+	if (path.dirname(worktree) !== worktreesDir) {
+		throw new Error(`unsafe worktree slug ${JSON.stringify(slug)}`);
+	}
+	await git(repoRoot, ['worktree', 'prune']);
+	if (await exists(path.join(worktree, '.git'))) {
+		await git(repoRoot, ['worktree', 'remove', '--force', worktree]);
+	} else if (await exists(worktree)) {
+		await fs.rm(worktree, { recursive: true, force: true });
+	}
+}
+
+/** Linked worktrees that live under `<repoRoot>/.claude/worktrees/` (the GC sweep's universe). */
+async function listWorktrees(repoRoot: string): Promise<WorktreeInfo[]> {
+	const { stdout } = await git(repoRoot, ['worktree', 'list', '--porcelain']);
+	const worktreesDir = await canonical(path.join(repoRoot, '.claude', 'worktrees'));
+	const out: WorktreeInfo[] = [];
+	for (const block of stdout.split('\n\n')) {
+		const info = await managedWorktree(block, worktreesDir);
+		if (info) out.push(info);
+	}
+	return out;
+}
+
+/**
+ * One porcelain record → WorktreeInfo, kept only when its canonical parent dir is
+ * EXACTLY `worktreesDir`. Comparing resolved paths (not a raw `.claude/worktrees`
+ * substring) is symlink-agnostic — git may report `/private/var/…` where the planner
+ * holds `/var/…` — and won't mistake a repo that itself sits under some *other*
+ * `.claude/worktrees/` for a managed child (which the GC would then try to remove).
+ */
+async function managedWorktree(block: string, worktreesDir: string): Promise<WorktreeInfo | null> {
+	const parsed = parseWorktreeBlock(block);
+	if (!parsed) return null; // the primary checkout / foreign worktrees
+	if (path.dirname(await canonical(parsed.path)) !== worktreesDir) return null;
+	return { slug: path.basename(parsed.path), path: parsed.path, branch: parsed.branch };
+}
+
+/** One porcelain record → its worktree path and branch (null when the block has no worktree line). */
+function parseWorktreeBlock(block: string): { path: string; branch: string | null } | null {
+	const lines = block.split('\n');
+	const wtLine = lines.find((l) => l.startsWith('worktree '));
+	if (!wtLine) return null;
+	const wtPath = wtLine.slice('worktree '.length);
+	const branchLine = lines.find((l) => l.startsWith('branch '));
+	const branch = branchLine ? branchLine.slice('branch '.length).replace(/^refs\/heads\//, '') : null;
+	return { path: wtPath, branch };
+}
+
+/** Resolved real path, falling back to a lexical resolve when the path doesn't exist yet. */
+function canonical(p: string): Promise<string> {
+	return fs.realpath(p).catch(() => path.resolve(p));
 }
 
 /** Reattach an existing branch, refusing a slug already checked out elsewhere. */
