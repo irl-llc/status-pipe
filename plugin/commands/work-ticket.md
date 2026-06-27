@@ -1,5 +1,5 @@
 ---
-description: One status-pipe worker pass over a single ticket (ticket mode) — orient, plan, implement, self-review, submit PR, kick CI, wrap; writes .status-pipe/tickets/<key>.json per the protocol skill. Ends the pass whenever a human is needed; never merges or approves.
+description: One status-pipe worker pass over a single ticket (ticket mode) — orient, plan, implement, harden via an adversarial review loop, submit PR, kick CI, wrap; writes .status-pipe/tickets/<key>.json per the protocol skill. Ends the pass whenever a human is needed; never merges or approves.
 argument-hint: "<ticket-key> [operator ack note...]"
 ---
 
@@ -142,11 +142,20 @@ cross-referenced one if absent, and never build a self-generated design without
 operator approval. Keep going on this ticket unless it is genuinely blocked on
 that work.
 
-### 4. review (self-review)
+### 4. hardening (adversarial review loop)
 
-Review your own diff as a skeptical colleague: correctness, tests, scope
-creep, debug leftovers, repo conventions. Fix what you find. Only then
-proceed (history note: review done, what changed).
+Set `phase: "hardening"` and run the adversarial review loop (protocol skill
+§4a): each wave a **critic** subagent finds defects and an independent
+**verifier/skeptic** subagent refutes them; fix every confirmed medium+ defect
+**on the branch that owns the code** (restack the upstack for a git-spice stack);
+repeat. Record each wave in `reviewLoop` and heartbeat the progress into
+`headline` (e.g. "Adversarial review wave 3 — 2 medium defects being fixed").
+Proceed to submit only when the loop **converges** (two consecutive clean waves,
+per `config.review.cleanWavesRequired`). If it hits `config.review.capWaves`
+without converging, **escalate** (blocker + `waitingOn.kind="owner"` +
+`health="blocked"`, post the ask) and end the pass — do not submit with known
+blocking defects. `config.review.enabled: false` collapses this back to a single
+skeptical self-review pass before submit.
 
 ### 5. submit
 
@@ -169,7 +178,10 @@ but apply the **capability wall** (protocol skill §4): if this failure has
 already been attempted once, or the fix needs something this environment can't
 provide (an operator-only credential or privileged step), do not retry or
 improvise — record a `deadEnds[]` entry, set `blockers[]`/`health="blocked"`,
-post the specific ask, and end. Otherwise headline it and end.
+post the specific ask, and end. Otherwise headline it and end. **A fix that
+materially changes the diff re-enters hardening (Phase 4) before re-submit** —
+re-run the loop (a fresh `reviewLoop` per §4a) to convergence so post-fix code
+gets the same gate.
 If CI is green and review comments are addressed: `phase: "awaiting-merge"`,
 `waitingOn = {kind: "merge", ref: <PR URL>, pr: N, since: now}`,
 `health: "waiting"` — the operator merges, never you. This is **not** terminal:

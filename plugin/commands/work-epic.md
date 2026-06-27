@@ -1,5 +1,5 @@
 ---
-description: One status-pipe worker pass over an epic spec file (epic mode) — ensures the tracking ticket + header, then runs the orient/plan/implement/review/submit/gate/wrap phase machine over the epic's frontier tranche, writing .status-pipe/tickets/<tracking-key>.json. Ends the pass whenever a human is needed; never merges or approves.
+description: One status-pipe worker pass over an epic spec file (epic mode) — ensures the tracking ticket + header, then runs the orient/plan/implement/harden/submit/gate/wrap phase machine over the epic's frontier tranche, writing .status-pipe/tickets/<tracking-key>.json. Ends the pass whenever a human is needed; never merges or approves.
 argument-hint: "<path-to-epic.md> [operator ack note...]"
 ---
 
@@ -47,7 +47,7 @@ file is `$PROTO/tickets/<tracking-key>.json`.
 
 ## The phase machine, epic-shaped
 
-Identical phases to `work-ticket` — orient → plan → implement → review →
+Identical phases to `work-ticket` — orient → plan → implement → harden →
 submit → gate → wrap — applied to the epic's **frontier tranche** (the next
 unchecked item in the tracking ticket's tranche checklist):
 
@@ -72,9 +72,12 @@ unchecked item in the tracking ticket's tranche checklist):
   design decision is operator-shaped, post the question on the **tracking
   ticket** (or the right sub-ticket), set `waitingOn = {kind: "owner",
   ref: <comment URL>, since: now}`, end the pass.
-- **implement / review / submit / gate**: as in `work-ticket`, on the
+- **implement / harden / submit / gate**: as in `work-ticket`, on the
   tranche's branch (`<branchPrefix><tranche>` — default prefix
-  `epic/<slug>/`), stacked via git-spice when available. Keep the tracking
+  `epic/<slug>/`), stacked via git-spice when available. **harden** runs the
+  adversarial review loop (protocol skill §4a) over the frontier tranche's
+  cumulative diff with `phase: "hardening"`, routing each fix to the branch in
+  the stack that owns the code. Keep the tracking
   ticket's checklist current: check off a tranche when its PR merges (one
   `post-comment` lifecycle one-liner, not a paragraph). Work outside the
   epic's scope is **orthogonal work** (protocol skill §4): search, file a
