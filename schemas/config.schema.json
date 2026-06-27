@@ -68,6 +68,35 @@
 			"default": 30,
 			"description": "Committed source of truth for the worker-heartbeat staleness threshold; the orchestrator echoes it into orchestrator.json"
 		},
+		"review": {
+			"type": "object",
+			"description": "Tuning for the worker's adversarial review loop (the 'hardening' phase). Absent = defaults below; the loop is on by default.",
+			"additionalProperties": true,
+			"properties": {
+				"enabled": {
+					"type": "boolean",
+					"default": true,
+					"description": "When false, the worker skips the hardening loop and goes straight from implement to submit (the old single self-review still applies)."
+				},
+				"blockSeverity": {
+					"enum": ["high", "medium"],
+					"default": "medium",
+					"description": "Lowest defect severity that blocks convergence. 'medium' blocks high+medium (default); 'high' loosens the gate to correctness/security only."
+				},
+				"cleanWavesRequired": {
+					"type": "integer",
+					"minimum": 1,
+					"default": 2,
+					"description": "Consecutive clean waves (no blocking defects) needed before the loop converges and the worker submits."
+				},
+				"capWaves": {
+					"type": "integer",
+					"minimum": 1,
+					"default": 30,
+					"description": "Maximum waves before the loop escalates to the operator without converging."
+				}
+			}
+		},
 		"trust": {
 			"type": "object",
 			"description": "Who may drive the agent through forge comments. The plugin refuses to tick a public repo without a declared mode; a private repo without this block defaults to single-maintainer with the authenticated forge user.",

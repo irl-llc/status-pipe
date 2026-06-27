@@ -29,6 +29,7 @@ import {
 const PHASES = new Set([
 	'planning',
 	'implementation',
+	'hardening',
 	'review',
 	'fixing',
 	'merging',
