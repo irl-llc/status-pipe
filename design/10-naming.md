@@ -31,7 +31,7 @@ One word per role; no role shares a word:
 | **fleet** | All agents across the workspace. *Fleet mode* = multi-repo supervision; the UI's agents summary row is the *fleet strip*. |
 | **supervisor** | Extension component owning orchestrator *processes*: launch, liveness, backoff, parking. Never touches protocol files except reading. |
 | **orchestrator** | The per-repo scheduling loop. Executes **ticks** (one idempotent pass: reconcile → consume inbox → dispatch workers → write state). Owns `orchestrator.json`. |
-| **worker** | The agent advancing one ticket (plan/implement/review/submit). Its liveness is the `worker` block in the ticket file. |
+| **worker** | The agent advancing one ticket (plan/implement/harden/submit). Its liveness is the `worker` block in the ticket file. |
 | **ticket** | A tracked work item — GitHub issue or Jira issue; the card unit; key is an opaque string (`"853"`, `"PROJ-123"`). |
 | **epic** | An in-repo spec file (`epics/<slug>.md`) that a ticket tracks. |
 | **ack** | An operator→orchestrator signal file in the inbox. |
@@ -98,6 +98,11 @@ Kept deliberately:
   prototypes already use it loosely and the looseness is useful.
 - `phase`, `health`, `headline`, `waitingOn`, `blockers`, `history`,
   `updatedAt` — unchanged semantics, unchanged names.
+- `hardening` — the pre-submit phase value for the worker's adversarial review
+  loop. Named for the *act* (hardening the diff), deliberately distinct from
+  `review`, which is reserved for "PR up, human reviewing". The loop's state
+  lives in the `reviewLoop` field (critic→verifier waves; agent working memory,
+  like `plan`/`deadEnds`).
 - Lane names **NEEDS YOU / WAITING ON WORLD / QUIET**; **epic**; **tranche**;
   **forge** (git-spice heritage — it is the right word).
 

@@ -71,7 +71,7 @@ extension interprets them:
 | `repo` | `owner/name` | Cross-checked against the forge repository inferred from the git remote; mismatch shows a warning on hover. |
 | `ticket` | string | Opaque ticket key; card identity is `(workspaceFolder, ticket)`. |
 | `title`, `slug`, `url` | string | Card header; `url` deep-links the tracking ticket (GitHub or Jira). |
-| `phase` | `planning \| implementation \| review \| fixing \| merging \| awaiting-merge \| merged \| blocked \| abandoned` | Phase as dim text. `merged`/`abandoned` move the card to QUIET. |
+| `phase` | `planning \| implementation \| hardening \| review \| fixing \| merging \| awaiting-merge \| merged \| blocked \| abandoned` | Phase as dim text. `hardening` = the worker's pre-submit adversarial review loop (§4a of the protocol skill); `review` = PR up, human reviewing. `merged`/`abandoned` move the card to QUIET. |
 | `health` | `ok \| waiting \| blocked \| error \| done` | Card accent color and lane bucket ([05-ui.md](05-ui.md)). |
 | `headline` | string | The agent's one-sentence "what just happened", verbatim; 2-line clamp, full on hover. |
 | `waitingOn` | null or `{kind, ref, pr, since, detail}` | `kind ∈ {build, review, comment, owner, merge}`. owner/review/merge/comment ⇒ NEEDS YOU; build ⇒ WAITING. `ref` should deep-link the exact comment/run. `since` renders as a live duration. |
@@ -80,6 +80,7 @@ extension interprets them:
 | `plan` | optional string | Agent working memory: the current plan, carried across passes (rewritten as it evolves). Not rendered today; surfaced in the raw-JSON peek. |
 | `deadEnds[]` | optional `{at, tried, failedBecause, doNotRetryWithout}` | Agent working memory: append-only log of approaches that failed, so a later pass does not repeat them. Not rendered today; raw-JSON peek only. |
 | `notes` | optional string | Agent working memory: free-form scratchpad carried across passes. Not rendered. |
+| `reviewLoop` | optional `{status, consecutiveCleanWaves, cleanWavesRequired, capWaves, waves[]}` | Agent working memory: state of the `hardening` adversarial review loop (critic→verifier per wave; converges on two clean waves, escalates at the cap). Carried across passes for resumability; surfaced in the raw-JSON peek, not rendered directly (the headline carries wave progress). |
 | `subTickets[]` | optional `{key, url, topic, status}` | Discussion channels carved out of an epic's tracking ticket ([07-claude-plugin.md](07-claude-plugin.md)); listed in the expanded card. Not work items — the epic stays one card. |
 | `agentCommentIds[]` | optional string[] | API ids of comments the agent itself posted (written by the plugin's posting wrapper); the trust gateway excludes them from operator-signal detection on shared accounts ([07-claude-plugin.md](07-claude-plugin.md)). Not rendered. |
 | `history[]` | `{at, phase, note, runId}` | Append-only log; the expanded card's timeline. `runId` is a deliberately generic run reference (CI run, workflow run). Ack consumption/supersession is recorded here. |

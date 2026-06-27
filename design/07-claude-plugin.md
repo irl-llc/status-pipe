@@ -49,6 +49,7 @@ Everything the plugin needs to know about *this repo's* conventions lives here
   "inventory": { "label": "agent-queue", "assignees": ["octocat", "octocat-bot"] },
   "tickets": { "source": "github-issues" },
   "staleWorkerMinutes": 30,
+  "review": { "enabled": true, "blockSeverity": "medium", "cleanWavesRequired": 2, "capWaves": 6 },
   "trust": {
     "mode": "single-maintainer",
     "operators": ["octocat"],
@@ -77,6 +78,11 @@ Everything the plugin needs to know about *this repo's* conventions lives here
 - `staleWorkerMinutes` — committed source of truth for the worker-heartbeat
   threshold; the orchestrator echoes it into `orchestrator.json` for the
   extension ([02-protocol.md](02-protocol.md)).
+- `review` (optional) — tunes the worker's pre-submit adversarial review loop
+  (the `hardening` phase, protocol skill §4a). On by default; `enabled: false`
+  reverts to a single self-review. `blockSeverity` (`medium` default) is the
+  lowest defect severity that blocks; `cleanWavesRequired` (2) and `capWaves` (6)
+  set convergence and the escalate-to-operator cap.
 - On Bitbucket + Jira repos, `trust.operators` spans two identity namespaces;
   use the split form `operators: { "bitbucket": ["{uuid}"], "jira":
   ["<accountId>"] }` — entries are matched per channel by the forge's own
