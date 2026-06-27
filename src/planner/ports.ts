@@ -98,10 +98,28 @@ export interface ProtocolWritePort {
 	deleteAck(path: string): Promise<void>;
 }
 
+/** A linked worktree under `.claude/worktrees/`, paired with the branch it checks out. */
+export interface WorktreeInfo {
+	/** Directory basename — `ticket-<key>` or an epic slug; the GC key. */
+	slug: string;
+	/** Absolute path to the worktree. */
+	path: string;
+	/** Checked-out branch name, or null when detached/broken. */
+	branch: string | null;
+}
+
 /** Git worktree management for work items. */
 export interface GitPort {
 	/** Ensure a worktree for `slug` exists; returns its absolute path (its cwd). */
 	ensureWorktree(slug: string): Promise<string>;
+	/** Linked worktrees under `.claude/worktrees/` — the GC sweep's input. */
+	listWorktrees(): Promise<WorktreeInfo[]>;
+	/**
+	 * Remove the worktree for `slug` if present. The branch is left intact, so a
+	 * later `ensureWorktree(slug)` reattaches it (the re-open round-trip).
+	 * Idempotent — a no-op when the worktree is already gone.
+	 */
+	removeWorktree(slug: string): Promise<void>;
 }
 
 /** Injected clock so passes are deterministic under test. */

@@ -13,6 +13,7 @@ import {
 	ProtocolWritePort,
 	StoredAck,
 	TicketState,
+	WorktreeInfo,
 } from '../../../planner/ports';
 import { PlannerConfig, PlannerInput } from '../../../planner/types';
 
@@ -157,12 +158,21 @@ export class FakePorts implements PlannerPorts {
 	};
 
 	failWorktreeSlug: string | null = null;
+	/** The GC sweep's input; tests set this to the worktrees "on disk" this pass. */
+	worktreeList: WorktreeInfo[] = [];
+	/** Slugs the planner asked to remove, in call order. */
+	removedWorktrees: string[] = [];
 
 	git = {
 		ensureWorktree: async (slug: string): Promise<string> => {
 			if (slug === this.failWorktreeSlug) throw new Error(`git worktree add failed for ${slug}`);
 			this.worktreeSlugs.push(slug);
 			return `/wt/${slug}`;
+		},
+		listWorktrees: async (): Promise<WorktreeInfo[]> => this.worktreeList,
+		removeWorktree: async (slug: string): Promise<void> => {
+			this.removedWorktrees.push(slug);
+			this.worktreeList = this.worktreeList.filter((w) => w.slug !== slug);
 		},
 	};
 }
