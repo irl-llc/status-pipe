@@ -160,17 +160,26 @@ skeptical self-review pass before submit.
 ### 5. submit
 
 Create or update the PR: `gh pr create` (or forge REST) with the ticket
-linked, `attribution.prBanner` near the top of the description, base per the
-stack (git-spice `repo sync`/`branch submit` where available, plain branch +
-PR otherwise). Record the PR in `prs[] = {number, url, head, base, draft,
+linked **by a closing keyword** (`Closes #<key>` / `Fixes #<key>`) so the merge
+auto-closes the issue — you never close it by hand, and orient's terminal close
+is the backstop if the keyword didn't take. Put `attribution.prBanner` near the
+top of the description, base per the stack (git-spice `repo sync`/`branch
+submit` where available, plain branch + PR otherwise). Record the PR in `prs[] = {number, url, head, base, draft,
 state, ci: "pending"}`. Write `phase: "review"`.
 
 ### 6. gate
 
 Kick CI if it doesn't start automatically; update `prs[].ci` from
-`gh pr checks` (or pipeline API). Answer review-bot comments (read via
-`fetch-comments --pr N`, reply via `post-comment`). **Never block waiting on
-CI**: if CI is running, set `waitingOn = {kind: "build", ref: <run URL>,
+`gh pr checks` (or pipeline API). **Answer review comments — including bot
+reviews — where they were made** (PR-response etiquette, protocol skill §7b):
+read via `fetch-comments --pr N` (it marks each inline review comment with its
+`file:line` and the exact reply command), reply **in-thread** with
+`post-comment --pr N --reply-to <review-comment-id>` — never as a new top-level
+issue comment. Process every review/bot comment, don't cherry-pick. Do **not**
+resolve or decline a review comment you haven't actually addressed: if you
+disagree with one, surface it to the operator (`waitingOn.kind="owner"`, the
+comment URL as `ref`) rather than dismissing it yourself. **Never block waiting
+on CI**: if CI is running, set `waitingOn = {kind: "build", ref: <run URL>,
 pr: N, since: now}`, `health: "ok"`, and end the pass — the next pass
 re-checks cheaply. If CI failed, that's the next pass's implement/fix work:
 `phase: "fixing"`, fix now if the pass has budget and the fix is tractable —

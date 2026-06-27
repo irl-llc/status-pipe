@@ -70,6 +70,7 @@ class FakeForgeApi {
 	requests: ApiRequest[] = [];
 	visibility: 'PUBLIC' | 'PRIVATE' = 'PRIVATE';
 	comments: Array<Record<string, unknown>> = [];
+	reviewComments: Array<Record<string, unknown>> = [];
 
 	constructor() {
 		this.server = http.createServer((req, res) => {
@@ -101,22 +102,32 @@ class FakeForgeApi {
 
 	private payloadFor(method: string, url: URL): unknown {
 		const p = url.pathname;
-		if (method === 'POST' && /\/(issues\/\d+|pullrequests\/\d+)\/comments$/.test(p)) {
+		if (method === 'POST') return this.postPayload(p);
+		if (/\/(issues|pulls)\/\d+\/comments$/.test(p)) {
+			const perPage = Number(url.searchParams.get('per_page') ?? 100);
+			const page = Number(url.searchParams.get('page') ?? 1);
+			const list = p.includes('/pulls/') ? this.reviewComments : this.comments;
+			return list.slice((page - 1) * perPage, page * perPage);
+		}
+		if (p === '/user') return { login: 'ed' };
+		if (/^\/repos\/[^/]+\/[^/]+$/.test(p)) return { private: this.visibility === 'PRIVATE' };
+		if (/^\/repositories\/[^/]+\/[^/]+$/.test(p)) return { is_private: this.visibility === 'PRIVATE' };
+		return { error: `unknown route ${p}` };
+	}
+
+	private postPayload(p: string): unknown {
+		// GitHub review-comment reply (the inline-reply path) — a distinct id.
+		if (/\/pulls\/\d+\/comments\/\d+\/replies$/.test(p)) {
+			return { id: 9920, html_url: 'https://github.com/acme/x/pull/7#discussion_r9920' };
+		}
+		if (/\/(issues\/\d+|pullrequests\/\d+)\/comments$/.test(p)) {
 			return {
 				id: 9912,
 				html_url: 'https://github.com/acme/x/issues/853#issuecomment-9912',
 				links: { html: { href: 'https://bitbucket.org/acme/x/pull-requests/7#comment-9912' } },
 			};
 		}
-		if (/\/(issues|pulls)\/\d+\/comments$/.test(p)) {
-			const perPage = Number(url.searchParams.get('per_page') ?? 100);
-			const page = Number(url.searchParams.get('page') ?? 1);
-			return p.includes('/pulls/') ? [] : this.comments.slice((page - 1) * perPage, page * perPage);
-		}
-		if (p === '/user') return { login: 'ed' };
-		if (/^\/repos\/[^/]+\/[^/]+$/.test(p)) return { private: this.visibility === 'PRIVATE' };
-		if (/^\/repositories\/[^/]+\/[^/]+$/.test(p)) return { is_private: this.visibility === 'PRIVATE' };
-		return { error: `unknown route ${p}` };
+		return { error: `unknown POST route ${p}` };
 	}
 }
 
@@ -242,6 +253,26 @@ function ghComment(id: number, login: string, body: string, association = 'NONE'
 	};
 }
 
+/** An inline PR review comment (pulls/{n}/comments shape): path/line + thread root. */
+function ghReviewComment(
+	id: number,
+	login: string,
+	body: string,
+	extra: { path?: string; line?: number; in_reply_to_id?: number } = {},
+): Record<string, unknown> {
+	return {
+		id,
+		user: { login },
+		author_association: 'NONE',
+		created_at: `2026-06-11T0${id % 10}:00:00Z`,
+		html_url: `https://github.com/acme/x/pull/7#discussion_r${id}`,
+		body,
+		path: extra.path ?? 'src/app.ts',
+		line: extra.line ?? 42,
+		...(extra.in_reply_to_id ? { in_reply_to_id: extra.in_reply_to_id } : {}),
+	};
+}
+
 describe('plugin/bin scripts', function () {
 	// Each test runs real git + several node child processes + an HTTP server.
 	this.timeout(20_000);
@@ -351,6 +382,27 @@ describe('plugin/bin scripts', function () {
 			const pages = api.requests.filter((r) => r.path.endsWith('/issues/853/comments'));
 			assert.equal(pages.length, 2, 'expected exactly two pages at per_page=100');
 		});
+
+		it('surfaces inline review comments with file:line and the in-thread reply command (--pr)', async () => {
+			api.comments = [ghComment(1, 'rando', 'top-level conversation comment')];
+			api.reviewComments = [ghReviewComment(55, 'reviewbot', 'this needs a null check', { path: 'src/x.ts', line: 7 })];
+			const res = await runScript(FETCH_COMMENTS, ['--repo-root', f.repo, '--pr', '7']);
+			assert.equal(res.status, 0, res.stderr);
+			// The review comment names where it is and exactly how to answer in-thread.
+			assert.match(res.stdout, /inline review on src\/x\.ts:7/);
+			assert.match(res.stdout, /reply IN-THREAD: post-comment --pr 7 --reply-to 55/);
+			// A plain conversation comment carries no reply hint.
+			const convoBlock = res.stdout.split('\n\n').find((b) => b.includes('top-level conversation comment')) ?? '';
+			assert.doesNotMatch(convoBlock, /reply IN-THREAD/);
+		});
+
+		it('points the reply target at the thread root (in_reply_to_id) for a follow-up review comment', async () => {
+			api.reviewComments = [ghReviewComment(60, 'reviewbot', 'follow-up in the same thread', { in_reply_to_id: 55 })];
+			const res = await runScript(FETCH_COMMENTS, ['--repo-root', f.repo, '--pr', '7']);
+			assert.equal(res.status, 0, res.stderr);
+			assert.match(res.stdout, /--reply-to 55\b/);
+			assert.doesNotMatch(res.stdout, /--reply-to 60\b/);
+		});
 	});
 
 	describe('auth chain (the git-spice credential model)', () => {
@@ -455,6 +507,53 @@ describe('plugin/bin scripts', function () {
 			assert.match((JSON.parse(post.body) as { body: string }).body, /\*\*CLAUDE COMMENT\*\*/);
 			const ticket = JSON.parse(fs.readFileSync(path.join(f.repo, '.status-pipe', 'tickets', '853.json'), 'utf8'));
 			assert.ok(ticket.agentCommentIds.includes('9912'));
+		});
+
+		it('--reply-to posts to the GitHub review-reply endpoint and ledgers the reply id', async () => {
+			const res = await runScript(POST_COMMENT, [
+				...['--repo-root', f.repo, '--ticket', '853', '--pr', '7', '--reply-to', '55'],
+				...['--body', 'Fixed in abc123 — added the null check.'],
+			]);
+			assert.equal(res.status, 0, res.stderr);
+			assert.match(res.stdout, /comment id: 9920/);
+
+			const post = api.requests.find((r) => r.method === 'POST');
+			assert.ok(post, 'expected a POST');
+			assert.equal(post.path, '/repos/acme/x/pulls/7/comments/55/replies');
+			assert.match((JSON.parse(post.body) as { body: string }).body, /\*\*CLAUDE COMMENT\*\*/);
+
+			const ticket = JSON.parse(fs.readFileSync(path.join(f.repo, '.status-pipe', 'tickets', '853.json'), 'utf8'));
+			assert.ok(ticket.agentCommentIds.includes('9920'), 'the reply id is ledgered like any agent post');
+		});
+
+		it('rejects --reply-to without --pr (issues and Jira have no inline review threads)', async () => {
+			const res = await runScript(POST_COMMENT, [
+				...['--repo-root', f.repo, '--ticket', '853', '--issue', '853', '--reply-to', '55'],
+				...['--body', 'misrouted reply'],
+			]);
+			assert.equal(res.status, 2);
+			assert.match(res.stderr, /--reply-to is only valid with --pr/);
+			assert.equal(api.requests.filter((r) => r.method === 'POST').length, 0, 'nothing may be posted');
+		});
+
+		it('Bitbucket --reply-to threads the inline reply under its parent', async () => {
+			const bb = makeFixture('https://bitbucket.org/acme/x.git');
+			try {
+				const res = await makeRunner(bb, base)(
+					POST_COMMENT,
+					[
+						...['--repo-root', bb.repo, '--ticket', '853', '--pr', '7', '--reply-to', '55'],
+						...['--body', 'addressed inline'],
+					],
+					{ fakeTools: true, env: { FAKE_GIT_CRED: 'username=eddy\npassword=app-pass\n', FAKE_GH_TOKEN: null } },
+				);
+				assert.equal(res.status, 0, res.stderr);
+				const post = api.requests.find((r) => r.method === 'POST');
+				assert.ok(post, 'expected a Bitbucket POST');
+				assert.deepEqual((JSON.parse(post.body) as { parent: { id: number } }).parent, { id: 55 });
+			} finally {
+				fs.rmSync(bb.root, { recursive: true, force: true });
+			}
 		});
 	});
 });
