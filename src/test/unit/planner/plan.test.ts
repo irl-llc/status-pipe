@@ -68,6 +68,9 @@ describe('planner/plan', () => {
 			assert.equal(stamped?.worker?.status, 'running');
 			assert.equal(stamped?.repo, 'acme/app');
 			assert.equal(stamped?.title, 'Ticket 5');
+			// A plain ticket keeps slug null — the GC reconstructs `ticket-5`, and a non-null
+			// slug is the UI's epic marker (only epics persist it; see the epics suite).
+			assert.equal(stamped?.slug, null);
 			assert.deepEqual(ports.worktreeSlugs, ['ticket-5']);
 		});
 
@@ -126,6 +129,16 @@ describe('planner/plan', () => {
 			const item = result.dispatch?.items[0];
 			assert.equal(item?.kind, 'epic');
 			assert.equal(item?.prompt, '/status-pipe:work-epic /epics/search.md');
+		});
+
+		it("persists the dispatch slug into the epic's ticket file so the GC reclaims by it, not ticket-<key>", async () => {
+			const ports = new FakePorts();
+			ports.epicSpecs = [{ slug: 'search', path: '/epics/search.md', title: 'Search', trackingTicket: null }];
+			await plan(makeInput(), ports);
+			// The worktree was created under the spec slug; the file must record that same
+			// slug (not null), or a later GC pass would guess `ticket-epic-1` and reclaim
+			// the live worktree. (Only epics persist slug — a plain ticket stays null.)
+			assert.equal(ports.tickets.get('epic-1')?.slug, 'search');
 		});
 
 		it('reuses an existing tracking ticket and dedupes it from labeled inventory', async () => {
@@ -433,6 +446,167 @@ describe('planner/plan', () => {
 			ports.labeled = [makeInventoryTicket({ key: 'done' }), makeInventoryTicket({ key: 'wait' })];
 			const result = await plan(makeInput(), ports);
 			assert.equal(result.dispatch, null);
+		});
+	});
+
+	describe('lifecycle reconcile — close', () => {
+		it('closes a ticket whose forge issue closed-as-completed (→ merged) and excludes it from dispatch', async () => {
+			const ports = new FakePorts();
+			// awaiting-merge + waiting, NOT labeled (the merge dropped it from the open inventory).
+			ports.tickets.set(
+				'5',
+				makeTicket({
+					ticket: '5',
+					phase: 'awaiting-merge',
+					health: 'waiting',
+					waitingOn: waiting('merge', minutesAgo(10)),
+				}),
+			);
+			ports.ticketStates.set('5', { state: 'closed', stateReason: 'completed' });
+			const result = await plan(makeInput(), ports);
+			assert.deepEqual(result.report.closedByReconcile, ['5']);
+			const t = ports.tickets.get('5');
+			assert.equal(t?.phase, 'merged');
+			assert.equal(t?.health, 'done');
+			assert.ok(t?.history.some((h) => /forge issue closed \(completed\); merged by reconcile/.test(h.note)));
+			assert.equal(result.dispatch, null); // terminal ⇒ never dispatched
+		});
+
+		it('closes a not-planned issue as abandoned', async () => {
+			const ports = new FakePorts();
+			ports.tickets.set('5', makeTicket({ ticket: '5', phase: 'implementation' }));
+			ports.ticketStates.set('5', { state: 'closed', stateReason: 'not_planned' });
+			const result = await plan(makeInput(), ports);
+			assert.deepEqual(result.report.closedByReconcile, ['5']);
+			assert.equal(ports.tickets.get('5')?.phase, 'abandoned');
+		});
+
+		it('does NOT close a ticket when the forge lookup fails (a hiccup must not abandon live work)', async () => {
+			const ports = new FakePorts();
+			ports.tickets.set('5', makeTicket({ ticket: '5', phase: 'implementation' }));
+			ports.ticketStates.set('5', { state: 'closed', stateReason: 'completed' });
+			ports.ticketStatesThrows = true;
+			const result = await plan(makeInput(), ports);
+			assert.deepEqual(result.report.closedByReconcile, []);
+			assert.equal(ports.tickets.get('5')?.phase, 'implementation'); // untouched
+		});
+
+		it('does NOT close a non-candidate ticket whose issue is still open (de-queued, not closed)', async () => {
+			const ports = new FakePorts();
+			ports.tickets.set('5', makeTicket({ ticket: '5', phase: 'implementation' }));
+			ports.ticketStates.set('5', { state: 'open', stateReason: null }); // label removed, issue still open
+			const result = await plan(makeInput(), ports);
+			assert.deepEqual(result.report.closedByReconcile, []);
+			assert.equal(ports.tickets.get('5')?.phase, 'implementation');
+		});
+
+		it('does NOT re-close a ticket already terminal (no forge lookup for it)', async () => {
+			const ports = new FakePorts();
+			ports.tickets.set('5', makeTicket({ ticket: '5', phase: 'merged', health: 'done' }));
+			const result = await plan(makeInput(), ports);
+			assert.deepEqual(result.report.closedByReconcile, []); // terminal ⇒ excluded from the drift set
+		});
+	});
+
+	describe('lifecycle reconcile — re-open', () => {
+		it('revives a terminal ticket whose issue was re-opened, dispatching it the same pass with memory intact', async () => {
+			const ports = new FakePorts();
+			ports.tickets.set(
+				'5',
+				makeTicket({
+					ticket: '5',
+					phase: 'merged',
+					health: 'done',
+					history: [{ at: minutesAgo(99), phase: 'merging', note: 'prior work', runId: null }],
+				}),
+			);
+			ports.labeled = [makeInventoryTicket({ key: '5' })]; // re-opened + still labeled ⇒ a candidate again
+			ports.ticketStates.set('5', { state: 'open', stateReason: 'reopened' }); // the forge confirms the re-open
+			const result = await plan(makeInput(), ports);
+			assert.deepEqual(result.report.reopened, ['5']);
+			const t = ports.tickets.get('5');
+			assert.equal(t?.phase, 'planning');
+			assert.equal(t?.health, 'ok');
+			assert.ok(t?.history.some((h) => /prior work/.test(h.note))); // memory preserved
+			assert.ok(t?.history.some((h) => /reopened by reconcile/.test(h.note)));
+			assert.equal(result.dispatch?.items[0].key, '5'); // eligible again THIS pass
+		});
+
+		it('does NOT revive a merged+labeled ticket the forge does not report reopened (no flip-flop)', async () => {
+			const ports = new FakePorts();
+			ports.tickets.set('5', makeTicket({ ticket: '5', phase: 'merged', health: 'done' }));
+			ports.labeled = [makeInventoryTicket({ key: '5' })]; // still labeled, but the issue was never re-opened
+			ports.ticketStates.set('5', { state: 'open', stateReason: null });
+			const result = await plan(makeInput(), ports);
+			assert.deepEqual(result.report.reopened, []);
+			assert.equal(ports.tickets.get('5')?.phase, 'merged'); // stays terminal — not re-dispatched every pass
+			assert.equal(result.dispatch, null);
+		});
+
+		it('leaves a non-terminal candidate untouched (normal dispatch, nothing revived)', async () => {
+			const ports = new FakePorts();
+			ports.tickets.set('5', makeTicket({ ticket: '5', phase: 'implementation' }));
+			ports.labeled = [makeInventoryTicket({ key: '5' })];
+			const result = await plan(makeInput(), ports);
+			assert.deepEqual(result.report.reopened, []);
+			assert.equal(ports.tickets.get('5')?.phase, 'implementation');
+		});
+	});
+
+	describe('lifecycle reconcile — worktree GC', () => {
+		const wt = (slug: string): { slug: string; path: string; branch: string | null } => ({
+			slug,
+			path: `/wt/${slug}`,
+			branch: slug,
+		});
+
+		it('reclaims worktrees that back no active work, keeping candidates and non-terminal files', async () => {
+			const ports = new FakePorts();
+			ports.tickets.set('9', makeTicket({ ticket: '9', phase: 'merged' })); // settled
+			ports.tickets.set('7', makeTicket({ ticket: '7', health: 'waiting', waitingOn: owner(minutesAgo(5)) }));
+			ports.labeled = [makeInventoryTicket({ key: '5' }), makeInventoryTicket({ key: '7' })];
+			ports.worktreeList = [wt('ticket-5'), wt('ticket-7'), wt('ticket-9'), { ...wt('epic-orphan'), branch: null }];
+			await plan(makeInput(), ports);
+			// ticket-5 (dispatched candidate) + ticket-7 (waiting, non-terminal) stay; the
+			// settled ticket-9 and the file-less epic-orphan are reclaimed.
+			assert.deepEqual(ports.removedWorktrees.sort(), ['epic-orphan', 'ticket-9']);
+		});
+
+		it('keeps the worktree of a re-opened ticket (revived ⇒ active again)', async () => {
+			const ports = new FakePorts();
+			ports.tickets.set('5', makeTicket({ ticket: '5', phase: 'merged', health: 'done' }));
+			ports.labeled = [makeInventoryTicket({ key: '5' })]; // re-opened
+			ports.ticketStates.set('5', { state: 'open', stateReason: 'reopened' });
+			ports.worktreeList = [wt('ticket-5')];
+			await plan(makeInput(), ports);
+			assert.deepEqual(ports.removedWorktrees, []);
+		});
+
+		it('removes nothing when every worktree backs active work', async () => {
+			const ports = new FakePorts();
+			ports.labeled = [makeInventoryTicket({ key: '5' })];
+			ports.worktreeList = [wt('ticket-5')];
+			await plan(makeInput(), ports);
+			assert.deepEqual(ports.removedWorktrees, []);
+		});
+
+		it("keeps a live epic's worktree (slug ≠ ticket-<key>) while its spec is momentarily absent", async () => {
+			const ports = new FakePorts();
+			// Non-terminal epic ticket whose worktree is the spec slug `search`, but no spec
+			// is listed this pass (operator mid-rename) and it isn't labeled ⇒ not a candidate.
+			ports.tickets.set('42', makeTicket({ ticket: '42', slug: 'search', phase: 'implementation' }));
+			ports.worktreeList = [wt('search')];
+			await plan(makeInput(), ports);
+			// activeSlugs reads the persisted slug, so the live worktree survives.
+			assert.deepEqual(ports.removedWorktrees, []);
+		});
+
+		it("reclaims an epic's worktree by its persisted slug once the ticket is terminal", async () => {
+			const ports = new FakePorts();
+			ports.tickets.set('42', makeTicket({ ticket: '42', slug: 'search', phase: 'merged' }));
+			ports.worktreeList = [wt('search')];
+			await plan(makeInput(), ports);
+			assert.deepEqual(ports.removedWorktrees, ['search']);
 		});
 	});
 

@@ -43,6 +43,12 @@ export interface PlanReport {
 	orphanedAcks: string[];
 	/** Ticket keys whose stale worker was reconciled to `error`. */
 	staleReconciled: string[];
+	/** Ticket keys revived because their forge issue was re-opened (terminal → planning). */
+	reopened: string[];
+	/** Ticket keys closed because their forge issue closed (→ merged/abandoned). */
+	closedByReconcile: string[];
+	/** Worktree slugs reclaimed because they no longer back active work. */
+	worktreesRemoved: string[];
 	/** Epic slugs whose tracking ticket the planner created this pass. */
 	createdTrackingTickets: string[];
 	/** Items dispatched (stamped + worktree'd + added to the plan). */

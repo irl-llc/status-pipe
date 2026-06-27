@@ -168,10 +168,11 @@ function mapIssueState(node: Record<string, unknown>): IssueState {
 	return { state, stateReason: mapStateReason(asStr(dig(node, 'stateReason'))) };
 }
 
-/** GitHub `IssueStateReason` → our two-way verdict; DUPLICATE counts as not-planned. */
-function mapStateReason(raw: string | null): 'completed' | 'not_planned' | null {
+/** GitHub `IssueStateReason` → our verdict; DUPLICATE counts as not-planned. */
+function mapStateReason(raw: string | null): 'completed' | 'not_planned' | 'reopened' | null {
 	if (raw === 'COMPLETED') return 'completed';
 	if (raw === 'NOT_PLANNED' || raw === 'DUPLICATE') return 'not_planned';
+	if (raw === 'REOPENED') return 'reopened';
 	return null;
 }
 

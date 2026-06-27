@@ -41,8 +41,8 @@ export interface FakeIssue {
 	number: number;
 	title: string;
 	state: 'open' | 'closed';
-	/** GitHub close reason served by the getIssueStates lookup; ignored while open. */
-	stateReason?: 'COMPLETED' | 'NOT_PLANNED' | 'DUPLICATE' | null;
+	/** GitHub state reason served by getIssueStates (REOPENED applies while open). */
+	stateReason?: 'COMPLETED' | 'NOT_PLANNED' | 'DUPLICATE' | 'REOPENED' | null;
 	labels: string[];
 	author: string | null;
 	assignees: string[];

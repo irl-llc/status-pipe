@@ -12,6 +12,7 @@ import { DispatchPlan, TicketFile, TrustMode } from '../protocol/types';
 import { consumeAcks } from './acks';
 import { Candidate, dedupeCandidates, discoverEpics, discoverTickets } from './inventory';
 import { PlannerPorts } from './ports';
+import { garbageCollectWorktrees, reconcileClosed, reconcileReopened } from './reconcile';
 import { computeParked, PassState, reconcileStaleness, selectAndDispatch, writeOrchestrator } from './schedule';
 import { resolveTrust } from './trust';
 import { PlannerInput, PlanReport, PlanResult, TrustResolution } from './types';
@@ -23,6 +24,9 @@ function emptyReport(): PlanReport {
 		supersededAcks: [],
 		orphanedAcks: [],
 		staleReconciled: [],
+		reopened: [],
+		closedByReconcile: [],
+		worktreesRemoved: [],
 		createdTrackingTickets: [],
 		dispatched: [],
 		deferred: [],
@@ -110,7 +114,16 @@ export async function plan(input: PlannerInput, ports: PlannerPorts): Promise<Pl
 	const consumed = await consumeAcks(ports, report);
 	const state: PassState = { ports, input, tickets: await loadTickets(ports), consumed, report };
 	await reconcileStaleness(state);
+	// Lifecycle reconcile, before dispatch so a re-opened ticket is eligible THIS pass
+	// and a closed one is excluded: revive candidates whose file is terminal, then
+	// close non-candidate files whose forge issue has closed.
+	await reconcileReopened(state, candidates);
+	await reconcileClosed(state, candidates);
 	const dispatch = await selectAndDispatch(state, candidates);
+	// After dispatch: reclaim worktrees that back no active work (terminal/closed,
+	// operator-removed, or orphaned). The worker's self-remove is the fast path; this
+	// is the guarantee for the merge-then-walk-away case where no worker runs.
+	await garbageCollectWorktrees(state, candidates);
 	await wrapPass(state, candidates, dispatch, startedAt);
 	return { dispatch, report };
 }
