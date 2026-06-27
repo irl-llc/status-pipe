@@ -5,6 +5,15 @@
  */
 
 export { plan } from './plan';
+export { deriveLiveWorkerKeys } from './liveWorkers';
+export {
+	DEFAULT_MAX_CONCURRENT,
+	buildPlannerPorts,
+	formatPlanReport,
+	plannerConfigFromFile,
+	runPlannerPass,
+} from './runPass';
+export type { PlannerPassArgs } from './runPass';
 export type {
 	Clock,
 	EpicSpec,

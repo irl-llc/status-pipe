@@ -1,0 +1,85 @@
+name: Release CLI Binaries
+
+# Reusable workflow (#39): builds the self-contained `status-pipe` CLI binary on
+# each target OS/arch and attaches the artifacts to a GitHub Release. Modeled on
+# publish.yml and called from the same two places, for the same reason — GitHub
+# will not re-trigger a workflow from a Release created with the default
+# GITHUB_TOKEN (issue #29), so the auto-release run calls this itself:
+#
+#   1. ci.yml — when a human creates a Release.
+#   2. auto-release.yml — as a chained job after the scheduled release is cut.
+#
+# Each binary is built (Node SEA) AND smoke-tested on its real runner OS — no
+# cross-compilation, so every artifact is proven on the platform it ships for.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref (tag/sha) to check out and build. Defaults to the caller commit.'
+        required: false
+        type: string
+        default: ''
+      tag:
+        description: 'Release tag to attach the binaries to.'
+        required: true
+        type: string
+
+permissions:
+  contents: write # upload release assets
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: linux-x64 }
+          - { os: ubuntu-24.04-arm, target: linux-arm64 }
+          - { os: macos-13, target: darwin-x64 }
+          - { os: macos-latest, target: darwin-arm64 }
+          - { os: windows-latest, target: win-x64 }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      # actions/setup-node installs an OFFICIAL nodejs.org build, which carries
+      # the SEA fuse the binary injection needs (Homebrew's omits it).
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build self-contained binary
+        run: npm run build:binary
+
+      - name: Smoke test (unix)
+        if: runner.os != 'Windows'
+        run: ./dist/status-pipe --version
+
+      - name: Smoke test (windows)
+        if: runner.os == 'Windows'
+        run: ./dist/status-pipe.exe --version
+
+      - name: Stage artifact
+        shell: bash
+        run: |
+          mkdir -p out-bin
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp dist/status-pipe.exe "out-bin/status-pipe-${{ matrix.target }}.exe"
+          else
+            cp dist/status-pipe "out-bin/status-pipe-${{ matrix.target }}"
+          fi
+
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: gh release upload "${{ inputs.tag }}" out-bin/* --clobber --repo "${{ github.repository }}"

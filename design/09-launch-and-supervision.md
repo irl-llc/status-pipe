@@ -227,6 +227,50 @@ gives us for free:
 Other backends (a shell script, a different CLI agent) plug in by meeting the
 same contract: run, write logs to stdout, exit nonzero on failure.
 
+## Standalone CLI (`status-pipe`) — the planner without the extension
+
+The deterministic planner (`src/planner/`) is pure and port-injected, so it has
+two consumers, not one: the extension runs it in-process (above), and a
+standalone `status-pipe` CLI runs the same `runPlannerPass` for environments with
+no VS Code at all — CI, cron, headless servers, non-VS-Code editors (#39). One
+source of truth; no second-language reimplementation (the failure mode the
+plugin's ackId already has to guard against, staying byte-identical to
+`src/protocol/ackId.ts`).
+
+The CLI is only the *standalone plumbing* the extension otherwise provides
+(`src/cli/`, vscode-free):
+
+- **Discovery** — resolve the repo from the cwd (or `--repo-root`), anchoring at
+  the **primary checkout** so a worktree still writes the main repo's
+  `.status-pipe/`; load committed `config.json` (a corrupt one fails loud, since
+  it drives the trust gate).
+- **Its own forge auth**, not the editor's auth provider:
+  `GITHUB_TOKEN`/`GH_TOKEN` → `gh auth token` → `git credential fill`. Tokens are
+  never read from the committed `config.json` (a credential in version control).
+  `GITHUB_BASE_URL`/`GITHUB_API_URL` select a GHES/Actions host.
+- **Live workers from heartbeats.** With no process supervisor, the CLI cannot
+  pass a live-worker set from a process table. It derives one from the on-disk
+  ticket files instead — `running` + a non-stale heartbeat, the same predicate
+  the card and the staleness reconcile share. `staleWorkerMinutes` is the
+  tolerance; passing an empty set would re-dispatch a working ticket and
+  reconcile a live one as crashed.
+- **Terminal output / exit codes** — the run-log report (or `--json`); `0`
+  success, `1` runtime error or trust refusal, `2` usage error.
+
+GitHub-only for now: the planner needs a first-class issue inventory, exactly the
+constraint the built-in tick carries; Bitbucket/Jira inventory is a follow-up.
+
+**Distribution (first-class).** A self-contained single-file executable that runs
+with **no preinstalled Node** — a box drops in one binary. Built from the shared
+TS via **Node SEA** (no second toolchain; pure Node, locally verifiable), one
+artifact per `os × arch` (linux/macOS/windows × x64/arm64). Each is built **and
+smoke-tested on its real runner OS** (`release-cli.yml`, the reusable-workflow
+twin of `publish.yml`, called from both the human-release and auto-release
+paths) — no cross-compilation, so no artifact ships unproven on its platform. An
+`npm i -g status-pipe` (`bin`) install is the secondary convenience. (Node SEA
+needs the fuse sentinel that official nodejs.org builds carry and Homebrew's
+omits; `actions/setup-node` provides an official build.)
+
 ## Supervisor design (`agentSupervisor` module)
 
 The supervisor runs two kinds of process. **Scheduled agents** (`lifetime`

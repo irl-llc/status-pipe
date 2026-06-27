@@ -87,12 +87,46 @@ const webviewConfig = (mode) => ({
 	},
 });
 
+/**
+ * The standalone CLI bundle (#39): a single Node CJS file (dist/cli.js) that is
+ * both the npm `bin` target and the input the Node SEA build injects into a
+ * binary. No `vscode` external — the CLI graph is vscode-free by design, so a
+ * stray import would (correctly) fail the bundle. The package version is inlined
+ * for `--version`, and the shebang is added here (not in source — see cli/main.ts).
+ */
+const cliConfig = {
+	name: 'cli',
+	target: 'node',
+	mode: 'none',
+	entry: './src/cli/main.ts',
+	output: {
+		path: path.resolve(__dirname, 'dist'),
+		filename: 'cli.js',
+		libraryTarget: 'commonjs2',
+	},
+	resolve: {
+		extensions: ['.ts', '.js'],
+	},
+	module: {
+		rules: [{ test: /\.ts$/, exclude: /node_modules/, use: [{ loader: 'ts-loader' }] }],
+	},
+	plugins: [
+		new webpack.DefinePlugin({
+			'process.env.SP_CLI_VERSION': JSON.stringify(require('./package.json').version),
+		}),
+		new webpack.BannerPlugin({ banner: '#!/usr/bin/env node', raw: true, entryOnly: true }),
+	],
+	devtool: 'nosources-source-map',
+	infrastructureLogging: { level: 'log' },
+};
+
 module.exports = (env, argv) => {
 	const mode = (argv && argv.mode) || 'none';
 	const webview = webviewConfig(mode);
 	if (mode === 'production') {
 		extensionConfig.mode = 'production';
 		webview.mode = 'production';
+		cliConfig.mode = 'production';
 	}
-	return [extensionConfig, webview];
+	return [extensionConfig, webview, cliConfig];
 };

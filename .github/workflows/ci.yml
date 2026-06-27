@@ -183,3 +183,15 @@ jobs:
     secrets:
       VSCE_PAT: ${{ secrets.VSCE_PAT }}
       OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+  # Build + attach the standalone CLI binaries to the Release (#39). Same gate
+  # and reasoning as publish; needs contents:write to upload assets (CI's
+  # top-level token is read-only), granted on this calling job.
+  release-cli:
+    needs: build
+    if: github.event_name == 'release'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-cli.yml
+    with:
+      tag: ${{ github.event.release.tag_name }}

@@ -94,3 +94,15 @@ jobs:
     secrets:
       VSCE_PAT: ${{ secrets.VSCE_PAT }}
       OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
+  # Attach the standalone CLI binaries to the freshly cut Release (#39), in the
+  # same run for the same GITHUB_TOKEN re-trigger reason as publish above.
+  release-cli:
+    needs: auto-release
+    if: needs.auto-release.outputs.released == 'true'
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-cli.yml
+    with:
+      ref: ${{ needs.auto-release.outputs.tag }}
+      tag: ${{ needs.auto-release.outputs.tag }}
