@@ -9,7 +9,7 @@
 import { asArr, asNum, asObj, asStr, dig, safeParse } from '../utils/json';
 import { GraphQLEndpoint, executeGraphQL } from './graphql';
 import { HttpClient, RateListener, readRateInfo, statusToForgeError } from './http';
-import { ForgeError, ForgeInventory, InventoryIssue } from './types';
+import { ForgeError, ForgeInventory, InventoryIssue, IssueState } from './types';
 
 const ISSUE_FIELDS = `number title url author { login } assignees(first: 20) { nodes { login } }`;
 const VISIBILITY_QUERY = `query($o:String!,$n:String!){ repository(owner:$o,name:$n){ visibility } }`;
@@ -80,6 +80,18 @@ export class GithubInventory implements ForgeInventory {
 		return mapIssueNodes(dig(repo, 'issues', 'nodes'));
 	}
 
+	async getIssueStates(keys: string[]): Promise<Map<string, IssueState>> {
+		const numbered = numericKeys(keys);
+		if (numbered.length === 0) return new Map();
+		const [o, n] = this.owner();
+		const data = await executeGraphQL(this.endpoint, issueStatesQuery(numbered), { o, n });
+		// A null repository would silently look like "every issue gone"; surface it
+		// as not-found (the reconcile catches it and closes nothing), mirroring above.
+		const repo = asObj(dig(data, 'repository'));
+		if (!repo) throw new ForgeError('not-found', `repository ${this.options.slug} not found`);
+		return collectIssueStates(repo, numbered);
+	}
+
 	async findIssueByTitle(title: string): Promise<InventoryIssue | null> {
 		const q = `repo:${this.options.slug} is:issue is:open in:title ${JSON.stringify(title)}`;
 		const data = await executeGraphQL(this.endpoint, SEARCH_QUERY, { q });
@@ -110,6 +122,57 @@ function mapIssueNodes(nodes: unknown): InventoryIssue[] {
 	return asArr(nodes)
 		.map(mapGraphQLIssue)
 		.filter((i): i is InventoryIssue => i !== null);
+}
+
+/**
+ * Keys parsed to positive issue numbers, carrying the original key. The decimal-only
+ * guard rejects hex/whitespace/sign/scientific forms (`"0x10"`, `" 7 "`, `"+7"`,
+ * `"1e21"`) that `Number` would silently remap or stringify with a `+` — the latter
+ * breaking the GraphQL alias `i1e+21`; `isSafeInteger` then bounds magnitude. Leading
+ * zeros (`"07"`) stay valid: `issueStatesQuery` dedups them against `"7"`.
+ */
+const DECIMAL_KEY = /^[0-9]+$/;
+function numericKeys(keys: string[]): Array<{ key: string; n: number }> {
+	return keys
+		.filter((key) => DECIMAL_KEY.test(key))
+		.map((key) => ({ key, n: Number(key) }))
+		.filter((x) => Number.isSafeInteger(x.n) && x.n > 0);
+}
+
+/**
+ * One aliased lookup per DISTINCT number: `i7: issue(number:7){ state stateReason }`.
+ * Dedup so keys like `'7'` and `'07'` (same number) don't emit a duplicate alias that a
+ * strict parser rejects; `collectIssueStates` still maps `i7` back to every original key.
+ */
+function issueStatesQuery(numbered: Array<{ n: number }>): string {
+	const uniqueNs = [...new Set(numbered.map((x) => x.n))];
+	const aliases = uniqueNs.map((n) => `i${n}: issue(number:${n}){ state stateReason }`).join(' ');
+	return `query($o:String!,$n:String!){ repository(owner:$o,name:$n){ ${aliases} } }`;
+}
+
+/** Pull each aliased issue node back out; a missing issue (null node) is omitted. */
+function collectIssueStates(
+	repo: Record<string, unknown>,
+	numbered: Array<{ key: string; n: number }>,
+): Map<string, IssueState> {
+	const out = new Map<string, IssueState>();
+	for (const x of numbered) {
+		const node = asObj(dig(repo, `i${x.n}`));
+		if (node) out.set(x.key, mapIssueState(node));
+	}
+	return out;
+}
+
+function mapIssueState(node: Record<string, unknown>): IssueState {
+	const state = asStr(dig(node, 'state')) === 'CLOSED' ? 'closed' : 'open';
+	return { state, stateReason: mapStateReason(asStr(dig(node, 'stateReason'))) };
+}
+
+/** GitHub `IssueStateReason` → our two-way verdict; DUPLICATE counts as not-planned. */
+function mapStateReason(raw: string | null): 'completed' | 'not_planned' | null {
+	if (raw === 'COMPLETED') return 'completed';
+	if (raw === 'NOT_PLANNED' || raw === 'DUPLICATE') return 'not_planned';
+	return null;
 }
 
 function mapGraphQLIssue(node: unknown): InventoryIssue | null {

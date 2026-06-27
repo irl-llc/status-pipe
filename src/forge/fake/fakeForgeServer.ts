@@ -21,6 +21,7 @@ import {
 	renderBitbucketStatuses,
 	renderBitbucketTasks,
 	renderGithubIssueNode,
+	renderGithubIssueState,
 	renderGithubPrNode,
 	renderRestIssue,
 } from './fakeForgeData';
@@ -87,7 +88,21 @@ export class FakeForgeServer {
 		if (Object.keys(variables).length === 0) return this.handlePrAliases(res, query);
 		if ('q' in variables) return this.handleIssueSearch(res, variables);
 		if ('labels' in variables) return this.handleLabeledIssues(res, variables);
+		// Visibility and getIssueStates both send only {o,n}; the latter is the one
+		// carrying aliased `i<n>: issue(number:…)` lookups, so route on that token.
+		if (query.includes('issue(number:')) return this.handleIssueStates(res, query);
 		this.handleVisibility(res);
+	}
+
+	/** Parses the aliased getIssueStates query: `iN: issue(number: X)`, open AND closed. */
+	private handleIssueStates(res: http.ServerResponse, query: string): void {
+		if (this.data.repoMissing) return plainJson(res, { data: { repository: null } });
+		const repository: Record<string, unknown> = {};
+		for (const match of query.matchAll(/(i\d+):\s*issue\(number:\s*(\d+)\)/g)) {
+			const issue = (this.data.issues ?? []).find((i) => i.number === Number(match[2]));
+			repository[match[1]] = issue ? renderGithubIssueState(issue) : null;
+		}
+		plainJson(res, { data: { repository } });
 	}
 
 	/** Parses the aliased query shape github.ts builds: `prN: pullRequest(number: X)`. */

@@ -12,6 +12,7 @@ import {
 	ProtocolReadPort,
 	ProtocolWritePort,
 	StoredAck,
+	TicketState,
 } from '../../../planner/ports';
 import { PlannerConfig, PlannerInput } from '../../../planner/types';
 
@@ -84,6 +85,9 @@ export class FakePorts implements PlannerPorts {
 	viewer: string | null = 'ed';
 	viewerThrows = false;
 	labeled: InventoryTicket[] = [];
+	/** Per-key forge state for getTicketStates (the lifecycle reconcile input). */
+	ticketStates = new Map<string, TicketState>();
+	ticketStatesThrows = false;
 	existingTracking = new Map<string, InventoryTicket>();
 	createdTickets: { title: string; label: string }[] = [];
 	epicSpecs: EpicSpec[] = [];
@@ -109,6 +113,10 @@ export class FakePorts implements PlannerPorts {
 			return this.viewer;
 		},
 		listLabeledTickets: async (): Promise<InventoryTicket[]> => this.labeled,
+		getTicketStates: async (keys: string[]): Promise<Map<string, TicketState>> => {
+			if (this.ticketStatesThrows) throw new Error('issue-state lookup unavailable');
+			return new Map(keys.flatMap((k) => (this.ticketStates.has(k) ? [[k, this.ticketStates.get(k)!]] : [])));
+		},
 		findTrackingTicket: async (title: string): Promise<InventoryTicket | null> =>
 			this.existingTracking.get(title) ?? null,
 		createTrackingTicket: async (title: string, label: string): Promise<InventoryTicket> => {

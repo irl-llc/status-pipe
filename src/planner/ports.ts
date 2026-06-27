@@ -25,6 +25,16 @@ export interface InventoryTicket {
 	assignees: string[];
 }
 
+/**
+ * Open/closed verdict for a ticket looked up by key — the lifecycle reconcile's
+ * input for a ticket whose issue has dropped out of the open-labeled listing.
+ * Mirrors the forge `IssueState`; the adapter renames it into the planner vocab.
+ */
+export interface TicketState {
+	state: 'open' | 'closed';
+	stateReason: 'completed' | 'not_planned' | null;
+}
+
 /** An epic spec on disk and the tracking ticket its header points at (null = none yet). */
 export interface EpicSpec {
 	slug: string;
@@ -51,6 +61,13 @@ export interface InventoryPort {
 	viewerLogin(): Promise<string | null>;
 	/** Open tickets carrying the inventory label (ticket mode). */
 	listLabeledTickets(label: string): Promise<InventoryTicket[]>;
+	/**
+	 * State of specific tickets by key — used to detect a ticket whose forge issue
+	 * has closed (it has dropped out of the open-labeled listing). Keys with no
+	 * resolvable issue are omitted; a throw means "unknown" (the reconcile then
+	 * closes nothing this pass).
+	 */
+	getTicketStates(keys: string[]): Promise<Map<string, TicketState>>;
 	/** An existing tracking ticket whose title matches, or null. */
 	findTrackingTicket(title: string): Promise<InventoryTicket | null>;
 	/** Create a tracking ticket carrying the inventory label; returns its key/url. */
