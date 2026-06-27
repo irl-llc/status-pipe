@@ -1,0 +1,2 @@
+kind: Added
+body: 'Workers now harden every change before submitting: a new `hardening` phase runs an adversarial review loop (a critic finds defects, an independent skeptic refutes them) and fixes confirmed medium+ defects on the owning branch, iterating until two consecutive clean waves or escalating to the operator at the wave cap. Tunable via `config.review`; tracked in the ticket file''s `reviewLoop`.'
