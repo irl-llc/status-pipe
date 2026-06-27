@@ -60,6 +60,7 @@ export function TicketCard({ card, state, selected, onSelect }: TicketCardProps)
 			<PrRows card={card} />
 			<div className="action-row" onClick={(e) => e.stopPropagation()}>
 				<PrimaryAction card={card} />
+				{card.lane === 'quiet' && card.ticket && <RemoveAction card={card} />}
 				<AckControl card={card} />
 			</div>
 		</div>
@@ -178,6 +179,24 @@ function SimpleAction({ card, kind }: { card: CardDisplay; kind: 'reveal' | 'res
 			onClick={() => post({ type: 'restartWorker', repoRoot: card.repoRoot, ticket: card.ticket ?? '' })}
 		>
 			Restart worker
+		</button>
+	);
+}
+
+/**
+ * QUIET-only: clear a settled ticket's file from the queue. Direct (no confirm) —
+ * the file is disposable working memory; the forge issue stays the record of
+ * truth and the planner reclaims the worktree.
+ */
+function RemoveAction({ card }: { card: CardDisplay }): JSX.Element {
+	const post = usePost();
+	return (
+		<button
+			className="text-button"
+			title="Remove this finished ticket from the queue (deletes its .status-pipe file)"
+			onClick={() => post({ type: 'removeTicket', repoRoot: card.repoRoot, ticket: card.ticket ?? '' })}
+		>
+			Remove
 		</button>
 	);
 }

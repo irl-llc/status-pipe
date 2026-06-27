@@ -23,11 +23,27 @@ export async function routeWebviewMessage(
 		case 'openEpicFile':
 			return controller.openEpicFile(message.repoRoot, message.slug);
 		case 'ack':
+		case 'withdrawAck':
+		case 'removeTicket':
+			return routeReplyMessage(controller, message, post);
+		default:
+			return routeControlMessage(controller, message);
+	}
+}
+
+/** The messages that post a result back to the webview. */
+async function routeReplyMessage(
+	controller: StatusPipeController,
+	message: Extract<WebviewMessage, { type: 'ack' | 'withdrawAck' | 'removeTicket' }>,
+	post: PostMessage,
+): Promise<void> {
+	switch (message.type) {
+		case 'ack':
 			return handleAck(controller, message, post);
 		case 'withdrawAck':
 			return handleWithdraw(controller, message, post);
-		default:
-			return routeControlMessage(controller, message);
+		case 'removeTicket':
+			return handleRemoveTicket(controller, message, post);
 	}
 }
 
@@ -67,4 +83,22 @@ async function handleWithdraw(
 ): Promise<void> {
 	const result = await controller.withdrawAck(message.repoRoot, message.ticket, message.ackId);
 	post({ type: 'withdrawResult', repoRoot: message.repoRoot, ticket: message.ticket, result });
+}
+
+async function handleRemoveTicket(
+	controller: StatusPipeController,
+	message: Extract<WebviewMessage, { type: 'removeTicket' }>,
+	post: PostMessage,
+): Promise<void> {
+	const result = await controller.removeTicket(message.repoRoot, message.ticket);
+	post({ type: 'removeResult', repoRoot: message.repoRoot, ticket: message.ticket, result });
+	// On success the card simply vanishes (the reload reflects the gone file), but a
+	// refusal/failure leaves it in place with no visible reason — surface that, or the
+	// operator clicks Remove and nothing happens. (The webview consumes no *Result yet.)
+	if (result === 'not-allowed') {
+		void vscode.window.showWarningMessage(`Status Pipe: ${message.ticket} can't be removed while it is still active.`);
+	} else if (result === 'error') {
+		// 'error' covers a revived/unknown ticket, an unsafe key, or a failed unlink.
+		void vscode.window.showErrorMessage(`Status Pipe: could not remove ${message.ticket} (it may no longer exist).`);
+	}
 }

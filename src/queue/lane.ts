@@ -45,7 +45,9 @@ export interface LaneAssignment {
 	reason: NeedsYouReason | null;
 }
 
-function isQuiet(ticket: TicketFile): boolean {
+/** A settled ticket: terminal phase or `health: "done"` — the QUIET lane, and the
+ *  only state in which an operator may remove the ticket file. */
+export function isQuiet(ticket: TicketFile): boolean {
 	return ticket.phase === 'merged' || ticket.phase === 'abandoned' || ticket.health === 'done';
 }
 
