@@ -21,6 +21,7 @@ import { resolveAgentCwd } from '../supervisor/launchTemplate';
 import { extensionVersion, goodTickets, removeSettledTicket, scheduleTimer } from './controllerHelpers';
 import { PlannerRepo } from './plannerSpawn';
 import { createSupervisor } from './supervisorSetup';
+import { e2eFixtureWorkers } from './e2eWorkerFixture';
 import { ForgeConnection, connectRepo } from './forgeSetup';
 import { approveAgents, isApproved } from './launchApproval';
 import { computeToasts } from './notifications';
@@ -287,10 +288,11 @@ export class StatusPipeController implements vscode.Disposable {
 	}
 
 	private buildState(): DisplayState {
+		const repos = [...this.repos.values()].filter((r) => r.state !== null).map((r) => this.repoState(r));
 		const input: QueueModelInput = {
-			repos: [...this.repos.values()].filter((r) => r.state !== null).map((r) => this.repoState(r)),
+			repos,
 			agents: this.supervisor.states(),
-			workers: this.supervisor.workerStates(),
+			workers: [...this.supervisor.workerStates(), ...e2eFixtureWorkers(repos.map((r) => r.repoRoot))],
 			activity: this.enricher.activity(),
 			now: Date.now(),
 			settings: settings.queueSettings(),

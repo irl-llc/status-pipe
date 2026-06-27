@@ -9,6 +9,7 @@
 import { useState, type JSX } from 'react';
 
 import { AgentActivity } from '../../output/claudeStream';
+import { WORKER_ID } from '../../protocol/types';
 import { AgentDisplay, DisplayState, WorkerProcessDisplay } from '../../queue/displayTypes';
 import { formatDuration } from '../format';
 import { AGENT_STATE_ICON } from '../icons';
@@ -93,10 +94,15 @@ function AgentRow({ agent, state }: { agent: AgentDisplay; state: DisplayState }
 
 /**
  * A live worker process (design/09): one `claude -p /work-ticket` the
- * supervisor spawned from the dispatch plan. Read-only — its lifecycle is the
- * planner's; the operator acts on the ticket card, not here.
+ * supervisor spawned from the dispatch plan. No lifecycle controls — its
+ * lifecycle is the planner's; the operator acts on the ticket card, not here.
+ * Open log is the one exception: observing a worker's output is read-only, and
+ * every worker streams into the shared WORKER_ID channel (issue #56).
  */
 function WorkerRow({ worker, state }: { worker: WorkerProcessDisplay; state: DisplayState }): JSX.Element {
+	const post = usePost();
+	const openLog = (): void =>
+		post({ type: 'agentControl', repoRoot: worker.repoRoot, agentId: WORKER_ID, action: 'openLog' });
 	return (
 		<div className="agent-row worker-row">
 			<span className={`codicon codicon-${AGENT_STATE_ICON.running} agent-state-running`} title="worker running" />
@@ -105,6 +111,9 @@ function WorkerRow({ worker, state }: { worker: WorkerProcessDisplay; state: Dis
 				{worker.key}
 			</span>
 			<span className="agent-meta">{workerMeta(worker, state.generatedAt)}</span>
+			<span className="agent-actions">
+				<IconButton title="Open log" icon="output" onClick={openLog} />
+			</span>
 		</div>
 	);
 }

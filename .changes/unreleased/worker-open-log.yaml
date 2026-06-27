@@ -1,0 +1,2 @@
+kind: Added
+body: 'Live worker rows in the agents strip now carry an Open-log button, mirroring the planner''s. It opens the shared per-repo worker output channel (where every worker streams, delimited by start/end banners), so you can watch a worker''s output without leaving the view. Worker rows stay otherwise read-only — no Run/Stop/Tick, since a worker''s lifecycle belongs to the planner.'

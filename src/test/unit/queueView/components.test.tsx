@@ -475,13 +475,12 @@ describe('queueView/components', () => {
 			assert.ok(result.getByTitle('Open log'));
 		});
 
-		// Coverage boundary for the live-worker rows: these jsdom assertions are the
-		// agreed floor (structure, summary text, prefix-drop, read-only, activity meta).
-		// The Playwright strip snapshot — the project's no-layout-shift oracle — does NOT
-		// exercise worker rows: `state.workers` comes from in-memory supervisor state
-		// (workerStates()), which the e2e harness (driven from on-disk fixtures) can't
-		// populate without spawning real `claude` workers. So the 30px row indent has no
-		// pixel guard; if a live-worker injection seam is added later, capture a baseline.
+		// Coverage boundary for the live-worker rows: these jsdom assertions cover
+		// structure/summary/prefix-drop/read-only/activity-meta semantics. The pixel
+		// oracle for the 30px row indent and the open-log glyph lives in the Playwright
+		// suite (workerRows.spec.ts) — `state.workers` comes from in-memory supervisor
+		// state (workerStates()) that the disk-fixture harness can't spawn, so it's fed
+		// through the controller's display-only STATUS_PIPE_E2E_WORKERS seam.
 		it('appends a worker count to the summary and renders a row per live worker', () => {
 			const state = makeState({
 				agents: [makeAgent({ state: 'scheduled', runningSince: null, nextTickAt: GENERATED_AT + 5 * 60_000 })],
@@ -502,12 +501,21 @@ describe('queueView/components', () => {
 			assert.equal(result.container.querySelectorAll('.worker-row').length, 2);
 		});
 
-		it('worker rows are read-only (no Run/Stop/Tick controls)', () => {
+		it('worker rows offer only Open log — no Run/Stop/Tick lifecycle controls', () => {
 			const state = makeState({ agents: [makeAgent()], workers: [makeWorker({ key: '19' })] });
 			const { result } = renderWithPost(<AgentsStrip state={state} />);
 			const row = result.container.querySelector('.worker-row');
 			assert.ok(row);
-			assert.equal(row?.querySelector('.agent-actions'), null);
+			const buttons = Array.from(row!.querySelectorAll('.agent-actions .icon-button'), (b) => b.getAttribute('title'));
+			assert.deepEqual(buttons, ['Open log']);
+		});
+
+		it('worker Open log opens the shared worker channel via agentControl (issue #56)', () => {
+			const state = makeState({ agents: [makeAgent()], workers: [makeWorker({ key: '19', repoRoot: '/repo' })] });
+			const { result, messages } = renderWithPost(<AgentsStrip state={state} />);
+			const row = result.container.querySelector('.worker-row');
+			fireEvent.click(row!.querySelector('.agent-actions .icon-button')!);
+			assert.deepEqual(messages, [{ type: 'agentControl', repoRoot: '/repo', agentId: 'worker', action: 'openLog' }]);
 		});
 
 		it('shows what a worker is doing from its stream-json activity', () => {

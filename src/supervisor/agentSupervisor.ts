@@ -138,7 +138,7 @@ export class AgentSupervisor {
 			// approval, not adding an entry. (Absent entries are unapproved too.)
 			this.deps.log(
 				repoRoot,
-				'worker',
+				WORKER_ID,
 				`[supervisor] ${plan.items.length} workers planned but no approved launch entry with id '${WORKER_ID}' — none spawned`,
 			);
 			return;
@@ -159,8 +159,9 @@ export class AgentSupervisor {
 		// never be disposed (channels live until controller teardown), leaking
 		// one channel per ticket ever dispatched and cluttering the Output
 		// dropdown; the per-worker start/end banners delimit the interleaved
-		// streams, and the operator monitors workers from the agents strip.
-		const channel = 'worker';
+		// streams, and the operator monitors workers from the agents strip. The UI's
+		// per-worker Open-log button opens this same WORKER_ID channel (issue #56).
+		const channel = WORKER_ID;
 		const runner = new WorkerRunner(item.key, request, template.timeoutMinutes, {
 			spawn: this.deps.spawn,
 			now: () => this.deps.now(),
