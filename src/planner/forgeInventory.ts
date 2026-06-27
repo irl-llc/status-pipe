@@ -6,14 +6,15 @@
  * Both the extension and the standalone CLI build their InventoryPort here.
  */
 
-import { ForgeInventory, InventoryIssue } from '../forge/types';
-import { InventoryPort, InventoryTicket } from './ports';
+import { ForgeInventory, InventoryIssue, IssueState } from '../forge/types';
+import { InventoryPort, InventoryTicket, TicketState } from './ports';
 
 export function forgeInventoryPort(inventory: ForgeInventory): InventoryPort {
 	return {
 		visibility: () => inventory.visibility(),
 		viewerLogin: () => inventory.viewerLogin(),
 		listLabeledTickets: async (label) => (await inventory.listLabeledIssues(label)).map(asTicket),
+		getTicketStates: async (keys) => mapTicketStates(await inventory.getIssueStates(keys)),
 		findTrackingTicket: async (title) => {
 			const issue = await inventory.findIssueByTitle(title);
 			return issue ? asTicket(issue) : null;
@@ -30,4 +31,9 @@ function asTicket(issue: InventoryIssue): InventoryTicket {
 		author: issue.author,
 		assignees: issue.assignees,
 	};
+}
+
+/** Rename the forge state map into the planner vocab (decouples plan.ts from forge types). */
+function mapTicketStates(states: Map<string, IssueState>): Map<string, TicketState> {
+	return new Map([...states].map(([key, s]) => [key, { state: s.state, stateReason: s.stateReason }]));
 }

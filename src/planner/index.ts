@@ -16,5 +16,6 @@ export type {
 	ProtocolReadPort,
 	ProtocolWritePort,
 	StoredAck,
+	TicketState,
 } from './ports';
 export type { PlannerConfig, PlannerInput, PlanReport, PlanResult, TrustResolution } from './types';

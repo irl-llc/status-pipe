@@ -104,6 +104,70 @@ describe('forge/githubInventory (FakeForgeServer)', () => {
 		});
 	});
 
+	describe('getIssueStates', () => {
+		it('returns open/closed plus the close reason, for issues open AND closed', async () => {
+			const inv = await inventory(
+				repoData({
+					issues: [
+						issue({ number: 7, title: 'still open' }),
+						issue({ number: 8, title: 'merged', state: 'closed', stateReason: 'COMPLETED' }),
+						issue({ number: 9, title: 'dropped', state: 'closed', stateReason: 'NOT_PLANNED' }),
+					],
+				}),
+			);
+			const states = await inv.getIssueStates(['7', '8', '9']);
+			assert.deepEqual(states.get('7'), { state: 'open', stateReason: null });
+			assert.deepEqual(states.get('8'), { state: 'closed', stateReason: 'completed' });
+			assert.deepEqual(states.get('9'), { state: 'closed', stateReason: 'not_planned' });
+		});
+
+		it('fans a single deduped issue node back to every key that names the same number', async () => {
+			const inv = await inventory(repoData({ issues: [issue({ number: 7, title: 'still open' })] }));
+			// '7' and '07' parse to the same number — one alias is emitted, but both keys resolve.
+			const states = await inv.getIssueStates(['7', '07']);
+			assert.deepEqual(states.get('7'), { state: 'open', stateReason: null });
+			assert.deepEqual(states.get('07'), { state: 'open', stateReason: null });
+		});
+
+		it('drops hex/whitespace/sign-formed keys instead of remapping them to another issue', async () => {
+			const inv = await inventory(repoData({ issues: [issue({ number: 16, title: 'sixteen' })] }));
+			// '0x10' Number-parses to 16; ' 7 '/'+7' to 7. The decimal-only guard rejects all three
+			// so a malformed key never silently looks up an unrelated issue.
+			const states = await inv.getIssueStates(['0x10', ' 7 ', '+7']);
+			assert.equal(states.size, 0);
+		});
+
+		it('maps DUPLICATE to not_planned and a missing close reason to null', async () => {
+			const inv = await inventory(
+				repoData({
+					issues: [
+						issue({ number: 8, title: 'dup', state: 'closed', stateReason: 'DUPLICATE' }),
+						issue({ number: 9, title: 'reasonless', state: 'closed', stateReason: null }),
+					],
+				}),
+			);
+			const states = await inv.getIssueStates(['8', '9']);
+			assert.equal(states.get('8')?.stateReason, 'not_planned');
+			assert.deepEqual(states.get('9'), { state: 'closed', stateReason: null });
+		});
+
+		it('omits a key whose issue does not exist, and short-circuits an empty/non-numeric request', async () => {
+			const inv = await inventory(repoData({ issues: [issue({ number: 7, title: 'x' })] }));
+			const states = await inv.getIssueStates(['7', '404', 'PROJ-1']);
+			assert.deepEqual([...states.keys()], ['7']); // 404 (no issue) and the non-numeric key drop out
+			assert.equal((await inv.getIssueStates([])).size, 0);
+			assert.equal((await inv.getIssueStates(['PROJ-1'])).size, 0); // no numeric keys ⇒ no round trip
+		});
+
+		it('throws not-found rather than reporting "all gone" when the repo is missing', async () => {
+			const inv = await inventory(repoData({ repoMissing: true }));
+			await assert.rejects(
+				inv.getIssueStates(['7']),
+				(e: unknown) => e instanceof ForgeError && e.kind === 'not-found',
+			);
+		});
+	});
+
 	describe('findIssueByTitle', () => {
 		const title = 'Epic: payments — implementation tracking';
 
@@ -179,7 +243,14 @@ describe('forge/githubInventory (FakeForgeServer)', () => {
 	describe('forgeInventoryPort adapter', () => {
 		it('maps the forge inventory onto the planner InventoryPort', async () => {
 			const inv = await inventory(
-				repoData({ visibility: 'private', issues: [issue({ number: 3, title: 'Ticket 3' })] }),
+				repoData({
+					visibility: 'private',
+					// Closed issue numbered BELOW the open one so the mint sequence (→ 4) is unperturbed.
+					issues: [
+						issue({ number: 2, title: 'Closed 2', state: 'closed', stateReason: 'COMPLETED' }),
+						issue({ number: 3, title: 'Ticket 3' }),
+					],
+				}),
 			);
 			const port = forgeInventoryPort(inv);
 			assert.equal(await port.visibility(), 'private');
@@ -187,8 +258,11 @@ describe('forge/githubInventory (FakeForgeServer)', () => {
 			const tickets = await port.listLabeledTickets('agent-queue');
 			assert.deepEqual(
 				tickets.map((t) => t.key),
-				['3'],
+				['3'], // listLabeledTickets is open-only; 2 is closed
 			);
+			const states = await port.getTicketStates(['3', '2']);
+			assert.deepEqual(states.get('3'), { state: 'open', stateReason: null });
+			assert.deepEqual(states.get('2'), { state: 'closed', stateReason: 'completed' });
 			const created = await port.createTrackingTicket('Epic: beta — implementation tracking', 'agent-queue');
 			assert.equal(created.key, '4');
 			const found = await port.findTrackingTicket('Ticket 3');

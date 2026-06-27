@@ -41,6 +41,8 @@ export interface FakeIssue {
 	number: number;
 	title: string;
 	state: 'open' | 'closed';
+	/** GitHub close reason served by the getIssueStates lookup; ignored while open. */
+	stateReason?: 'COMPLETED' | 'NOT_PLANNED' | 'DUPLICATE' | null;
 	labels: string[];
 	author: string | null;
 	assignees: string[];
@@ -78,6 +80,11 @@ export function renderGithubIssueNode(issue: FakeIssue, slug: string): Record<st
 		author: issue.author === null ? null : { login: issue.author },
 		assignees: { nodes: issue.assignees.map((login) => ({ login })) },
 	};
+}
+
+/** GraphQL `issue(number){ state stateReason }` node for the getIssueStates lookup. */
+export function renderGithubIssueState(issue: FakeIssue): Record<string, unknown> {
+	return { state: issue.state.toUpperCase(), stateReason: issue.stateReason ?? null };
 }
 
 /** REST issue shape (the create-issue response). */

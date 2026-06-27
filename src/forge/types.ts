@@ -148,6 +148,17 @@ export interface InventoryIssue {
 }
 
 /**
+ * Open/closed verdict for an issue looked up by key — the lifecycle reconcile's
+ * input for an issue that has dropped out of the open-labeled listing. A closed
+ * issue's `stateReason` distinguishes a completed/merged close from a
+ * not-planned (or duplicate) one.
+ */
+export interface IssueState {
+	state: 'open' | 'closed';
+	stateReason: 'completed' | 'not_planned' | null;
+}
+
+/**
  * The issue-inventory surface the planner reconciles against: discover labeled
  * work, find-or-create epic tracking tickets, and read repo visibility for the
  * trust gate. Read-only except `createLabeledIssue` — the one mutation, used to
@@ -160,6 +171,13 @@ export interface ForgeInventory {
 	viewerLogin(): Promise<string | null>;
 	/** Open issues carrying `label`. */
 	listLabeledIssues(label: string): Promise<InventoryIssue[]>;
+	/**
+	 * State of specific issues by key — for issues that have dropped out of the
+	 * open-labeled listing (closed, or label removed). Keys with no resolvable
+	 * issue are omitted. One round trip; throws ForgeError on transport failure,
+	 * which the lifecycle reconcile treats as "unknown" (closes nothing).
+	 */
+	getIssueStates(keys: string[]): Promise<Map<string, IssueState>>;
 	/** An existing open issue whose title matches exactly, or null. */
 	findIssueByTitle(title: string): Promise<InventoryIssue | null>;
 	/** Create an issue carrying `label`; returns its key/url. */
