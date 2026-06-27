@@ -98,6 +98,10 @@ export function formatPlanReport(result: PlanResult): string {
 	// has no other view of them, but a clean pass shouldn't carry the noise.
 	if (r.supersededAcks.length > 0) parts.push(`acks superseded ${r.supersededAcks.length}`);
 	if (r.orphanedAcks.length > 0) parts.push(`acks orphaned ${r.orphanedAcks.length}`);
+	// Lifecycle reconcile outcomes — only when something happened, same noise rule.
+	if (r.reopened.length > 0) parts.push(`reopened ${r.reopened.length}`);
+	if (r.closedByReconcile.length > 0) parts.push(`closed ${r.closedByReconcile.length}`);
+	if (r.worktreesRemoved.length > 0) parts.push(`worktrees reclaimed ${r.worktreesRemoved.length}`);
 	const parked = r.parked ? ` — parked: ${r.parked.reason}` : '';
 	return `[planner] ${parts.join(', ')}${parked}\n`;
 }

@@ -137,6 +137,13 @@ describe('forge/githubInventory (FakeForgeServer)', () => {
 			assert.equal(states.size, 0);
 		});
 
+		it('reports an open, re-opened issue as reopened (the reconcile revive signal)', async () => {
+			const inv = await inventory(
+				repoData({ issues: [issue({ number: 7, title: 'reopened', state: 'open', stateReason: 'REOPENED' })] }),
+			);
+			assert.deepEqual((await inv.getIssueStates(['7'])).get('7'), { state: 'open', stateReason: 'reopened' });
+		});
+
 		it('maps DUPLICATE to not_planned and a missing close reason to null', async () => {
 			const inv = await inventory(
 				repoData({

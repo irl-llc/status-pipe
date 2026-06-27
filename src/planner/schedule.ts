@@ -138,7 +138,19 @@ function newTicket(candidate: Candidate, repo: string, iso: string): TicketFile 
 
 function stamped(existing: TicketFile | undefined, candidate: Candidate, repo: string, iso: string): TicketFile {
 	const base = existing ?? newTicket(candidate, repo, iso);
-	return { ...base, worker: { status: 'running', taskId: null, startedAt: iso, heartbeatAt: iso }, updatedAt: iso };
+	// Persist an EPIC's dispatch slug so the worktree GC reads it from the file instead
+	// of guessing `ticket-<key>` (wrong for an epic, whose slug is the spec basename, e.g.
+	// `search`) and reclaiming a live epic's worktree on a pass where the spec is briefly
+	// absent. A plain ticket's slug stays null: its worktree is `ticket-<key>`, which the
+	// GC fallback already reconstructs, and `slug` is the UI's epic marker — setting it on
+	// a plain ticket would wrongly light its "open epic file" affordance. Backfill only;
+	// never clobber a worker-set slug.
+	return {
+		...base,
+		slug: base.slug ?? (candidate.kind === 'epic' ? candidate.slug : null),
+		worker: { status: 'running', taskId: null, startedAt: iso, heartbeatAt: iso },
+		updatedAt: iso,
+	};
 }
 
 function promptFor(candidate: Candidate, ackNote: string | null): string {
@@ -207,7 +219,7 @@ export function computeParked(state: PassState, candidates: Candidate[]): Parked
 	return park(now, iso, `${active.length} active items all waiting on you; no dispatchable work`);
 }
 
-function isTerminal(ticket: TicketFile | undefined): boolean {
+export function isTerminal(ticket: TicketFile | undefined): boolean {
 	return ticket !== undefined && TERMINAL.includes(ticket.phase);
 }
 

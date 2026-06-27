@@ -32,7 +32,8 @@ export interface InventoryTicket {
  */
 export interface TicketState {
 	state: 'open' | 'closed';
-	stateReason: 'completed' | 'not_planned' | null;
+	/** `reopened` is the signal reconcileReopened revives a terminal ticket on. */
+	stateReason: 'completed' | 'not_planned' | 'reopened' | null;
 }
 
 /** An epic spec on disk and the tracking ticket its header points at (null = none yet). */

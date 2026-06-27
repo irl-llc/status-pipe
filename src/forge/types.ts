@@ -155,7 +155,8 @@ export interface InventoryIssue {
  */
 export interface IssueState {
 	state: 'open' | 'closed';
-	stateReason: 'completed' | 'not_planned' | null;
+	/** `reopened` is the open-issue signal the lifecycle reconcile revives on. */
+	stateReason: 'completed' | 'not_planned' | 'reopened' | null;
 }
 
 /**
