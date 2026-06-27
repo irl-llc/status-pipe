@@ -1,0 +1,2 @@
+kind: Fixed
+body: 'A card no longer snaps back to NEEDS YOU after you click "Ready for another look". Once the orchestrator picks the ack up, the card stays calm in WAITING — it''s the agent''s turn now — and the button gives way to a "picked up" chip so a second click can''t overwrite the note you sent. Previously the card re-alarmed near the top of the queue with the button live again until the worker happened to change the ticket''s state. A genuinely new question the agent raises after re-looking, a crashed worker, or an ack the loop never picked up still alarm.'

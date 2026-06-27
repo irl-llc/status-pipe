@@ -7,7 +7,7 @@
 import { emptyActivity } from '../output/claudeStream';
 import { LaunchAgent, TicketFile, WORKER_ID } from '../protocol/types';
 import { byCodepoint } from '../utils/ordering';
-import { AckContext, deriveAckControl, hasFreshPendingAck, hasStaleAck, isAcked } from './ackState';
+import { AckContext, deriveAckControl, hasAckedCurrentRequest, hasStaleAck, isAcked } from './ackState';
 import {
 	AgentDisplay,
 	CardDisplay,
@@ -135,14 +135,15 @@ function deriveTicket(
 		staleWorkerMinutes: ackCtx.staleWorkerMinutes,
 		now: input.now,
 		enrichment: repo.enrichment,
-		freshAckPending: hasFreshPendingAck(ticket, ticketAcks, ackCtx),
+		requestAcked: hasAckedCurrentRequest(ticket, ticketAcks, ackCtx),
 		staleAck: hasStaleAck(ticket, ticketAcks, ackCtx),
 		prRows: buildPrRows(ticket, repoTickets, repo.enrichment),
 	};
 	const { lane, reason } = assignLane(ticket, laneCtx);
-	// "Acked" is the calm WAITING state: a pending/picked-up ack moved the card
-	// out of NEEDS YOU and it's awaiting pickup. NEEDS YOU keeps its alarm (the
-	// ack didn't park it); QUIET keeps its own done/abandoned treatment (issue #10).
+	// "Acked" is the calm WAITING state: a pending or still-matching picked-up ack
+	// moved the card out of NEEDS YOU — the operator handed it back and it's the
+	// agent's turn (#57). NEEDS YOU keeps its alarm (the ack didn't park it);
+	// QUIET keeps its own done/abandoned treatment (issue #10).
 	const acked = lane === 'waiting' && isAcked(ticket, ticketAcks, ackCtx);
 	return { ackCtx, laneCtx, lane, reason, acked, ticketAcks };
 }
