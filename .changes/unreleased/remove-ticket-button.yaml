@@ -1,0 +1,2 @@
+kind: Added
+body: 'A finished ticket can now be cleared from the queue: QUIET cards (merged/abandoned/done) carry a "Remove" action that deletes the ticket''s `.status-pipe` file directly. It is the one non-ack write the extension makes, and only for a settled ticket — the controller refuses to remove an active one. Nothing durable is lost: the forge issue stays the record of truth and the planner reclaims the worktree, so removing a card just clears its local working-memory file.'

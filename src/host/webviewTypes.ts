@@ -18,7 +18,8 @@ export type ExtensionMessage =
 			result: 'created' | 'already-sent' | 'error';
 			detail?: string;
 	  }
-	| { type: 'withdrawResult'; repoRoot: string; ticket: string; result: 'withdrawn' | 'picked-up-first' | 'error' };
+	| { type: 'withdrawResult'; repoRoot: string; ticket: string; result: 'withdrawn' | 'picked-up-first' | 'error' }
+	| { type: 'removeResult'; repoRoot: string; ticket: string; result: 'removed' | 'not-allowed' | 'error' };
 
 export type WebviewMessage =
 	| { type: 'ready' }
@@ -27,6 +28,7 @@ export type WebviewMessage =
 	| { type: 'openEpicFile'; repoRoot: string; slug: string }
 	| { type: 'ack'; repoRoot: string; ticket: string; note: string | null }
 	| { type: 'withdrawAck'; repoRoot: string; ticket: string; ackId: string }
+	| { type: 'removeTicket'; repoRoot: string; ticket: string }
 	| { type: 'restartWorker'; repoRoot: string; ticket: string }
 	| {
 			type: 'agentControl';

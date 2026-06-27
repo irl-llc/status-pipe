@@ -18,6 +18,7 @@ import { QueueModelInput, RepoState } from '../queue/queueInputs';
 import { buildDisplayState } from '../queue/queueModel';
 import { AgentSupervisor } from '../supervisor/agentSupervisor';
 import { resolveAgentCwd } from '../supervisor/launchTemplate';
+import { extensionVersion, goodTickets, removeSettledTicket, scheduleTimer } from './controllerHelpers';
 import { PlannerRepo } from './plannerSpawn';
 import { createSupervisor } from './supervisorSetup';
 import { ForgeConnection, connectRepo } from './forgeSetup';
@@ -349,6 +350,17 @@ export class StatusPipeController implements vscode.Disposable {
 		return pickedUp ? 'picked-up-first' : 'withdrawn';
 	}
 
+	async removeTicket(repoRoot: string, ticketKey: string): Promise<'removed' | 'not-allowed' | 'error'> {
+		const repo = this.repos.get(repoRoot);
+		if (!repo) return 'error';
+		// The helper re-reads fresh (closing the revive race), QUIET-gates, and unlinks —
+		// rejection-free, so a load/unlink failure surfaces as 'error', never an unhandled
+		// host rejection. On success the reload reflects the now-gone file.
+		const result = await removeSettledTicket(repo.context, ticketKey);
+		if (result === 'removed') this.scheduleReload(repo);
+		return result;
+	}
+
 	async restartWorker(repoRoot: string): Promise<void> {
 		const repo = this.repos.get(repoRoot);
 		if (repo?.state?.launch && repo.context.role !== 'worktree') {
@@ -446,20 +458,4 @@ export class StatusPipeController implements vscode.Disposable {
 		for (const d of this.disposables) d.dispose();
 		if (this.pushTimer) clearTimeout(this.pushTimer);
 	}
-}
-
-// ── helpers ──────────────────────────────────────────────────────────────
-
-function goodTickets(state: RepoProtocolState): import('../protocol/types').TicketFile[] {
-	return state.tickets.flatMap((t) => (t.parsed.ok ? [t.parsed.value] : []));
-}
-
-function scheduleTimer(fn: () => void, ms: number): () => void {
-	const timer = setTimeout(fn, ms);
-	return () => clearTimeout(timer);
-}
-
-function extensionVersion(ctx: vscode.ExtensionContext): string {
-	const packageJson = ctx.extension.packageJSON as { version?: string };
-	return packageJson.version ?? '0.0.0';
 }
