@@ -84,7 +84,9 @@ A launch entry has three orthogonal fields — `id` (role), `type` (mechanism),
     external process and no `command`/`args`. Valid only on the reserved `tick`
     id. It is the **default** for `tick`: the ~95%-deterministic reconciliation
     the LLM tick did (trust filter, inventory, ack consumption, staleness
-    reconcile, fair-schedule, `orchestrator.json`) is plain code, shared with the
+    reconcile, lifecycle reconcile — close a ticket whose forge issue closed,
+    revive one the forge reports reopened — fair-schedule, worktree GC,
+    `orchestrator.json`) is plain code, shared with the
     standalone CLI, skipping a cold-start `claude` boot every interval. It rides
     the same supervised-runner machinery as a process — it presents as a one-shot
     "process" that streams a report and exits — so lifetime, parking, and backoff
@@ -127,10 +129,13 @@ A launch entry has three orthogonal fields — `id` (role), `type` (mechanism),
 ### Tick anatomy: the planner plans, the supervisor executes
 
 A tick is a **planner** pass, not the whole unit of work. The planner
-reconciles state, consumes acks, reconciles staleness, decides which workers
-should run (trust filter, fairness, `max-concurrent`, ack-priority), creates
-each worker's worktree, stamps `worker.status=running` in its ticket file, and
-writes a **dispatch plan** to `orchestrator.json` —
+reconciles state, consumes acks, reconciles staleness, reconciles each ticket's
+lifecycle against its forge issue (close a ticket whose issue has closed, revive
+one the forge reports reopened — see [02-protocol.md](02-protocol.md#lifecycle)),
+decides which workers should run (trust filter, fairness, `max-concurrent`,
+ack-priority), creates each worker's worktree, stamps `worker.status=running` in
+its ticket file, reclaims worktrees that back no live work, and writes a
+**dispatch plan** to `orchestrator.json` —
 `dispatch: {maxConcurrent, items: [{kind, key, prompt, worktree}]}` — then
 exits. It spawns no workers and waits for none. **Writing the plan IS the
 dispatch.**
@@ -157,6 +162,12 @@ relocated:
   spawned (extension down, crash between stamp and spawn) is reclaimed by the
   next planner pass's staleness reconcile (heartbeat stale ⇒ `error`, eligible
   for relaunch).
+- **Worktree GC.** A worktree is a disposable cache; the worker self-removes its
+  own when a ticket reaches a terminal phase (the fast path), and every planner pass reclaims any
+  that back no live work — a settled/closed ticket, an operator-removed file, or
+  an orphan — so a finished checkout never lingers on the trunk. A re-opened
+  ticket re-provisions its worktree on the next dispatch (reattaching the
+  branch), so removal is always safe.
 
 **Worker failures are not planner failures**: a worker that errors records it
 in its own ticket file (`worker.status=error`, history note); the planner pass
