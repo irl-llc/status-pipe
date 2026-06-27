@@ -16,11 +16,13 @@ schemas: `schemas/*.schema.json` (all in this repository).
 | `commands/launch.md` | `/status-pipe:launch [interval]` — interactive recurring wrapper around `tick` (honors `parked` + the inbox) |
 | `commands/work-ticket.md` | `/status-pipe:work-ticket <key>` — one worker pass, ticket mode |
 | `commands/work-epic.md` | `/status-pipe:work-epic <path-to-epic.md>` — one worker pass, epic mode |
+| `commands/git-spice-worker.md` | `/status-pipe:git-spice-worker <dispatched /status-pipe:work-* cmd>` — integration-branch-aware worker variant for git-spice repos |
 | `commands/split.md` | `/status-pipe:split <ticket> <topic>` — carve a discussion into a cross-linked sub-ticket |
 | `commands/ack-check.md` | `/status-pipe:ack-check` — inbox consume + staleness reconcile only |
 | `bin/fetch-comments` | the **trust gateway**: API-verified, operator-filtered comment digests — the only sanctioned comment *read* path |
 | `bin/post-comment` | the **posting wrapper**: attribution marker + `agentCommentIds[]` ledger — the only sanctioned comment *write* path |
 | `skills/protocol/SKILL.md` | the binding protocol rules (anchoring, atomic writes, trust, attribution, acks, parking) |
+| `skills/git-spice-integration/SKILL.md` | git-spice integration-branch worker rules (tip = readiness; the finishing worker rebuilds in its own worktree, lock via one-worktree-per-branch + backoff/jitter) |
 
 ## Install
 
