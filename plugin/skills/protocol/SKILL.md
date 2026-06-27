@@ -192,6 +192,87 @@ Schema: `ticket.schema.json`, `schemaVersion: 1`. The filename stem equals the
     comment or ack (§6) — never your own say-so, never inferred from silence.
     Do not go whole-hog building a feature you invented.
 
+## 4a. Adversarial review loop (the `hardening` phase)
+
+Before a worker submits, it **hardens** the change: iterate adversarial reviews
+and fixes until the diff is clean. This is the default, modeled on the comment
+gate (§7a) — a critic finds, a skeptic refutes, only survivors count. It is one
+loop **per ticket** over the ticket's whole change (the cumulative diff of the
+stack vs. the trunk base), not per branch — but each fix lands on the branch that
+**owns** that code.
+
+**When it runs.** After `implement`, before `submit`, with `phase: "hardening"`.
+It also runs again whenever `fixing` work (CI failures, review comments)
+materially changes the diff: loop back through `hardening` before re-submit, so
+post-fix code gets the same gate. **Each entry starts a fresh loop.** When you
+*transition into* `hardening` — first time from `implement`, or re-entry from
+`fixing` after a material diff change — reset `reviewLoop` to
+`{status:"running", waves:[], consecutiveCleanWaves:0}` before the first wave, so
+`capWaves` and `cleanWavesRequired` count the *current* diff's waves only, never
+ones carried over from a prior entry (a converged-then-fixed ticket would
+otherwise false-escalate on stale wave counts). The prior entry's outcome stays
+in `history`. **Resuming is not entering:** if orient already finds
+`phase:"hardening"` with `reviewLoop.status:"running"`, a previous pass ended
+mid-loop — continue that loop from its carried `waves`/`consecutiveCleanWaves`
+(working memory, §4), do **not** reset. An already-clean post-fix diff converges
+in two quick clean waves, so re-entry is cheap.
+
+**Each wave = critic then verifier, both `Task`-tool subagents.** Same hard
+requirement as §7a: if `Task` is unavailable, set `health="error"`,
+history-note the missing tool, and **end the pass** — never collapse the two
+roles into reviewing your own diff.
+
+1. **Critic (find).** A skeptical reviewer. Give it the ticket title + `plan` +
+   authoritative comments, the **current full ticket diff** (with per-branch
+   attribution when stacked), and the repo conventions it must hold the change
+   to (`CLAUDE.md`, `design/`). It returns candidate defects, each classified
+   `high` / `medium` / `low`, with `file:line`, the owning `branch`, and a
+   one-line rationale.
+2. **Verifier / skeptic (refute).** For each candidate, an **independent**
+   subagent tries to **refute** it — is it real, does it reproduce, is the
+   severity right? — defaulting to `refuted` when uncertain. Only **confirmed**
+   defects count and get fixed; refuted ones are recorded so the next wave does
+   not re-litigate them. (Fan the verifier out to N skeptics with a majority
+   rule when a ticket warrants extra rigor; one each is the default.)
+
+**Severity and the blocking threshold.**
+
+- **high** — a correctness, security, or data-loss defect; ships a real bug.
+- **medium** — a missing/weak test for changed behavior, a broken repo
+  convention, scope creep, or a latent maintainability trap.
+- **low** — style/nit/cosmetic; recorded, never blocks.
+
+A wave is **clean** when it confirms zero defects at or above
+`config.review.blockSeverity` (default `medium`, i.e. high+medium block; set
+`high` to gate on correctness/security only). Record each wave in `reviewLoop`
+(schema: `reviewLoop`): append `{at, runId, mediumPlus, clean, defects[]}` where
+`mediumPlus` is the count of **confirmed** blocking defects; bump
+`consecutiveCleanWaves` on a clean wave and **reset it to 0** on any wave that
+confirms a blocking defect.
+
+**Fix routing (git-spice).** Commit each fix on the branch that owns the code,
+then restack the upstack (`git spice` restack / `branch submit` semantics — see
+the `git-spice-integration` skill). For a single-branch ticket it is just that
+branch. A fix that hits a **capability wall** obeys §4 unchanged: fails twice or
+needs an operator-only step ⇒ `deadEnds[]` + `blockers[]` + escalate + end pass.
+
+**Termination.**
+
+- **Converge** — `consecutiveCleanWaves` reaches `config.review.cleanWavesRequired`
+  (default 2): set `reviewLoop.status="converged"`, history-note it, proceed to
+  `submit`.
+- **Cap → escalate** — this entry's `waves` reaches `config.review.capWaves`
+  (default 6) without converging: set `reviewLoop.status="escalated"`, write the unresolved
+  blocking defects into a `blocker`, set
+  `waitingOn={kind:"owner", …}` + `health="blocked"`, post the specific ask via
+  the gated `post-comment`, and **end the pass before submit**. Nothing ships
+  with known blocking defects; an oscillating reviewer is itself the signal a
+  human is needed.
+
+`config.review.enabled: false` skips the loop entirely — the worker falls back to
+a single skeptical self-review of its own diff (correctness, tests, scope creep,
+debug leftovers, conventions) and goes straight to submit.
+
 ## 5. The ack inbox and ackId derivation
 
 Acks are operator → orchestrator signal files:
