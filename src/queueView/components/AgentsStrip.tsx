@@ -12,6 +12,8 @@ import { AgentActivity } from '../../output/claudeStream';
 import { AgentDisplay, DisplayState, WorkerProcessDisplay } from '../../queue/displayTypes';
 import { formatDuration } from '../format';
 import { AGENT_STATE_ICON } from '../icons';
+import { agentStateMeaning } from '../meanings';
+import { IndicatorGlyph } from './IndicatorGlyph';
 import { usePost } from './QueueApp';
 
 /** States in which the supervisor is actively driving the config (→ Stop). */
@@ -75,9 +77,10 @@ function describeGroup(runState: string, n: number, state: DisplayState): string
 function AgentRow({ agent, state }: { agent: AgentDisplay; state: DisplayState }): JSX.Element {
 	return (
 		<div className="agent-row">
-			<span
-				className={`codicon codicon-${AGENT_STATE_ICON[agent.state]} agent-state-${agent.state}`}
-				title={agent.detail ?? agent.state}
+			<IndicatorGlyph
+				icon={AGENT_STATE_ICON[agent.state]}
+				meaning={agentStateMeaning(agent.state, agent.detail)}
+				className={`agent-state-${agent.state}`}
 			/>
 			{state.multiRepo && <span className="agent-repo">{agent.repoName}</span>}
 			<span className="agent-title" title={agent.title}>

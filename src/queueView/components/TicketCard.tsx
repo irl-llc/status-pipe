@@ -9,6 +9,8 @@ import { CardDisplay, DisplayState } from '../../queue/displayTypes';
 import { Health } from '../../protocol/types';
 import { formatAge, formatDuration, plainHeadline } from '../format';
 import { WAITING_ICON } from '../icons';
+import { accentMeaning, statusIconMeaning, waitingMeaning } from '../meanings';
+import { AccentTip, IndicatorGlyph } from './IndicatorGlyph';
 import { AckControl } from './AckControl';
 import { PrRows } from './PrRows';
 import { usePost, useRepoFilter } from './QueueApp';
@@ -43,6 +45,7 @@ export function TicketCard({ card, state, selected, onSelect }: TicketCardProps)
 			className={`card ${accentClass(card)}${card.acked ? ' acked' : ''}${selected ? ' selected' : ''}`}
 			onClick={onSelect}
 		>
+			<AccentTip meaning={accentMeaning(card)} />
 			<CardHeader card={card} state={state} />
 			{card.phase && <div className="card-phase">{card.phase}</div>}
 			{card.headline && (
@@ -53,7 +56,7 @@ export function TicketCard({ card, state, selected, onSelect }: TicketCardProps)
 			<WaitingLine card={card} />
 			{card.blockers.map((blocker, i) => (
 				<div key={i} className="blocker-line">
-					<span className="codicon codicon-circle-slash" />
+					<IndicatorGlyph icon="circle-slash" meaning="Blocked — needs you" />
 					{blocker}
 				</div>
 			))}
@@ -84,7 +87,7 @@ function CardHeader({ card, state }: { card: CardDisplay; state: DisplayState })
 	const icon = headerIcon(card);
 	return (
 		<div className="card-header">
-			{icon && <span className={`codicon codicon-${icon} card-status-icon`} />}
+			{icon && <IndicatorGlyph icon={icon} meaning={statusIconMeaning(card) ?? ''} className="card-status-icon" />}
 			{state.multiRepo && (
 				<span
 					className="repo-badge"
@@ -130,7 +133,7 @@ function WaitingLine({ card }: { card: CardDisplay }): JSX.Element | null {
 			}}
 			title={waiting.ref ?? ''}
 		>
-			<span className={`codicon codicon-${WAITING_ICON[waiting.kind]}`} />
+			<IndicatorGlyph icon={WAITING_ICON[waiting.kind]} meaning={waitingMeaning(waiting.kind)} />
 			<span>{waiting.detail ?? `waiting on ${waiting.kind}`}</span>
 			<span className="dim">· {formatDuration(waiting.durationMs)}</span>
 		</div>

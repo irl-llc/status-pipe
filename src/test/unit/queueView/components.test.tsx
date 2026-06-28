@@ -463,6 +463,19 @@ describe('queueView/components', () => {
 			assert.deepEqual(messages, [{ type: 'agentControl', repoRoot: '/repo', agentId: 'tick', action: 'start' }]);
 		});
 
+		it('labels the state glyph with its meaning, preferring live detail', () => {
+			const named = makeState({ agents: [makeAgent({ state: 'scheduled', detail: null })] });
+			const r1 = renderWithPost(<AgentsStrip state={named} />);
+			assert.equal(
+				r1.result.container.querySelector('.agent-row .codicon')?.getAttribute('aria-label'),
+				'Scheduled — waiting for next tick',
+			);
+			cleanup();
+			const detailed = makeState({ agents: [makeAgent({ state: 'failed', detail: 'exit 1 ×3' })] });
+			const r2 = renderWithPost(<AgentsStrip state={detailed} />);
+			assert.equal(r2.result.container.querySelector('.agent-row .codicon')?.getAttribute('aria-label'), 'exit 1 ×3');
+		});
+
 		it('offers Tick now and Open log for an installed but idle config', () => {
 			const state = makeState({
 				agents: [
@@ -724,6 +737,71 @@ describe('queueView/components', () => {
 		it('renders the circle-slash glyph on blocker lines', () => {
 			const { result } = renderCard(makeCard({ blockers: ['need creds'] }));
 			assert.ok(result.container.querySelector('.blocker-line .codicon-circle-slash'));
+		});
+	});
+
+	// Rule 6 meanings render as DOM tooltips (the `.tip` widget): the words live
+	// in `data-tip` (drawn by CSS, so the snapshot suite can pixel-test them) and
+	// in `aria-label` (so screen readers read them) — never a native `title`,
+	// which the OS draws off-page where no test can see it.
+	describe('indicator meaning tooltips (rule 6)', () => {
+		// Both attributes carry the same words; assert both so neither the visible
+		// tooltip nor the accessible name can silently drop.
+		function meaning(el: Element | null): { tip: string | null; aria: string | null } {
+			return { tip: el?.getAttribute('data-tip') ?? null, aria: el?.getAttribute('aria-label') ?? null };
+		}
+
+		it('labels the accent bar with the health meaning', () => {
+			const { result } = renderCard(makeCard({ health: 'blocked' }));
+			assert.deepEqual(meaning(result.container.querySelector('.card .accent-tip')), {
+				tip: 'Blocked — needs you',
+				aria: 'Blocked — needs you',
+			});
+		});
+
+		it('labels the accent bar with the stale-worker meaning over health', () => {
+			const card = makeCard({
+				health: 'ok',
+				worker: { status: 'running', heartbeatAt: null, heartbeatAgeMs: 40 * 60_000, stale: true },
+			});
+			assert.deepEqual(meaning(renderCard(card).result.container.querySelector('.card .accent-tip')), {
+				tip: 'Stale worker — no heartbeat in 40m',
+				aria: 'Stale worker — no heartbeat in 40m',
+			});
+		});
+
+		it('labels the header status glyph with its meaning', () => {
+			const { result } = renderCard(makeCard({ reason: 'worker-crashed' }));
+			assert.deepEqual(meaning(result.container.querySelector('.card-status-icon')), {
+				tip: 'Worker crashed — restart it',
+				aria: 'Worker crashed — restart it',
+			});
+		});
+
+		it('labels the blocker glyph with Blocked — needs you', () => {
+			const { result } = renderCard(makeCard({ blockers: ['need creds'] }));
+			assert.deepEqual(meaning(result.container.querySelector('.blocker-line .codicon-circle-slash')), {
+				tip: 'Blocked — needs you',
+				aria: 'Blocked — needs you',
+			});
+		});
+
+		it('labels the waiting glyph with the kind meaning (not the link)', () => {
+			const card = makeCard({
+				waiting: {
+					kind: 'merge',
+					ref: 'https://x/pr/1',
+					pr: 1,
+					since: '2026-06-11T10:00:00Z',
+					durationMs: 60_000,
+					detail: null,
+				},
+			});
+			const { result } = renderCard(card);
+			assert.deepEqual(meaning(result.container.querySelector('.waiting-line .codicon-git-merge')), {
+				tip: 'Ready to merge — your call',
+				aria: 'Ready to merge — your call',
+			});
 		});
 	});
 
