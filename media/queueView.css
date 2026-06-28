@@ -148,7 +148,8 @@ body {
 }
 
 /* Live worker processes read as children of the planner that dispatched them:
-   indented, no action controls (their lifecycle is the planner's). */
+   indented, no lifecycle controls (their lifecycle is the planner's) — only the
+   read-only Open-log action sits in the actions slot (issue #56). */
 .agent-row.worker-row {
 	padding-left: 30px;
 }
