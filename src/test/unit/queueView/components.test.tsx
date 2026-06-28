@@ -794,7 +794,7 @@ describe('queueView/components', () => {
 					}}
 				/>,
 			);
-			handler!({ type: 'init', mode: 'editor' });
+			act(() => handler!({ type: 'init', mode: 'editor' }));
 			const push = (cards: CardDisplay[]): void =>
 				act(() => handler!({ type: 'displayState', state: makeState({ cards }) }));
 			push(initialCards);
@@ -827,9 +827,12 @@ describe('queueView/components', () => {
 			const b = makeCard({ id: 'b', ticket: 'B', title: 'Bravo', lane: 'needs-you' });
 			const { result, push } = mountEditor([a, b]);
 			fireEvent.click(listCardByTitle(result, 'Bravo'));
-			push([a, makeCard({ id: 'b', ticket: 'B', title: 'Bravo', lane: 'needs-you', phase: 'review' })]);
+			// Re-push B with genuinely changed content (new title) but the same id:
+			// the selection survives by id and the pane reflects the fresh content,
+			// never falling back to the nothing-selected note.
+			push([a, makeCard({ id: 'b', ticket: 'B', title: 'Bravo (updated)', lane: 'needs-you' })]);
 			assert.equal(result.container.querySelector('.selection-note'), null);
-			assert.equal(result.container.querySelector('.editor-detail .card-title')?.textContent, 'Bravo');
+			assert.equal(result.container.querySelector('.editor-detail .card-title')?.textContent, 'Bravo (updated)');
 		});
 	});
 
