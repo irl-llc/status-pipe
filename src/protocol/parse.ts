@@ -399,6 +399,18 @@ function inventoryAssigneesFromJson(inventory: Json | null): string[] {
 	return byChannel ? Object.values(byChannel).flatMap(strArray) : [];
 }
 
+/** The pre-handoff review gate (`config.reviewGate`), flattened with defaults. */
+function reviewGateFromJson(
+	json: Json,
+): Pick<ConfigFile, 'reviewGateRequireCiGreen' | 'reviewGateWaitForBots' | 'reviewGateBotWaitMaxMinutes'> {
+	const gate = obj(json.reviewGate);
+	return {
+		reviewGateRequireCiGreen: gate?.requireCiGreen === false ? false : true,
+		reviewGateWaitForBots: strArray(gate?.waitForBots),
+		reviewGateBotWaitMaxMinutes: Math.max(0, num(gate?.botWaitMaxMinutes) ?? 30),
+	};
+}
+
 function configValueFromJson(json: Json): ConfigFile {
 	const tickets = obj(json.tickets) ?? {};
 	const jira = obj(tickets.jira) ?? {};
@@ -414,6 +426,7 @@ function configValueFromJson(json: Json): ConfigFile {
 		staleWorkerMinutes: num(json.staleWorkerMinutes),
 		trustMode: trustModeFromJson(json),
 		trustOperators: trustOperatorsFromJson(json),
+		...reviewGateFromJson(json),
 	};
 }
 

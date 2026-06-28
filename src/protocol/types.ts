@@ -211,6 +211,18 @@ export interface ConfigFile {
 	trustMode: TrustMode | null;
 	/** Identities allowed to drive the agent (flattened from trust.operators). */
 	trustOperators: string[];
+	/**
+	 * Pre-handoff review gate (`config.reviewGate`, flattened). Governs when a
+	 * worker may reach `awaiting-merge`: head CI must have actually run+passed and
+	 * every configured review bot must have reviewed the current head. The plugin
+	 * (Layer 1) is the binding consumer; the extension's deterministic CI backstop
+	 * (Layer 2) reads only `reviewGateRequireCiGreen`. Bots listed here are
+	 * routing, never trust — they delay the human handoff, they never drive the
+	 * agent (same independence as inventory.assignees vs trust.operators).
+	 */
+	reviewGateRequireCiGreen: boolean;
+	reviewGateWaitForBots: string[];
+	reviewGateBotWaitMaxMinutes: number;
 }
 
 /**

@@ -50,6 +50,7 @@ Everything the plugin needs to know about *this repo's* conventions lives here
   "tickets": { "source": "github-issues" },
   "staleWorkerMinutes": 30,
   "review": { "enabled": true, "blockSeverity": "medium", "cleanWavesRequired": 2, "capWaves": 6 },
+  "reviewGate": { "requireCiGreen": true, "waitForBots": ["gemini-code-assist[bot]"], "botWaitMaxMinutes": 30 },
   "trust": {
     "mode": "single-maintainer",
     "operators": ["octocat"],
@@ -83,6 +84,16 @@ Everything the plugin needs to know about *this repo's* conventions lives here
   reverts to a single self-review. `blockSeverity` (`medium` default) is the
   lowest defect severity that blocks; `cleanWavesRequired` (2) and `capWaves` (6)
   set convergence and the escalate-to-operator cap.
+- `reviewGate` (optional) — the **pre-handoff** gate: what must hold before a
+  worker reaches `awaiting-merge` (the two-layer gate below). `requireCiGreen`
+  (default **true**) demands the PR head's checks actually ran and the live
+  aggregate is `passing`; a repo with no CI sets it `false` (documented escape
+  hatch). `waitForBots` (default **empty**) lists review-bot usernames that must
+  review the *current head* before handoff — opt-in, since identities are
+  repo-specific. `botWaitMaxMinutes` (default ~30) bounds the wait for a stranded
+  bot before the worker escalates a NEEDS-YOU blocker. Like `inventory.assignees`,
+  `waitForBots` is **routing, not trust** — a listed bot only delays the human
+  handoff; its comments stay untrusted data and never drive the agent.
 - On Bitbucket + Jira repos, `trust.operators` spans two identity namespaces;
   use the split form `operators: { "bitbucket": ["{uuid}"], "jira":
   ["<accountId>"] }` — entries are matched per channel by the forge's own
@@ -285,8 +296,30 @@ Phase machine identical in shape to irl-llc's tranche loop, generalized:
 **orient** (reconcile git + forge + ticket file; consume any inbox acks for this
 ticket) → **plan** → **implement** → **review** (self-review the diff) →
 **submit** (create/update PR; stacked PRs via git-spice when available, plain
-branches otherwise — git-spice is *not* required) → **gate** (CI kicked off,
-bot comments answered; never block waiting on CI) → **wrap**.
+branches otherwise — git-spice is *not* required) → **gate** (the pre-handoff
+`reviewGate` below; never block waiting on CI) → **wrap**.
+
+**The pre-handoff gate is two layers** (`config.reviewGate`):
+
+1. **Worker gate (binding, prompt-side).** A worker reaches `awaiting-merge`
+   only when the PR head's CI has *actually run and passed* (when
+   `requireCiGreen`) **and** every `waitForBots` reviewer has a review on the
+   *current head SHA* that the worker has read and addressed. Both halves are
+   **head-anchored**: a check or bot review on a stale commit does not count, so
+   "it passed" means "it passed on this commit." Checks still pending on head ⇒
+   `waitingOn.kind=build` (WAITING, re-polled). A required bot missing on head ⇒
+   `waitingOn.kind=review`. A bot still silent after `botWaitMaxMinutes` ⇒
+   `health=blocked` + a blocker (NEEDS YOU) — never stranded, never skipped.
+2. **Extension CI backstop (deterministic, CI-only).** The queue model already
+   computes live CI (`effectiveCi` overrides the worker's cached `pr.ci` with the
+   live `ChecksInfo.aggregate`). `assignLane` consults it: a card the worker
+   marked merge-ready (`phase: awaiting-merge` / `waitingOn.kind: merge`) is
+   **not** rendered as ready-to-merge while the merge PR's `effectiveCi` isn't
+   `passing` — a failing PR surfaces as orphaned-CI, anything else falls to
+   WAITING — so a worker that jumped the gate is visibly corrected regardless of
+   what it wrote. This layer honors `requireCiGreen` (a no-CI repo opts out) and
+   stays CI-only: "bot addressed" is judgment that lives with the worker;
+   "checks passed" is deterministic and belongs in the extension.
 
 State-writing discipline (enforced by the `protocol` skill):
 
