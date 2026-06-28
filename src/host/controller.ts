@@ -18,6 +18,8 @@ import { QueueModelInput, RepoState } from '../queue/queueInputs';
 import { buildDisplayState } from '../queue/queueModel';
 import { AgentSupervisor } from '../supervisor/agentSupervisor';
 import { resolveAgentCwd } from '../supervisor/launchTemplate';
+import { openWorkerLogFile } from './workerLogStore';
+import { showWorkerLog } from './workerLogView';
 import { extensionVersion, goodTickets, removeSettledTicket, scheduleTimer } from './controllerHelpers';
 import { PlannerRepo } from './plannerSpawn';
 import { createSupervisor } from './supervisorSetup';
@@ -64,6 +66,7 @@ export class StatusPipeController implements vscode.Disposable {
 		this.enricher.load(ctx.workspaceState.get<PersistedEnrichment>(ENRICHMENT_CACHE_KEY, {}));
 		this.supervisor = createSupervisor({
 			log: (repoRoot, agentId, line) => this.channel(repoRoot, agentId).append(line),
+			openWorkerLog: (repoRoot, key) => openWorkerLogFile(this.protocolDirFor(repoRoot), key),
 			onStateChange: () => this.pushSoon(),
 			schedule: scheduleTimer,
 			planner: {
@@ -419,12 +422,21 @@ export class StatusPipeController implements vscode.Disposable {
 		this.enricher.setVisible(visible);
 	}
 
+	/** A repo's protocol dir, falling back to the conventional path before
+	 *  discovery has landed (shared by ticket-file and worker-log opens). */
+	private protocolDirFor(repoRoot: string): string {
+		return this.repos.get(repoRoot)?.context.protocolDir ?? path.join(repoRoot, settings.protocolDirName());
+	}
+
 	async revealTicketFile(repoRoot: string, ticketKey: string): Promise<void> {
-		// Fall back to the conventional path when discovery has not landed yet.
-		const protocolDir =
-			this.repos.get(repoRoot)?.context.protocolDir ?? path.join(repoRoot, settings.protocolDirName());
-		const file = path.join(protocolDir, 'tickets', `${ticketKey}.json`);
+		const file = path.join(this.protocolDirFor(repoRoot), 'tickets', `${ticketKey}.json`);
 		await vscode.window.showTextDocument(vscode.Uri.file(file));
+	}
+
+	/** The crashed-worker card's post-mortem surface (design/09): the persisted
+	 *  per-worker log survives the reload the live OutputChannel doesn't. */
+	async openWorkerLog(repoRoot: string, ticketKey: string): Promise<void> {
+		await showWorkerLog(this.protocolDirFor(repoRoot), ticketKey);
 	}
 
 	async openEpicFile(repoRoot: string, slug: string): Promise<void> {

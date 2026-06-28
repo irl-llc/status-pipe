@@ -51,23 +51,31 @@ interface Harness {
 	spawner: FakeSpawner;
 	supervisor: AgentSupervisor;
 	logs: string[];
+	/** Lines teed to each worker's disk sink, keyed by `repoRoot::key`. */
+	workerLogs: Map<string, string[]>;
 }
 
 function makeSupervisor(settings: Partial<SupervisorSettings> = {}): Harness {
 	const clock = new ManualClock();
 	const spawner = new FakeSpawner();
 	const logs: string[] = [];
+	const workerLogs = new Map<string, string[]>();
 	const supervisor = new AgentSupervisor(
 		{
 			spawn: spawner.spawn,
 			now: () => clock.now,
 			schedule: clock.schedule,
 			log: (repoRoot, agentId, line) => logs.push(`${repoRoot}:${agentId}:${line}`),
+			openWorkerLog: (repoRoot, key) => {
+				const lines: string[] = [];
+				workerLogs.set(`${repoRoot}::${key}`, lines);
+				return { write: (line) => lines.push(line), close: () => undefined };
+			},
 			onStateChange: () => undefined,
 		},
 		{ enabled: true, pauseWhenIdle: false, maxRestarts: 3, ...settings },
 	);
-	return { clock, spawner, supervisor, logs };
+	return { clock, spawner, supervisor, logs, workerLogs };
 }
 
 /** start → clean exit, leaving the repo's single runner scheduled. */
@@ -279,6 +287,17 @@ describe('supervisor/agentSupervisor', () => {
 			assert.equal(h.spawner.requests.length, 2);
 			assert.deepEqual(h.spawner.requests[0].args, ['-p', '/status-pipe:work-ticket 19']);
 			assert.equal(h.spawner.requests[0].cwd, '/wt/19');
+		});
+
+		it('opens a per-key disk log and tees the worker output into it', () => {
+			const h = makeSupervisor();
+			h.supervisor.setAgents(REPO, [workerAgent()]);
+			h.supervisor.noteOrchestrator(REPO, dispatched(['19']));
+			h.spawner.outputLast('{"type":"assistant"}');
+			const lines = h.workerLogs.get(`${REPO}::19`);
+			assert.ok(lines, 'expected a disk sink opened for worker 19');
+			assert.ok(lines.some((l) => l.includes('worker 19 started')));
+			assert.ok(lines.includes('{"type":"assistant"}'));
 		});
 
 		it('dedups by key while a worker is still alive (even across a new pass)', () => {

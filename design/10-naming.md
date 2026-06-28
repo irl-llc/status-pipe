@@ -55,9 +55,20 @@ the **operator** watches all three through the queue.
     ├── tickets/                 # ignored — one file per tracked ticket
     │   ├── 853.json
     │   └── PROJ-123.json
-    └── inbox/                   # ignored — operator → orchestrator acks
-        └── 853/ack-7f3a9c2e.json
+    ├── inbox/                   # ignored — operator → orchestrator acks
+    │   └── 853/ack-7f3a9c2e.json
+    └── logs/                    # ignored — supervisor-owned worker telemetry
+        ├── worker-853.log       #   current attempt
+        └── worker-853.log.1     #   rotated; last 3 attempts kept per key
 ```
+
+`logs/` holds **process** telemetry, never agent-owned state: each worker run's
+stdout/stderr is teed to `worker-<key>.log` (the same lines the live "worker"
+OutputChannel shows) so a *failed* worker's output survives the extension
+reload the channel doesn't, isolated per ticket key. The supervisor rotates on
+each worker start (`worker-<key>.log` → `.1` → `.2`), keeping the last three
+attempts. The crashed-worker card's "Open log" opens this file; the live worker
+row opens the channel.
 
 Recommended ignore rules (everything runtime; only launcher + config committed):
 

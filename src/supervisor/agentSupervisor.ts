@@ -9,6 +9,7 @@ import { DispatchItem, DispatchPlan, LaunchAgent, OrchestratorFile, ParkedState,
 import { AgentProcessState, WorkerProcessState } from '../queue/queueInputs';
 import { SupervisedRunner, Spawner, launchAgentToRequest } from './supervisedRunner';
 import { resolveWorkerRequest } from './launchTemplate';
+import { WorkerLogOpener } from './workerLog';
 import { WorkerRunner } from './workerRunner';
 
 const WEDGE_CHECK_MS = 60_000;
@@ -25,6 +26,9 @@ export interface SupervisorDeps {
 	now(): number;
 	schedule(fn: () => void, ms: number): () => void;
 	log(repoRoot: string, agentId: string, line: string): void;
+	/** Opens a rotated, persistent disk log for one worker run (design/09);
+	 *  absent in headless/test contexts, where workers log only to the channel. */
+	openWorkerLog?: WorkerLogOpener;
 	onStateChange(): void;
 }
 
@@ -166,6 +170,9 @@ export class AgentSupervisor {
 			now: () => this.deps.now(),
 			schedule: (fn, ms) => this.deps.schedule(fn, ms),
 			log: (line) => this.deps.log(repoRoot, channel, line),
+			// Persisted per-key so a crashed worker's output survives reload, while
+			// the shared channel above keeps the live interleaved view.
+			logFile: this.deps.openWorkerLog?.(repoRoot, item.key),
 			onDone: () => {
 				repo.workers.delete(item.key);
 				this.deps.onStateChange();

@@ -255,6 +255,15 @@ escalate the planner's `failed` state — worker outcomes live in ticket files.
   stdout/stderr go to a per-agent **OutputChannel** ("Status Pipe: fleet-api ·
   tick"); "Open log" jumps there. A "Run in terminal" secondary action exists
   for interactive debugging.
+- **Worker telemetry is also persisted.** Workers share one per-repo "worker"
+  OutputChannel (a per-key channel would never be disposed), so the live view
+  interleaves them and — like every channel — is lost on reload. That is
+  exactly the failed-worker case the operator needs, so each worker run's output
+  is *additionally* teed to `.status-pipe/logs/worker-<key>.log` (design/10):
+  per-key, rotated to the last three attempts on each start. The live worker row
+  opens the channel; the crashed-worker card's "Open log" opens the persisted
+  file. Disk logging is best-effort — a setup failure degrades to a no-op and
+  never blocks a spawn.
 - **Liveness**: `lastOutputAt` from stdout activity (stream-json makes this
   dense) feeds the fleet-strip display; the only kill rule is the
   `timeoutMinutes` wall-clock cap. **Daemons** get a staleness check too: a

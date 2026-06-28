@@ -56,6 +56,9 @@ async function routeControlMessage(controller: StatusPipeController, message: We
 		case 'restartWorker':
 			await controller.restartWorker(message.repoRoot);
 			return;
+		case 'openWorkerLog':
+			await controller.openWorkerLog(message.repoRoot, message.ticket);
+			return;
 		case 'agentControl':
 			await controller.agentControl(message.repoRoot, message.agentId, message.action);
 			return;
