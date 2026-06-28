@@ -77,8 +77,11 @@ unchecked item in the tracking ticket's tranche checklist):
   `epic/<slug>/`), stacked via git-spice when available. **harden** runs the
   adversarial review loop (protocol skill §4a) over the frontier tranche's
   cumulative diff with `phase: "hardening"`, routing each fix to the branch in
-  the stack that owns the code. Keep the tracking
-  ticket's checklist current: check off a tranche when its PR merges (one
+  the stack that owns the code. **gate** applies `config.reviewGate` to the
+  tranche's PR exactly as `work-ticket` §6 does — head-anchored CI ran+passed
+  (when `requireCiGreen`) and every `waitForBots` reviewer has an addressed head
+  review before `awaiting-merge`, with the stranded-bot escalation. Keep the
+  tracking ticket's checklist current: check off a tranche when its PR merges (one
   `post-comment` lifecycle one-liner, not a paragraph). Work outside the
   epic's scope is **orthogonal work** (protocol skill §4): search, file a
   cross-referenced ticket, get operator approval before building — never

@@ -501,6 +501,9 @@ describe('protocol/parse', () => {
 				staleWorkerMinutes: null,
 				trustMode: null,
 				trustOperators: [],
+				reviewGateRequireCiGreen: true,
+				reviewGateWaitForBots: [],
+				reviewGateBotWaitMaxMinutes: 30,
 			});
 		});
 
@@ -512,6 +515,7 @@ describe('protocol/parse', () => {
 				tickets: { source: 'jira-cloud', jira: { siteUrl: 'https://irl.atlassian.net', projectKey: 'PROJ' } },
 				staleWorkerMinutes: 45,
 				trust: { mode: 'multi-maintainer', operators: ['ekohlwey', 'ed-irl'] },
+				reviewGate: { requireCiGreen: false, waitForBots: ['gemini-code-assist[bot]'], botWaitMaxMinutes: 45 },
 			});
 			assert.deepStrictEqual(ok(parseConfigFile(raw)), {
 				schemaVersion: 1,
@@ -524,7 +528,40 @@ describe('protocol/parse', () => {
 				staleWorkerMinutes: 45,
 				trustMode: 'multi-maintainer',
 				trustOperators: ['ekohlwey', 'ed-irl'],
+				reviewGateRequireCiGreen: false,
+				reviewGateWaitForBots: ['gemini-code-assist[bot]'],
+				reviewGateBotWaitMaxMinutes: 45,
 			});
+		});
+
+		it('defaults reviewGate: requireCiGreen on, no bots, 30-minute bound', () => {
+			const value = ok(parseConfigFile('{"schemaVersion": 1}'));
+			assert.strictEqual(value.reviewGateRequireCiGreen, true);
+			assert.deepStrictEqual(value.reviewGateWaitForBots, []);
+			assert.strictEqual(value.reviewGateBotWaitMaxMinutes, 30);
+		});
+
+		it('only an explicit false disables requireCiGreen; a malformed value keeps the default', () => {
+			const off = ok(parseConfigFile(JSON.stringify({ schemaVersion: 1, reviewGate: { requireCiGreen: false } })));
+			assert.strictEqual(off.reviewGateRequireCiGreen, false);
+			const garbled = ok(parseConfigFile(JSON.stringify({ schemaVersion: 1, reviewGate: { requireCiGreen: 'no' } })));
+			assert.strictEqual(garbled.reviewGateRequireCiGreen, true);
+		});
+
+		it('drops non-string waitForBots entries and a malformed botWaitMaxMinutes', () => {
+			const raw = JSON.stringify({
+				schemaVersion: 1,
+				reviewGate: { waitForBots: ['gemini-code-assist[bot]', 7, null], botWaitMaxMinutes: 'soon' },
+			});
+			const value = ok(parseConfigFile(raw));
+			assert.deepStrictEqual(value.reviewGateWaitForBots, ['gemini-code-assist[bot]']);
+			assert.strictEqual(value.reviewGateBotWaitMaxMinutes, 30);
+		});
+
+		it('clamps a negative botWaitMaxMinutes to 0 (never a wait bound in the past)', () => {
+			const raw = JSON.stringify({ schemaVersion: 1, reviewGate: { botWaitMaxMinutes: -5 } });
+			const value = ok(parseConfigFile(raw));
+			assert.strictEqual(value.reviewGateBotWaitMaxMinutes, 0);
 		});
 
 		it('flattens the per-channel object form of trust.operators', () => {

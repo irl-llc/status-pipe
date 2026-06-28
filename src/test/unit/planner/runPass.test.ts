@@ -54,6 +54,9 @@ function config(over: Partial<ConfigFile> = {}): ConfigFile {
 		staleWorkerMinutes: 30,
 		trustMode: 'single-maintainer',
 		trustOperators: [],
+		reviewGateRequireCiGreen: true,
+		reviewGateWaitForBots: [],
+		reviewGateBotWaitMaxMinutes: 30,
 		...over,
 	};
 }

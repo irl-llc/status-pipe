@@ -36,8 +36,10 @@ export interface LaneContext {
 	/** A fresh pending ack suppresses the ackable classes (→ WAITING). */
 	freshAckPending: boolean;
 	staleAck: boolean;
-	/** Effective (enrichment-merged) PR rows for the orphaned-CI rule. */
+	/** Effective (enrichment-merged) PR rows for the orphaned-CI and merge-gate rules. */
 	prRows: PrRowDisplay[];
+	/** config.reviewGate.requireCiGreen — gates the Layer-2 merge-ready CI backstop. */
+	requireCiGreen: boolean;
 }
 
 export interface LaneAssignment {
@@ -75,6 +77,23 @@ function orphanedFailingCi(ticket: TicketFile, ctx: LaneContext): boolean {
 	return ctx.prRows.some((pr) => pr.state === 'open' && pr.ci === 'failing');
 }
 
+/**
+ * Layer-2 CI backstop (design/07, issue #36): a card the worker marked
+ * merge-ready presents as 'merge' only when its PR's effective (live) CI is
+ * actually passing. With `requireCiGreen`, a merge PR whose CI is not 'passing'
+ * withholds the 'merge' reason — a failing PR then falls to 'orphaned-ci',
+ * anything else (pending/none/unknown) to WAITING — so a worker that jumped the
+ * gate is visibly corrected regardless of what it wrote. `requireCiGreen: false`
+ * (a no-CI repo) disables the backstop. No live row to judge ⇒ trust the worker.
+ */
+function mergeReady(ticket: TicketFile, ctx: LaneContext): boolean {
+	if (!ctx.requireCiGreen) return true;
+	const prNumber = ticket.waitingOn?.pr;
+	const open = ctx.prRows.filter((pr) => pr.state === 'open');
+	const rows = typeof prNumber === 'number' ? open.filter((pr) => pr.number === prNumber) : open;
+	return rows.length === 0 || rows.every((pr) => pr.ci === 'passing');
+}
+
 function ackableReason(ticket: TicketFile, ctx: LaneContext): NeedsYouReason | null {
 	if (ticket.health === 'blocked' || ticket.blockers.length > 0) return 'blocked';
 	const kind = ticket.waitingOn?.kind;
@@ -84,7 +103,7 @@ function ackableReason(ticket: TicketFile, ctx: LaneContext): NeedsYouReason | n
 	// per the review rule's fallback, unattributable ⇒ include.
 	if (kind === 'owner' || kind === 'comment') return 'owner';
 	if (kind === 'review') return reviewIsSomeoneElses(ticket, ctx) ? null : 'review';
-	if (kind === 'merge') return 'merge';
+	if (kind === 'merge') return mergeReady(ticket, ctx) ? 'merge' : null;
 	return null;
 }
 

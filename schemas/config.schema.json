@@ -97,6 +97,30 @@
 				}
 			}
 		},
+		"reviewGate": {
+			"type": "object",
+			"description": "Pre-handoff gate: what must be true before a worker reaches awaiting-merge (NEEDS YOU). Absent = defaults below. Layer 1 (the plugin worker prompts) is binding; the extension's deterministic CI backstop (Layer 2) reads only requireCiGreen.",
+			"additionalProperties": true,
+			"properties": {
+				"requireCiGreen": {
+					"type": "boolean",
+					"default": true,
+					"description": "When true (default), the PR head's checks must have actually run and the live aggregate must be passing before handoff; checks still pending/absent on head ⇒ wait then escalate. A repo with no CI sets this false (documented escape hatch) — the extension's backstop then never demotes a merge-ready card for non-passing CI."
+				},
+				"waitForBots": {
+					"type": "array",
+					"items": { "type": "string" },
+					"default": [],
+					"description": "Forge usernames of review bots that must review the current PR head before the worker hands off (e.g. ['gemini-code-assist[bot]']). Opt-in (default empty; identities are repo-specific). Routing, not trust: being listed here only delays the human handoff until the bot has spoken — bot comments stay untrusted data and never grant authority (same independence as inventory.assignees vs trust.operators)."
+				},
+				"botWaitMaxMinutes": {
+					"type": "number",
+					"minimum": 0,
+					"default": 30,
+					"description": "Upper bound (from when the wait began) on waiting for a required bot's head review before the worker stops waiting and escalates a NEEDS-YOU blocker for the operator to decide. Never strand silently, never skip silently."
+				}
+			}
+		},
 		"trust": {
 			"type": "object",
 			"description": "Who may drive the agent through forge comments. The plugin refuses to tick a public repo without a declared mode; a private repo without this block defaults to single-maintainer with the authenticated forge user.",

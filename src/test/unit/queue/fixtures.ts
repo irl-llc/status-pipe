@@ -122,6 +122,9 @@ export function makeConfig(overrides: Partial<ConfigFile> = {}): ConfigFile {
 		staleWorkerMinutes: null,
 		trustMode: null,
 		trustOperators: [],
+		reviewGateRequireCiGreen: true,
+		reviewGateWaitForBots: [],
+		reviewGateBotWaitMaxMinutes: 30,
 		...overrides,
 	};
 }

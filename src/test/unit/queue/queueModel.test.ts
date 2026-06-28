@@ -234,6 +234,77 @@ describe('queue/queueModel buildDisplayState', () => {
 		});
 	});
 
+	describe('Layer-2 merge CI backstop (issue #36)', () => {
+		const mergeTicket = (ci: 'passing' | 'failing' | 'pending' | 'unknown', extraPrs: number[] = []): TicketFile =>
+			makeTicket({
+				phase: 'awaiting-merge',
+				waitingOn: waiting({ kind: 'merge', pr: 855 }),
+				prs: [makePr({ number: 855, ci }), ...extraPrs.map((number) => makePr({ number, ci: 'pending' }))],
+			});
+
+		it('renders merge-ready when the merge PR CI is passing', () => {
+			assertLane(soloCard(mergeTicket('passing')), 'needs-you', 'merge');
+		});
+
+		it('withholds merge and surfaces orphaned-ci when the merge PR CI is failing', () => {
+			assertLane(soloCard(mergeTicket('failing')), 'needs-you', 'orphaned-ci');
+		});
+
+		it('withholds merge and falls to WAITING when the merge PR CI is still pending', () => {
+			assertLane(soloCard(mergeTicket('pending')), 'waiting', null);
+		});
+
+		it('withholds merge when checks never ran on head (ci unknown)', () => {
+			assertLane(soloCard(mergeTicket('unknown')), 'waiting', null);
+		});
+
+		it('uses live effective CI: live pending beats a cached passing ci for the merge gate', () => {
+			const enrichment: RepoEnrichment = {
+				viewerLogin: null,
+				prs: {
+					855: prEnrichment({ checks: { aggregate: 'pending', checks: [{ name: 'build', status: 'pending' }] } }),
+				},
+			};
+			assertLane(soloCard(mergeTicket('passing'), { enrichment }), 'waiting', null);
+		});
+
+		it('withholds merge and falls to WAITING when live checks report none (no checks on head)', () => {
+			const enrichment: RepoEnrichment = {
+				viewerLogin: null,
+				prs: { 855: prEnrichment({ checks: { aggregate: 'none', checks: [] } }) },
+			};
+			assertLane(soloCard(mergeTicket('passing'), { enrichment }), 'waiting', null);
+		});
+
+		it('disables the backstop when reviewGate.requireCiGreen is false (no-CI repo)', () => {
+			assertLane(
+				soloCard(mergeTicket('unknown'), { config: makeConfig({ reviewGateRequireCiGreen: false }) }),
+				'needs-you',
+				'merge',
+			);
+		});
+
+		it('opt-out still renders merge even with failing CI, never demoting to orphaned-ci', () => {
+			assertLane(
+				soloCard(mergeTicket('failing'), { config: makeConfig({ reviewGateRequireCiGreen: false }) }),
+				'needs-you',
+				'merge',
+			);
+		});
+
+		it('checks only the named merge PR, ignoring other open PRs in the stack', () => {
+			assertLane(soloCard(mergeTicket('passing', [860])), 'needs-you', 'merge');
+		});
+
+		it('trusts the worker when no PR row is available to judge', () => {
+			assertLane(
+				soloCard(makeTicket({ phase: 'awaiting-merge', waitingOn: waiting({ kind: 'merge' }) })),
+				'needs-you',
+				'merge',
+			);
+		});
+	});
+
 	describe('NEEDS YOU: degraded entries', () => {
 		it('renders a corrupt entry as a degraded needs-you card with the raw JSON', () => {
 			const state = buildDisplayState(makeInput([makeRepo({ tickets: [corruptEntry('999')] })]));

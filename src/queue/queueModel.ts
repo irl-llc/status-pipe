@@ -123,12 +123,13 @@ function ackContextFor(repo: RepoState, input: QueueModelInput): AckContext {
 	};
 }
 
-function deriveTicket(
+/** ackCtx + this ticket's acks + the lane context, bundled to keep deriveTicket small. */
+function laneInputsFor(
 	ticket: TicketFile,
 	repo: RepoState,
 	repoTickets: TicketFile[],
 	input: QueueModelInput,
-): TicketDerivation {
+): Pick<TicketDerivation, 'ackCtx' | 'ticketAcks' | 'laneCtx'> {
 	const ackCtx = ackContextFor(repo, input);
 	const ticketAcks = repo.acks.filter((k) => k.ack.ticket === ticket.ticket);
 	const laneCtx: LaneContext = {
@@ -138,7 +139,18 @@ function deriveTicket(
 		freshAckPending: hasFreshPendingAck(ticket, ticketAcks, ackCtx),
 		staleAck: hasStaleAck(ticket, ticketAcks, ackCtx),
 		prRows: buildPrRows(ticket, repoTickets, repo.enrichment),
+		requireCiGreen: repo.config?.reviewGateRequireCiGreen ?? true,
 	};
+	return { ackCtx, ticketAcks, laneCtx };
+}
+
+function deriveTicket(
+	ticket: TicketFile,
+	repo: RepoState,
+	repoTickets: TicketFile[],
+	input: QueueModelInput,
+): TicketDerivation {
+	const { ackCtx, ticketAcks, laneCtx } = laneInputsFor(ticket, repo, repoTickets, input);
 	const { lane, reason } = assignLane(ticket, laneCtx);
 	// "Acked" is the calm WAITING state: a pending/picked-up ack moved the card
 	// out of NEEDS YOU and it's awaiting pickup. NEEDS YOU keeps its alarm (the
