@@ -247,7 +247,9 @@ The CLI is only the *standalone plumbing* the extension otherwise provides
 - **Its own forge auth**, not the editor's auth provider:
   `GITHUB_TOKEN`/`GH_TOKEN` → `gh auth token` → `git credential fill`. Tokens are
   never read from the committed `config.json` (a credential in version control).
-  `GITHUB_BASE_URL`/`GITHUB_API_URL` select a GHES/Actions host.
+  A GHES host is selected by `GITHUB_BASE_URL` (else `GITHUB_SERVER_URL`) for the
+  web host the remote is matched against, and `GITHUB_API_URL` for the API —
+  both Actions-native, so the binary works on enterprise Actions without config.
 - **Live workers from heartbeats.** With no process supervisor, the CLI cannot
   pass a live-worker set from a process table. It derives one from the on-disk
   ticket files instead — `running` + a non-stale heartbeat, the same predicate

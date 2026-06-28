@@ -4,8 +4,9 @@
  * alive from its own process table and passes that set as `liveWorkerKeys`. A
  * standalone planner has no such table: the only liveness signal is the ticket
  * file's own heartbeat. So "live" = a ticket whose worker is `running` and whose
- * heartbeat has NOT aged past `staleWorkerMinutes` — exactly the predicate the
- * card and the staleness reconcile already share (`isWorkerStale`).
+ * sign of life — `heartbeatAt`, or its `startedAt` fallback before the first
+ * beat — has NOT aged past `staleWorkerMinutes`, exactly the predicate the card
+ * and the staleness reconcile already share (`isWorkerStale`).
  *
  * Passing `[]` instead would be a correctness bug: the staleness reconcile would
  * flip every running worker to `error` (racing its writes) and dispatch would

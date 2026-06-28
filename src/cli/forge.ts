@@ -5,9 +5,11 @@
  * constraint the in-process built-in planner carries (host/plannerSpawn.ts).
  * Bitbucket/Jira inventory is a documented follow-up, not a silent half-feature.
  *
- * GHES / GitHub Actions: GITHUB_BASE_URL and GITHUB_API_URL override the web and
- * API endpoints (Actions sets GITHUB_API_URL natively), so the same binary works
- * against an enterprise host without a config change.
+ * GHES / GitHub Actions: the web host comes from GITHUB_BASE_URL, else
+ * GITHUB_SERVER_URL (which Actions sets natively, including on enterprise), and
+ * the API from GITHUB_API_URL (also Actions-native). The web host is what the
+ * remote is matched against, so honoring GITHUB_SERVER_URL is what makes the same
+ * binary work against an enterprise host on Actions without extra config.
  */
 
 import { GithubForge } from '../forge/github';
@@ -24,11 +26,11 @@ export interface ForgeSetup {
 
 export type ForgeResult = { ok: true; value: ForgeSetup } | { ok: false; message: string };
 
-/** A GitHub forge honoring GITHUB_BASE_URL / GITHUB_API_URL overrides (GHES, Actions, tests). */
+/** A GitHub forge honoring web/API host overrides (GHES, Actions, tests). */
 function githubForge(env: NodeJS.ProcessEnv): GithubForge {
 	return new GithubForge({
 		http: fetchHttpClient,
-		baseUrl: env.GITHUB_BASE_URL || undefined,
+		baseUrl: env.GITHUB_BASE_URL || env.GITHUB_SERVER_URL || undefined,
 		apiUrl: env.GITHUB_API_URL || undefined,
 	});
 }

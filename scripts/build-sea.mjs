@@ -9,6 +9,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { chmodSync, copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -58,10 +59,20 @@ function copyNode() {
 	if (isMac) sh('codesign', ['--remove-signature', binary]);
 }
 
+// Resolve the pinned postject from node_modules (NOT `npx`, which would fetch a
+// fresh copy over the network — breaking repeatable/offline builds and the
+// devDependency pin) and run its CLI with the current node.
+function postjectCli() {
+	const require = createRequire(import.meta.url);
+	const pkg = require('postject/package.json');
+	const bin = typeof pkg.bin === 'string' ? pkg.bin : pkg.bin.postject;
+	return require.resolve(`postject/${bin}`);
+}
+
 function inject() {
-	const args = [binary, 'NODE_SEA_BLOB', blob, '--sentinel-fuse', FUSE];
+	const args = [postjectCli(), binary, 'NODE_SEA_BLOB', blob, '--sentinel-fuse', FUSE];
 	if (isMac) args.push('--macho-segment-name', 'NODE_SEA');
-	sh('npx', ['--yes', 'postject', ...args]);
+	sh(process.execPath, args);
 	// Re-sign so macOS Gatekeeper will run it (ad-hoc; release signing is a later concern).
 	if (isMac) sh('codesign', ['--sign', '-', binary]);
 }
