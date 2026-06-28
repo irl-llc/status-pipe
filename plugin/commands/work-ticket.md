@@ -27,15 +27,24 @@ expected and fine for *code*; protocol state never lives here.
   **every phase transition** and at wrap; set `updatedAt` and refresh
   `worker.heartbeatAt` on every write, and heartbeat at least every few
   minutes during long phases (a stale heartbeat = presumed crashed).
-- `headline`: one present-tense sentence the operator can read cold.
+- **Operator-facing brevity (protocol skill §4 brevity contract — binding).**
+  These four fields are the operator's glance-level triage signal, so each has
+  a hard cap: `headline` = one present-tense clause on one rendered line;
+  each `blockers[]` entry = one terse imperative; `waitingOn.detail` = one
+  short phrase (the `ref` carries the rest); each `history[].note` = the
+  shortest line that conveys it. **Action, not justification**: the *why*
+  (context, what was tried) goes in a `history[]` note or `plan`/`notes`,
+  never crammed into `headline`/`blockers`. The blocked-ticket failure mode —
+  defensive walls of permission/trust prose — has a worked terse example in
+  protocol skill §4.
 - `history[]`: append `{at, phase, note, runId}` on every meaningful action;
   never rewrite or delete entries.
 - **When you need a human**: set `waitingOn = {kind, ref, pr, since, detail}`
-  with a **deep-linkable `ref`** (the exact comment/PR/run URL), set
-  `health = "waiting"` (or `"blocked"` + `blockers[]` when only the operator
-  can unblock), post the actual question on the ticket via `post-comment`,
-  write the file with `worker.status = "idle"` — and **END the pass**. Never
-  poll, sleep, or busy-wait for a human.
+  with a **deep-linkable `ref`** (the exact comment/PR/run URL) and a one-phrase
+  `detail`, set `health = "waiting"` (or `"blocked"` + `blockers[]` when only
+  the operator can unblock), post the actual question on the ticket via
+  `post-comment`, write the file with `worker.status = "idle"` — and **END the
+  pass**. Never poll, sleep, or busy-wait for a human.
 - **Comments**: read ONLY via
   `fetch-comments --repo-root "$(git rev-parse --show-toplevel)" --ticket <key>`
   (or `--pr <N>`); post ONLY via

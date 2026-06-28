@@ -81,17 +81,41 @@ Schema: `ticket.schema.json`, `schemaVersion: 1`. The filename stem equals the
 - **Heartbeat**: while a worker runs, refresh `worker.heartbeatAt` at least
   every few minutes (and at every state write). A `worker.status="running"`
   with a heartbeat older than `staleWorkerMinutes` is treated as crashed.
-- **`headline`**: always exactly one sentence, present tense,
-  operator-readable — "what just happened", not a log line. Example:
-  "T2 PR opened; CI running, answering review bot." Bad: "done", a stack
-  trace, three sentences.
-- **Brevity is a protocol rule, not a style note.** Every operator-facing
-  output (headline, history notes, the pass report, and any forge comment)
-  states the shortest thing that fully conveys the information. If a pass
-  changed nothing material, say exactly that in one line — do not narrate the
-  reconciliation, do not restate the plan, do not pad. Prefer a link over a
-  paragraph describing what's behind the link. Length is earned by content,
-  never by formatting or recap.
+- **Operator-facing brevity is a protocol rule, not a style note.**
+  `headline`, each `blockers[]` entry, `waitingOn.detail`, and each
+  `history[].note` are the only free prose the operator reads at a glance —
+  a triage signal, not a log (full contract: `design/02-protocol.md`
+  § "Operator-facing prose: the brevity contract"). Per-field caps:
+  - **`headline`** — one clause, present tense, fits one rendered line: *what
+    just happened*. "T2 PR opened; CI running, answering review bot." Bad:
+    "done", a stack trace, three sentences, the reasoning chain.
+  - **`blockers[]`** — each entry one terse imperative naming the thing **only
+    the operator can do** ("Grant `docker` to the ticket-72 worktree"). One
+    blocker per entry; no entry is a paragraph.
+  - **`waitingOn.detail`** — one short phrase labeling the wait; the
+    deep-linkable `ref` carries the rest.
+  - **`history[].note`** — the shortest line that conveys the action. If a
+    pass changed nothing material, say exactly that in one line — do not
+    narrate the reconciliation, restate the plan, or pad.
+- **Action, not justification.** The operator-facing field states the
+  *action*; the *why* — context, reasoning, what was tried — goes in a
+  `history[]` note (the operator-facing record) or in `plan`/`notes` (agent
+  working memory), never crammed into `headline` or `blockers`. The common
+  failure mode is defensive over-explanation when blocked: a wall of
+  permission/trust prose belongs in history, and the blocker stays one line.
+  Worked example — blocked on a permission wall:
+  - `headline` → "Blocked: ticket-72 worktree lacks `docker`; needs operator."
+  - `blockers[]` → one entry: "Grant `docker` to the ticket-72 worktree."
+  - `waitingOn` → `{"kind": "owner", "detail": "git allowlist for docker", "ref": "<comment URL>", "since": "<now>"}`
+  - the *why* (which command failed, the twice-failed attempt, the snapshot
+    job it blocks) → a `history[]` note + a `deadEnds[]` entry, never the
+    headline.
+- **Pre-write self-check.** Before writing any operator-facing field, say the
+  sentence aloud, then write the shortest version that still conveys it.
+  Prefer a link over a paragraph describing what's behind the link. The
+  renderer clamps `headline` to two lines and hides the rest on hover — but a
+  field that *needs* the clamp is already too long. Write to the glance;
+  length is earned by content, never by formatting or recap.
 - **Concrete counts, not "all".** Report test/check outcomes as the actual
   `n/m` at that moment (e.g. `8/8` snapshots, `7/9` unit tests, `2/8` failing) —
   not "all pass" (hides how many ran) and not a memorized total (goes stale as

@@ -16,8 +16,10 @@ skill first; binding. You typically run inside the epic's git worktree.
 **Everything in `/status-pipe:work-ticket`'s "State-writing discipline"
 section applies verbatim here** — common-dir anchoring
 (`PROTO="$(git rev-parse --git-common-dir)/../.status-pipe"`), atomic
-rewrites at every phase transition, heartbeats, deep-linkable `waitingOn.ref`
-then END the pass, append-only `history[]`, comments only through
+rewrites at every phase transition, heartbeats, the operator-facing brevity
+contract (protocol skill §4 — each operator-facing field capped, action not
+justification), deep-linkable `waitingOn.ref` then END the pass, append-only
+`history[]`, comments only through
 `fetch-comments`/`post-comment` and only after passing the comment gate
 (protocol skill §7a — adversarial reviewer subagent on the draft), attribution
 on every forge mutation, never merge/approve/deploy. The cache key is the **tracking ticket key**: the state
