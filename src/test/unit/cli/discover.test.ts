@@ -103,4 +103,14 @@ describe('cli/discover (real temp checkouts)', () => {
 		const result = await discover(repo, null, null);
 		assert.equal(result.ok, false);
 	});
+
+	it('fails loud on a config.json read error (not ENOENT)', async () => {
+		// A directory in place of the file makes readFile throw EISDIR — a non-ENOENT
+		// error must fail loud, never be swallowed as "absent config" (trust gate).
+		await seedProtocol(repo, null);
+		await fs.mkdir(path.join(repo, '.status-pipe', 'config.json'));
+		const result = await discover(repo, null, null);
+		assert.equal(result.ok, false);
+		assert.match(result.ok ? '' : result.message, /unreadable/);
+	});
 });

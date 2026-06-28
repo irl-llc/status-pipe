@@ -71,11 +71,11 @@ function render(result: PlanResult, json: boolean): CliResult {
 }
 
 async function runTick(opts: TickOptions, ctx: CliContext): Promise<CliResult> {
-	const disc = await discover(ctx.cwd, opts.repoRoot, opts.protocolDir);
-	if (!disc.ok) return fail(disc.message);
-	const forge = await connectForge(disc.value.remoteUrl, ctx.env);
-	if (!forge.ok) return fail(forge.message);
 	try {
+		const disc = await discover(ctx.cwd, opts.repoRoot, opts.protocolDir);
+		if (!disc.ok) return fail(disc.message);
+		const forge = await connectForge(disc.value.remoteUrl, ctx.env);
+		if (!forge.ok) return fail(forge.message);
 		return render(await executePass(opts, disc.value, forge.value, ctx), opts.json);
 	} catch (err) {
 		return fail(`planner pass failed: ${err instanceof Error ? err.message : String(err)}`);

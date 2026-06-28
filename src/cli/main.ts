@@ -9,10 +9,17 @@
 import { run } from './run';
 
 async function main(): Promise<void> {
-	const result = await run(process.argv.slice(2), { cwd: process.cwd(), env: process.env });
-	if (result.stdout) process.stdout.write(result.stdout);
-	if (result.stderr) process.stderr.write(result.stderr);
-	process.exitCode = result.code;
+	try {
+		const result = await run(process.argv.slice(2), { cwd: process.cwd(), env: process.env });
+		if (result.stdout) process.stdout.write(result.stdout);
+		if (result.stderr) process.stderr.write(result.stderr);
+		process.exitCode = result.code;
+	} catch (err) {
+		// run() is built to return a CliResult, but a last-resort catch keeps an
+		// unexpected throw from surfacing as an unhandled rejection + raw stack.
+		process.stderr.write(`status-pipe: fatal: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`);
+		process.exitCode = 1;
+	}
 }
 
 void main();

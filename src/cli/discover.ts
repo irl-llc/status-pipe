@@ -34,8 +34,18 @@ async function isDirectory(p: string): Promise<boolean> {
 async function loadConfig(
 	protocolDir: string,
 ): Promise<{ ok: true; value: ConfigFile | null } | { ok: false; message: string }> {
-	const raw = await fs.readFile(path.join(protocolDir, 'config.json'), 'utf8').catch(() => null);
-	if (raw === null) return { ok: true, value: null };
+	const file = path.join(protocolDir, 'config.json');
+	let raw: string;
+	try {
+		raw = await fs.readFile(file, 'utf8');
+	} catch (err) {
+		// Only a genuinely absent file means "no config, apply defaults". A read
+		// error like EACCES must fail loud — config.json drives the trust gate, so
+		// silently planning without it would be a trust downgrade, never a default.
+		if ((err as NodeJS.ErrnoException).code === 'ENOENT') return { ok: true, value: null };
+		const detail = err instanceof Error ? err.message : String(err);
+		return { ok: false, message: `config.json is unreadable: ${detail}` };
+	}
 	const parsed = parseConfigFile(raw);
 	if (!parsed.ok) return { ok: false, message: `config.json is unreadable (${parsed.reason}): ${parsed.detail}` };
 	return { ok: true, value: parsed.value };

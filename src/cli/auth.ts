@@ -19,23 +19,26 @@ function fromEnv(env: NodeJS.ProcessEnv): string | null {
 	return env.GITHUB_TOKEN || env.GH_TOKEN || null;
 }
 
-function ghCliToken(): Promise<string | null> {
+function ghCliToken(host: string): Promise<string | null> {
 	return new Promise((resolve) => {
-		execFile('gh', ['auth', 'token'], { timeout: 5000 }, (err, stdout) => {
+		// --hostname scopes the lookup to the forge host: without it gh returns the
+		// github.com token even when planning against a GHES instance (wrong creds).
+		execFile('gh', ['auth', 'token', '--hostname', host], { timeout: 5000 }, (err, stdout) => {
 			resolve(err ? null : stdout.trim() || null);
 		});
 	});
 }
 
-/** First credential that resolves, or null. `baseUrl` keys the git credential helper. */
+/** First credential that resolves, or null. `baseUrl` keys both gh and the git credential helper. */
 export async function resolveGithubToken(
 	baseUrl: string,
 	env: NodeJS.ProcessEnv = process.env,
 ): Promise<string | null> {
 	const fromVar = fromEnv(env);
 	if (fromVar) return fromVar;
-	const fromGh = await ghCliToken();
+	const host = hostOfUrl(baseUrl);
+	const fromGh = await ghCliToken(host);
 	if (fromGh) return fromGh;
-	const cred = await fillGitCredential(hostOfUrl(baseUrl));
+	const cred = await fillGitCredential(host);
 	return cred?.password ?? null;
 }
