@@ -24,6 +24,7 @@ import {
 } from '../../../queue/displayTypes';
 import { AckControl } from '../../../queueView/components/AckControl';
 import { AgentsStrip } from '../../../queueView/components/AgentsStrip';
+import { DetailPane } from '../../../queueView/components/DetailPane';
 import { LaneSection } from '../../../queueView/components/LaneSection';
 import { PrRows } from '../../../queueView/components/PrRows';
 import { PostContext } from '../../../queueView/components/QueueApp';
@@ -733,6 +734,140 @@ describe('queueView/components', () => {
 			const { result } = renderWithPost(<PrRows card={makeCard({ prs: [pr] })} />);
 			const refs = Array.from(result.container.querySelectorAll('.stack-ref')).map((el) => el.textContent);
 			assert.deepEqual(refs, ['↑ T1a #855', '↓ T2 #861']);
+		});
+	});
+
+	describe('DetailPane hierarchy (design/05-ui.md Editor tab)', () => {
+		function renderDetail(card: CardDisplay, state = makeState()): Rendered {
+			return renderWithPost(<DetailPane card={card} state={state} />);
+		}
+
+		function sectionHeaders(result: RenderResult): string[] {
+			return Array.from(result.container.querySelectorAll('.detail-section > h3'), (el) => el.textContent ?? '');
+		}
+
+		it('renders the four top-level headers in order, every block under a labeled section', () => {
+			const card = makeCard({
+				headline: 'CI green; awaiting merge',
+				blockers: ['needs release credential'],
+				prs: [makePr()],
+				history: [{ at: '2026-06-11T10:00:00Z', phase: 'review', note: 'PR opened', runId: null }],
+			});
+			const { result } = renderDetail(card);
+			const headers = sectionHeaders(result);
+			assert.deepEqual(headers.slice(0, 3), ['Status', 'What needs you', 'Context']);
+			// Evidence is a group of headered sections, not a single "Evidence" header.
+			assert.ok(headers.includes('Pull requests'));
+			assert.ok(headers.includes('History'));
+			// No bare floating headline <p> outside a section (the named anti-pattern).
+			assert.equal(result.container.querySelector('div > p'), null);
+		});
+
+		it('Status is one line naming health, phase, age, and worker liveness', () => {
+			const card = makeCard({
+				health: 'waiting',
+				phase: 'awaiting-merge',
+				worker: { status: 'idle', heartbeatAt: '2026-06-11T11:55:00Z', heartbeatAgeMs: 5 * 60_000, stale: false },
+			});
+			const { result } = renderDetail(card);
+			const line = result.container.querySelector('.detail-status-line')?.textContent ?? '';
+			assert.match(line, /health: waiting/);
+			assert.match(line, /awaiting-merge/);
+			assert.match(line, /old/); // age
+			assert.match(line, /worker idle/);
+			assert.match(line, /heartbeat 5m ago/);
+		});
+
+		it('flags a stale worker in the Status line', () => {
+			const card = makeCard({
+				worker: { status: 'running', heartbeatAt: null, heartbeatAgeMs: null, stale: true },
+			});
+			const line = renderDetail(card).result.container.querySelector('.detail-status-line')?.textContent ?? '';
+			assert.match(line, /worker running \(stale\), no heartbeat/);
+		});
+
+		it('omits What needs you entirely when there are no blockers and no waiting line', () => {
+			const { result } = renderDetail(makeCard());
+			assert.equal(sectionHeaders(result).includes('What needs you'), false);
+		});
+
+		it('clamps a long blocker to one line but keeps the full text in the hover title (no dump)', () => {
+			const long =
+				'migration is locked because the staging database has an open long-running transaction that must drain first';
+			const { result } = renderDetail(makeCard({ blockers: [long] }));
+			const line = result.container.querySelector('.blocker-line.detail-clamp');
+			assert.ok(line, 'blocker renders under What needs you with the clamp class');
+			assert.equal(line?.getAttribute('title'), long); // full text on hover
+			assert.equal(line?.querySelector('.detail-clamp-text')?.textContent, long);
+			assert.ok(line?.querySelector('.codicon-circle-slash'));
+		});
+
+		it('renders the waiting line under What needs you and deep-links its ref', () => {
+			const card = makeCard({
+				waiting: {
+					kind: 'merge',
+					ref: 'https://github.com/o/r/pull/9',
+					pr: 9,
+					since: '2026-06-11T10:00:00Z',
+					durationMs: 90 * 60_000,
+					detail: 'ready to merge',
+				},
+			});
+			const { result, messages } = renderDetail(card);
+			const wl = result.container.querySelector('.waiting-line');
+			assert.ok(wl);
+			fireEvent.click(wl!);
+			assert.deepEqual(messages, [{ type: 'openExternal', url: 'https://github.com/o/r/pull/9' }]);
+		});
+
+		it('renders the headline markdown-stripped under Context, not as a floating paragraph', () => {
+			const { result } = renderDetail(makeCard({ headline: '**CI** green; `merge` ready' }));
+			const ctx = result.container.querySelector('.detail-headline');
+			assert.equal(ctx?.textContent, 'CI green; merge ready');
+		});
+
+		it('omits the Context section entirely when the headline is empty', () => {
+			const { result } = renderDetail(makeCard({ headline: '' }));
+			assert.equal(sectionHeaders(result).includes('Context'), false);
+			assert.equal(result.container.querySelector('.detail-headline'), null);
+		});
+
+		it('appends the orchestrator pass age to the Status line for the card’s repo', () => {
+			const card = makeCard({ repoRoot: '/repo' });
+			const state = makeState({
+				repos: [
+					{
+						repoRoot: '/repo',
+						name: 'repo',
+						forgeId: 'github',
+						capabilities: null,
+						lastPassFinishedAt: '2026-06-11T11:50:00.000Z',
+						parked: null,
+						monitorOnlyNote: null,
+						ticketCount: 1,
+						inventoryLabel: 'agent-queue',
+						inventoryAssignees: [],
+						issuesUrl: 'https://github.com/o/r/issues',
+					},
+				],
+			});
+			const line = renderDetail(card, state).result.container.querySelector('.detail-status-line')?.textContent ?? '';
+			assert.match(line, /orchestrator ran 10m ago/);
+		});
+
+		it('omits the worker segment from the Status line when no worker is attached', () => {
+			const line =
+				renderDetail(makeCard({ worker: null })).result.container.querySelector('.detail-status-line')?.textContent ??
+				'';
+			assert.doesNotMatch(line, /worker/);
+			assert.doesNotMatch(line, /·\s*·|·\s*$/); // filtered-out segment leaves no stray separator
+		});
+
+		it('omits the orchestrator pass age when the card has no matching repo', () => {
+			const state = makeState({ repos: [] }); // card.repoRoot matches nothing → lastRan is null
+			const line =
+				renderDetail(makeCard(), state).result.container.querySelector('.detail-status-line')?.textContent ?? '';
+			assert.doesNotMatch(line, /orchestrator ran/);
 		});
 	});
 });

@@ -511,6 +511,10 @@ body {
 	padding: 12px 16px;
 }
 
+.detail-header {
+	margin-bottom: 12px;
+}
+
 .detail-section {
 	margin-bottom: 14px;
 }
@@ -521,6 +525,24 @@ body {
 	letter-spacing: 0.04em;
 	color: var(--vscode-descriptionForeground);
 	margin: 0 0 4px;
+}
+
+.detail-status-line {
+	font-size: 0.95em;
+}
+
+.detail-headline {
+	white-space: pre-wrap;
+	overflow-wrap: anywhere;
+}
+
+/* A long blocker clamps to one line; the full text is the title-attr hover —
+   the detail pane structures verbose content, it does not dump it. */
+.detail-clamp .detail-clamp-text {
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
 }
 
 .detail-table {
