@@ -30,6 +30,18 @@ test.describe('launch configs', () => {
 		// Both declared-but-not-installed → a Run control, no Open log yet.
 		await expect(frame.locator('.agent-actions [title="Run"]')).toHaveCount(2);
 		await expect(frame.locator('.agent-actions [title="Open log"]')).toHaveCount(0);
+		// The right pane settles to the "nothing selected" fallback note (issue
+		// #26). It paints into the nested webview iframe a beat after it becomes
+		// visible, and a fullPage workbench capture can stabilize before that
+		// paint flushes — the strip and lanes are stable while the detail pane
+		// still reads as empty. Mirror the lanes-editor baseline: assert the
+		// note's copy, then a detail-pane screenshot whose retry-until-stable
+		// loop forces the iframe to flush so the fullPage shot below is
+		// deterministic. Capture the whole `.editor-detail` (not just the
+		// note) so the pixel tolerance rides on stable chrome rather than 15px
+		// of AA-sensitive italic text.
+		await expect(frame.locator('.selection-note', { hasText: 'most urgent — nothing selected' })).toBeVisible();
+		await expect(frame.locator('.editor-detail')).toHaveScreenshot('launch-configs-detail.png');
 		await expect(vscode.workbench).toHaveScreenshot('launch-configs-strip.png', { fullPage: true });
 	});
 
