@@ -26,6 +26,13 @@
  *   post-comment --repo-root <path> --ticket <KEY> --pr <N>     (--body <text> | --body-file <path>) [--context <text>]
  *   post-comment --repo-root <path> --ticket <KEY> --jira <KEY> (--body <text> | --body-file <path>) [--context <text>]
  *
+ * Inline review-thread reply (the PR-etiquette path — reply where the reviewer
+ * commented, not on the main issue): add --reply-to <review-comment-id> to a
+ * --pr call. The id comes from `fetch-comments --pr <N>`, which surfaces each
+ * inline review comment's reply target. GitHub posts via the review-comment
+ * replies endpoint; Bitbucket threads it under the parent comment. --reply-to
+ * is only valid with --pr (issues and Jira have no inline review threads).
+ *
  * Prints the created comment's id and url on stdout.
  * No npm dependencies. Node >= 18 (global fetch).
  */
@@ -50,6 +57,7 @@ function parseArgs(argv) {
 		pr: null,
 		issue: null,
 		jira: null,
+		replyTo: null,
 		body: null,
 		bodyFile: null,
 		context: null,
@@ -66,6 +74,7 @@ function parseArgs(argv) {
 		else if (a === '--pr') args.pr = next();
 		else if (a === '--issue') args.issue = next();
 		else if (a === '--jira') args.jira = next();
+		else if (a === '--reply-to') args.replyTo = next();
 		else if (a === '--body') args.body = next();
 		else if (a === '--body-file') args.bodyFile = next();
 		else if (a === '--context') args.context = next();
@@ -73,7 +82,7 @@ function parseArgs(argv) {
 			process.stdout.write(
 				`usage: ${PROG} --repo-root <path> --ticket <KEY> ` +
 					`(--pr <N> | --issue <N> | --jira <KEY>) ` +
-					`(--body <text> | --body-file <path>) [--context <text>]\n`,
+					`(--body <text> | --body-file <path>) [--reply-to <review-comment-id>] [--context <text>]\n`,
 			);
 			process.exit(0);
 		} else die(`unknown argument: ${a}`, 2);
@@ -82,6 +91,10 @@ function parseArgs(argv) {
 	if (!args.ticket) die('--ticket is required (names the ticket file ledger)', 2);
 	const targets = [args.pr, args.issue, args.jira].filter((t) => t !== null);
 	if (targets.length !== 1) die('exactly one of --pr, --issue, --jira is required', 2);
+	if (args.replyTo !== null && args.pr === null) {
+		die('--reply-to is only valid with --pr (issues and Jira have no inline review threads)', 2);
+	}
+	if (args.replyTo !== null && !/^\d+$/.test(args.replyTo)) die('--reply-to must be a numeric review-comment id', 2);
 	if (args.pr && !/^\d+$/.test(args.pr)) die('--pr must be a number', 2);
 	if (args.issue && !/^\d+$/.test(args.issue)) die('--issue must be a number', 2);
 	if ((args.body === null) === (args.bodyFile === null)) {
@@ -203,7 +216,36 @@ async function githubPost(forge, issueNumber, body, token) {
 	return { id: String(created.id), url: created.html_url || null };
 }
 
-async function bitbucketPost(forge, pr, body, authHeader) {
+/** Reply in-thread to a GitHub PR review comment (the inline-reply path). */
+async function githubReplyToReview(forge, pr, replyTo, body, token) {
+	if (!forge.slug) die('could not parse the GitHub owner/repo from the origin remote.');
+	let res;
+	try {
+		res = await fetch(`${GITHUB_API}/repos/${forge.slug}/pulls/${pr}/comments/${replyTo}/replies`, {
+			method: 'POST',
+			headers: {
+				accept: 'application/vnd.github+json',
+				'content-type': 'application/json',
+				'user-agent': 'status-pipe-plugin',
+				...(token ? { authorization: `Bearer ${token}` } : {}),
+			},
+			body: JSON.stringify({ body }),
+		});
+	} catch (e) {
+		die(`GitHub API request failed (${e.message}). Nothing was posted.`);
+	}
+	if (!res.ok) {
+		die(
+			`GitHub API returned ${res.status} replying to review comment ${replyTo} on PR ${pr}. ` +
+				'Confirm the id names an inline review comment on this PR (from `fetch-comments --pr ' +
+				`${pr}\`), and that GITHUB_TOKEN/credentials are set. Nothing was posted.`,
+		);
+	}
+	const created = await res.json();
+	return { id: String(created.id), url: created.html_url || null };
+}
+
+async function bitbucketPost(forge, pr, body, authHeader, replyTo) {
 	if (!authHeader) {
 		die(
 			'no Bitbucket credentials: set BITBUCKET_TOKEN or configure a git ' +
@@ -213,6 +255,8 @@ async function bitbucketPost(forge, pr, body, authHeader) {
 	if (!forge.workspace || !forge.slug) {
 		die('could not parse the Bitbucket workspace/slug from the origin remote.');
 	}
+	const payload = { content: { raw: body } };
+	if (replyTo) payload.parent = { id: Number(replyTo) };
 	let res;
 	try {
 		res = await fetch(`${BITBUCKET_API}/repositories/${forge.workspace}/${forge.slug}/pullrequests/${pr}/comments`, {
@@ -222,7 +266,7 @@ async function bitbucketPost(forge, pr, body, authHeader) {
 				'Content-Type': 'application/json',
 				Accept: 'application/json',
 			},
-			body: JSON.stringify({ content: { raw: body } }),
+			body: JSON.stringify(payload),
 		});
 	} catch (e) {
 		die(`Bitbucket API request failed (${e.message}). Nothing was posted.`);
@@ -351,7 +395,10 @@ async function main() {
 	if (args.jira) {
 		created = await jiraPost(config, args.jira, body);
 	} else if (args.pr && forge.kind === 'bitbucket') {
-		created = await bitbucketPost(forge, args.pr, body, bitbucketAuthHeader(repoRoot));
+		created = await bitbucketPost(forge, args.pr, body, bitbucketAuthHeader(repoRoot), args.replyTo);
+	} else if (args.replyTo !== null) {
+		// In-thread reply to a GitHub PR review comment (validated --pr only).
+		created = await githubReplyToReview(forge, args.pr, args.replyTo, body, githubToken(repoRoot, forge.host));
 	} else {
 		// GitHub: PR conversation comments are issue comments.
 		const n = args.pr || args.issue;

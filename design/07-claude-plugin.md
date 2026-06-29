@@ -26,9 +26,11 @@ plugin/
 │   └── ack-check.md               # /status-pipe:ack-check  (inbox consume, standalone)
 ├── bin/
 │   ├── fetch-comments             # trust gateway: API-verified, operator-filtered
-│   │                              #   comment digests (the only sanctioned read path)
+│   │                              #   comment digests (the only sanctioned read path;
+│   │                              #   tags inline review comments w/ file:line + reply id)
 │   └── post-comment               # posting wrapper: attribution marker + comment-id
-│                                  #   ledger (the only sanctioned write path)
+│                                  #   ledger (the only sanctioned write path; --reply-to
+│                                  #   answers a PR review comment in-thread)
 ├── skills/
 │   └── protocol/SKILL.md          # how to read/write the status-pipe protocol correctly,
 │                                  #   incl. trust + attribution rules (binding)
@@ -176,7 +178,10 @@ the rules is the same model the untrusted comments could inject. Three layers:
    `public` mode is headers-only: author, time, one-line machine summary) or
    wrapped in clearly delimited untrusted-data fences. Operator-grade signals
    ("proceed", approvals) are extracted by the script from operator comments
-   only — the model never decides who is an operator.
+   only — the model never decides who is an operator. For a PR it folds in the
+   inline review comments too, tagging each with the `file:line` it annotates
+   and the reply-target id, so a worker answering a review knows which thread to
+   reply in (PR-response etiquette, the `protocol` skill §7b).
 2. **Permission allowlists**: the repo's committed `.claude/settings.json`
    allows the gateway and the posting wrapper (below) and denies raw
    `gh issue comment` / direct comment-API calls, so the rules are enforced by
@@ -209,7 +214,10 @@ field** (never against parseable comment text, which anyone can spoof):
   by text**: every agent post goes through the posting wrapper
   (`plugin/bin/post-comment` — the same script that prepends the attribution
   marker), which records the created comment's API id in the ticket file
-  (`agentCommentIds[]`, additive field). The comment gateway excludes those
+  (`agentCommentIds[]`, additive field). A `--reply-to <review-comment-id>` on a
+  `--pr` post threads the reply under an inline review comment (via the forge's
+  review-reply endpoint) instead of opening a new top-level comment, so workers
+  answer reviewers where they commented. The comment gateway excludes those
   ids from "the operator said". Recognizing own posts by the text prefix was
   rejected: it violates the never-trust-parseable-text rule, and a single
   unmarked post would mint operator-grade authority for the next tick. The
