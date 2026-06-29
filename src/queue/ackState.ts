@@ -71,27 +71,56 @@ function newestFirst(a: KnownAck, b: KnownAck): number {
 }
 
 /**
- * Derives the card's ack control: the most recent relevant chip plus
- * whether the "Ready for another look" button applies right now.
+ * The operator answered the ticket's CURRENT request and the loop is honoring
+ * it: a `pending` ack awaiting pickup, or a `picked-up` ack whose target still
+ * matches the live `waitingOn`/blockers (handed back — the agent will act next,
+ * not the operator; issue #57). A `picked-up` ack whose request the agent has
+ * already advanced past (`waitingOn` moved on, so the ack no longer matches) is
+ * a freshly-raised question, NOT honored — it must keep alarming. `pending`
+ * already implies a matching target, so it needs no extra match check.
+ */
+function honorsCurrentRequest(known: KnownAck, ticket: TicketFile, ctx: AckContext): boolean {
+	const state = chipStateFor(known, ticket, ctx);
+	if (state === 'pending') return true;
+	return state === 'picked-up' && ackMatchesTicket(known.ack, ticket);
+}
+
+/**
+ * Derives the card's ack control: the most recent relevant chip plus whether
+ * the "Ready for another look" button applies right now. The button hides once
+ * the current request carries an ack the loop is honoring (pending pickup, or
+ * picked up — the agent's turn now) or a `stale` ack (re-acking won't help; the
+ * loop is down) — re-acking in those states would only overwrite the operator's
+ * note (#57). `moved-on`/`pickup-unconfirmed`/`superseded` leave it live so a
+ * fresh, lost-signal, or advanced-state request can still be acked.
+ *
+ * The button/chip key on the NEWEST ack only (like `isAcked`), while the lane's
+ * `hasAckedCurrentRequest` keys on `some` — intentionally: the lane reflects
+ * whether ANY ack parks the card, the chip reflects the latest signal. They are
+ * not meant to agree.
  */
 export function deriveAckControl(ticket: TicketFile, acks: KnownAck[], ctx: AckContext): AckControlDisplay {
 	const sorted = [...acks].sort(newestFirst);
 	const chipSource = sorted[0] ?? null;
 	const chip = chipSource ? toChip(chipSource, chipStateFor(chipSource, ticket, ctx)) : null;
-	const hasLiveAck = chip !== null && (chip.state === 'pending' || chip.state === 'stale');
-	const actionable = ackTargetFor(ticket) !== null && !hasLiveAck;
+	const suppressed = chipSource !== null && (honorsCurrentRequest(chipSource, ticket, ctx) || chip?.state === 'stale');
+	const actionable = ackTargetFor(ticket) !== null && !suppressed;
 	return { actionable, chip };
 }
 
 /**
- * A fresh pending ack means "operator answered, waiting for pickup" — it
- * suppresses the ackable NEEDS-YOU classes (blocked/owner/review/merge) and
- * moves the card to WAITING. A stale ack does the opposite (escalates), and
- * pickup-unconfirmed deliberately does NOT suppress: if the consumption was
- * lost, suppressing would silently starve the item.
+ * The current request is acked and the loop is honoring it — suppresses the
+ * ackable NEEDS-YOU classes (blocked/owner/review/merge) and moves the card to
+ * WAITING. True for a fresh `pending` ack and for a `picked-up` ack still
+ * matching the request (the operator did their part; it is the agent's turn —
+ * #57). A `stale` ack does the opposite (escalates), and
+ * pickup-unconfirmed/moved-on deliberately do NOT suppress: a lost signal or a
+ * newly-raised question must not be silently starved. Uses `some` so an older
+ * ack that still answers the current request keeps the card calm even when a
+ * newer ack has moved on.
  */
-export function hasFreshPendingAck(ticket: TicketFile, acks: KnownAck[], ctx: AckContext): boolean {
-	return acks.some((k) => chipStateFor(k, ticket, ctx) === 'pending');
+export function hasAckedCurrentRequest(ticket: TicketFile, acks: KnownAck[], ctx: AckContext): boolean {
+	return acks.some((k) => honorsCurrentRequest(k, ticket, ctx));
 }
 
 /** Any on-disk ack gone stale (pass ran without consuming it)? */

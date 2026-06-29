@@ -33,8 +33,8 @@ export interface LaneContext {
 	staleWorkerMinutes: number;
 	now: number;
 	enrichment: RepoEnrichment | null;
-	/** A fresh pending ack suppresses the ackable classes (→ WAITING). */
-	freshAckPending: boolean;
+	/** An honored ack (pending, or picked-up still matching) suppresses the ackable classes (→ WAITING). */
+	requestAcked: boolean;
 	staleAck: boolean;
 	/** Effective (enrichment-merged) PR rows for the orphaned-CI rule. */
 	prRows: PrRowDisplay[];
@@ -91,7 +91,7 @@ function ackableReason(ticket: TicketFile, ctx: LaneContext): NeedsYouReason | n
 function needsYouReason(ticket: TicketFile, ctx: LaneContext): NeedsYouReason | null {
 	if (workerCrashed(ticket, ctx)) return 'worker-crashed';
 	if (ctx.staleAck) return 'stale-ack';
-	if (!ctx.freshAckPending) {
+	if (!ctx.requestAcked) {
 		const reason = ackableReason(ticket, ctx);
 		if (reason) return reason;
 	}

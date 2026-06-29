@@ -366,9 +366,11 @@ describe('queue/queueModel buildDisplayState', () => {
 			assert.strictEqual(card.acked, true);
 		});
 
-		it('does NOT calm a picked-up ack while the ticket still waits on the owner', () => {
-			// Agent re-looked, recorded the pickup, but still needs the operator —
-			// keep the alarm (stays in NEEDS YOU, acked=false).
+		it('calms a picked-up ack that still matches the owner request — agent’s turn (#57)', () => {
+			// Operator clicked "Ready for another look", the orchestrator picked it
+			// up, but the worker hasn't changed waitingOn yet. The operator did their
+			// part; the card must leave NEEDS YOU (calm + WAITING) and the button must
+			// not reappear — re-clicking would only overwrite the note.
 			const base = makeTicket({ waitingOn: waiting({ kind: 'owner' }) });
 			const known = ackFor(base, hoursAgo(1), false);
 			const ticket = {
@@ -377,8 +379,27 @@ describe('queue/queueModel buildDisplayState', () => {
 			};
 			const card = soloCard(ticket, { acks: [known] });
 			assert.strictEqual(card.ackControl.chip?.state, 'picked-up');
+			assert.strictEqual(card.ackControl.actionable, false);
+			assertLane(card, 'waiting', null);
+			assert.strictEqual(card.acked, true);
+		});
+
+		it('keeps alarming a picked-up ack once the agent raised a NEW owner question (#57)', () => {
+			// Agent re-looked, recorded the pickup, then came back needing the
+			// operator again: waitingOn advanced (new since) so the old ack no longer
+			// matches. The card must alarm again and the button must be live so the
+			// operator can ack the fresh question.
+			const old = makeTicket({ waitingOn: waiting({ kind: 'owner', since: hoursAgo(3) }) });
+			const known = ackFor(old, hoursAgo(2), false);
+			const ticket = {
+				...makeTicket({ waitingOn: waiting({ kind: 'owner', since: minutesAgo(20) }) }),
+				history: [{ at: minutesAgo(15), phase: null, note: `consumed ack ${known.ack.ackId}`, runId: null }],
+			};
+			const card = soloCard(ticket, { acks: [known] });
+			assert.strictEqual(card.ackControl.chip?.state, 'picked-up');
 			assertLane(card, 'needs-you', 'owner');
 			assert.strictEqual(card.acked, false);
+			assert.strictEqual(card.ackControl.actionable, true);
 		});
 
 		it('does NOT flag stale / pickup-unconfirmed / superseded acks as acked', () => {
@@ -421,6 +442,32 @@ describe('queue/queueModel buildDisplayState', () => {
 			const ticket = makeTicket({ blockers: ['waiting on a decision'] });
 			const card = soloCard(ticket, { acks: [ackFor(ticket, minutesAgo(5))] });
 			assertLane(card, 'waiting', null);
+		});
+
+		it('honors a picked-up blockers ack only while its target still matches (#57 blockers path)', () => {
+			// A blockers-only ack keys waitingSince on the ticket's updatedAt
+			// (ackId.ts) — unlike an owner ack, whose waitingSince is the stable
+			// waitingOn.since. So its match is updatedAt-sensitive: while updatedAt is
+			// unchanged the picked-up ack still matches → honored → calm + button
+			// hidden, exactly like the owner path. Once updatedAt advances (the worker
+			// touched the ticket, or raised a new blocker) the ack no longer matches
+			// and the card re-alarms with a live button — the safe direction, since a
+			// changed blocker set must not be silently calmed.
+			const base = makeTicket({ blockers: ['waiting on a decision'], updatedAt: minutesAgo(20) });
+			const known = ackFor(base, minutesAgo(10), false);
+			const note = { at: minutesAgo(3), phase: null, note: `consumed ack ${known.ack.ackId}`, runId: null };
+
+			const matching = soloCard({ ...base, history: [note] }, { acks: [known] });
+			assert.strictEqual(matching.ackControl.chip?.state, 'picked-up');
+			assertLane(matching, 'waiting', null);
+			assert.strictEqual(matching.acked, true);
+			assert.strictEqual(matching.ackControl.actionable, false);
+
+			const advanced = soloCard({ ...base, updatedAt: minutesAgo(2), history: [note] }, { acks: [known] });
+			assert.strictEqual(advanced.ackControl.chip?.state, 'picked-up');
+			assertLane(advanced, 'needs-you', 'blocked');
+			assert.strictEqual(advanced.acked, false);
+			assert.strictEqual(advanced.ackControl.actionable, true);
 		});
 
 		it('does NOT suppress worker-crashed', () => {
