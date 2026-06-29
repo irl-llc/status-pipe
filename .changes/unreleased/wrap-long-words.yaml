@@ -1,0 +1,2 @@
+kind: Fixed
+body: 'Long unbreakable words in a status card (URLs, commit hashes, branch names) now wrap inside the card instead of widening it and making the whole pane scroll horizontally. The headline, waiting line, and blocker lines break long words at the card edge; blockers still render verbatim and untruncated, they just wrap. The leading warning/blocker icon now aligns to the first line of wrapped text (top-aligned, not on the font baseline) and the waiting-line duration no longer shrinks.'
