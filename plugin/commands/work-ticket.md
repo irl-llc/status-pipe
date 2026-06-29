@@ -70,6 +70,20 @@ have missed one between ticks. Decide the real current phase from evidence,
 not from the cached file; correct the file if they disagree (history note:
 what was reconciled).
 
+**Freshen the branch against the trunk — every pass, before you plan.** Part of
+the git reconcile: a ticket can sit blocked or waiting for days while the trunk
+races ahead, and a branch that silently rots into a merge conflict is far worse
+than one rebased early. So if this ticket's branch exists and is **behind its
+base** (`git rev-list --count HEAD..<base>` > 0, where `<base>` is the trunk or
+the parent PR for a stack), rebase/restack it onto the current trunk *now*: for
+a git-spice stack, `git spice repo sync` then restack the branch; otherwise
+fetch and rebase onto the updated base. This is not the same as a stale heartbeat
+or a phase correction — the branch can be perfectly tracked and still be 40
+commits behind. If the rebase hits a conflict you cannot cleanly resolve, that is
+a real blocker, not a thing to power through: record it (`deadEnds[]` +
+`blockers[]`), escalate (`waitingOn.kind="owner"`, post the ask), and end the
+pass — never force-push a half-resolved tree.
+
 **If the work has already landed, close the ticket.** The terminal check is
 part of reconciling the forge: if this ticket's PR(s) are merged (or the issue
 is closed as completed), the work is *done* — write `phase: "merged"`,

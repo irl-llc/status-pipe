@@ -1,0 +1,2 @@
+kind: Changed
+body: 'A status-pipe worker now rebases its branch onto the current trunk during orient, every pass, before it plans. Previously a ticket that stayed blocked or waiting for days never re-synced — branch syncing only happened at submit/integration-publish, past the hardening phase a stuck ticket never reaches — so its branch silently drifted behind the trunk and rotted into a merge conflict. An unresolvable rebase conflict is now surfaced as an operator blocker instead of being force-pushed through.'

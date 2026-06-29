@@ -65,7 +65,12 @@ unchecked item in the tracking ticket's tranche checklist):
   `deadEnds`, protocol skill §4): resume the existing tranche plan instead of
   re-deriving it, and never re-attempt a recorded dead-end unless its
   `doNotRetryWithout` condition is now met — reconcile `phase` from evidence,
-  but carry the memory forward.
+  but carry the memory forward. **Freshen the frontier tranche against the
+  trunk** as part of the git reconcile (same rule as `work-ticket`'s orient): a
+  long-blocked epic's stack rots while the trunk advances, so if the frontier
+  branch is behind its base (`git rev-list --count HEAD..<base>` > 0), `git
+  spice repo sync` and restack the stack before planning; an unresolvable
+  rebase conflict is a blocker to escalate, never to force through.
 - **plan**: pick the frontier tranche and **persist the tranche plan to the
   ticket file's `plan` field** (working memory, protocol skill §4 — carry-over
   for the next pass, not just a history line). If the spec is ambiguous or a

@@ -290,7 +290,8 @@ above, so a missing or spoofed marker can embarrass but never escalate.
 ### `work-ticket` / `work-epic` — one work-item pass
 
 Phase machine identical in shape to irl-llc's tranche loop, generalized:
-**orient** (reconcile git + forge + ticket file; consume any inbox acks for this
+**orient** (reconcile git + forge + ticket file; rebase the branch onto the
+current trunk when it has fallen behind; consume any inbox acks for this
 ticket) → **plan** → **implement** → **review** (self-review the diff) →
 **submit** (create/update PR; stacked PRs via git-spice when available, plain
 branches otherwise — git-spice is *not* required) → **gate** (CI kicked off,
