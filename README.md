@@ -96,6 +96,30 @@ the file.) The packaged extension activates when a `.status-pipe/` directory
 exists anywhere under a workspace folder. To use the companion Claude Code
 plugin from source, see [plugin/README.md](plugin/README.md).
 
+## Standalone CLI (no VS Code)
+
+For CI, cron, and headless servers, `status-pipe` runs one planner pass
+(reconcile → dispatch → report) over a repo's `.status-pipe/` state with no
+extension installed — the same planner core the extension runs in-process.
+
+A self-contained single-file binary is attached to each
+[release](https://github.com/irl-llc/status-pipe/releases) (linux/macOS/windows ×
+x64/arm64) and needs **no preinstalled Node** — drop it on PATH and run:
+
+```sh
+status-pipe tick                 # one planner pass over the current repo
+status-pipe tick --json          # machine-readable PlanResult
+status-pipe --help
+```
+
+GitHub auth is resolved from `GITHUB_TOKEN`/`GH_TOKEN`, else `gh auth token`,
+else the git credential helper (never from committed config). Exit codes:
+`0` success · `1` runtime error or trust refusal · `2` usage error.
+
+Prefer npm? `npm i -g status-pipe` installs the same CLI (needs Node). Build the
+binary yourself with `npm run build:binary` (requires an official nodejs.org
+Node — Homebrew's omits the SEA fuse).
+
 ## Development
 
 ```sh
