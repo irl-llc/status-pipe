@@ -69,6 +69,27 @@ async function findQueueFrame(workbench: Page): Promise<Frame | undefined> {
 }
 
 /**
+ * Drags the editor view's list/detail splitter by `deltaPx` (positive = wider
+ * list) and returns the resulting list-pane width. Exercises the real
+ * pointer-driven resize path in Splitter.tsx; the caller asserts on the
+ * resized layout. Frame-local coordinates are mapped to page coordinates via
+ * the splitter's bounding box.
+ */
+export async function dragEditorSplitter(workbench: Page, frame: Frame, deltaPx: number): Promise<number> {
+	const splitter = frame.locator('.editor-splitter');
+	const box = await splitter.boundingBox();
+	if (!box) throw new Error('Editor splitter has no bounding box');
+	const cx = box.x + box.width / 2;
+	const cy = box.y + box.height / 2;
+	await workbench.mouse.move(cx, cy);
+	await workbench.mouse.down();
+	await workbench.mouse.move(cx + deltaPx, cy, { steps: 10 });
+	await workbench.mouse.up();
+	await workbench.waitForTimeout(150);
+	return frame.locator('.editor-list').evaluate((el) => (el as HTMLElement).getBoundingClientRect().width);
+}
+
+/**
  * Drags the sash between the primary sidebar and the editor area so the
  * sidebar is `widthPx` wide (the tray default ~300px clips cards).
  */

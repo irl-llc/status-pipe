@@ -11,7 +11,11 @@ import { createRoot } from 'react-dom/client';
 import { ExtensionMessage, WebviewMessage } from '../host/webviewTypes';
 import { QueueApp } from './components/QueueApp';
 
-declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
+declare function acquireVsCodeApi(): {
+	postMessage(message: unknown): void;
+	getState(): unknown;
+	setState(state: unknown): void;
+};
 
 document.addEventListener('DOMContentLoaded', () => {
 	try {
@@ -36,6 +40,10 @@ function bootstrap(): void {
 		window.addEventListener('message', listener);
 		return () => window.removeEventListener('message', listener);
 	};
+	const getUiState = (): unknown => vscode.getState();
+	const setUiState = (state: unknown): void => vscode.setState(state);
 
-	createRoot(container).render(createElement(QueueApp, { postMessage: post, subscribeMessages: subscribe }));
+	createRoot(container).render(
+		createElement(QueueApp, { postMessage: post, subscribeMessages: subscribe, getUiState, setUiState }),
+	);
 }

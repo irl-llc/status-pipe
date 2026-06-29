@@ -499,10 +499,29 @@ body {
 .editor-list {
 	width: 340px;
 	flex: none;
-	border-right: 1px solid var(--vscode-widget-border, transparent);
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column;
+}
+
+/* Drag handle between the two panes. A fixed 5px slot keeps resting geometry
+ * stable (design/05-ui.md no-layout-shift); a centered 1px rule preserves the
+ * original divider, and hover/drag widens the accent without moving anything. */
+.editor-splitter {
+	flex: none;
+	width: 5px;
+	cursor: col-resize;
+	background:
+		linear-gradient(var(--vscode-widget-border, transparent), var(--vscode-widget-border, transparent)) center / 1px
+			100% no-repeat;
+	touch-action: none;
+}
+
+.editor-splitter:hover,
+.editor-splitter:active {
+	background:
+		linear-gradient(var(--vscode-focusBorder, #007fd4), var(--vscode-focusBorder, #007fd4)) center / 3px 100%
+			no-repeat;
 }
 
 .editor-detail {

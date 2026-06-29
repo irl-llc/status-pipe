@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
 import { buildFixtureWorkspace } from '../fixtures/protocolFixtures';
 import { QUIET_TOASTS, degradedRepo, lanesRepo } from './fixtures/scenarios';
 import { launchVSCode, type VSCodeInstance } from './fixtures/vscode';
-import { openQueueEditor, openQueueView, setSidebarWidth } from './fixtures/webview';
+import { dragEditorSplitter, openQueueEditor, openQueueView, setSidebarWidth } from './fixtures/webview';
 
 test.describe('queue lanes', () => {
 	let vscode: VSCodeInstance;
@@ -62,6 +62,26 @@ test.describe('queue lanes', () => {
 		await expect(ackedCard).toHaveScreenshot('acked-card.png');
 
 		await expect(vscode.workbench).toHaveScreenshot('lanes-editor.png', { fullPage: true });
+	});
+
+	test('editor list pane is resizable via the splitter', async () => {
+		const workspace = buildFixtureWorkspace([lanesRepo()], QUIET_TOASTS);
+		vscode = await launchVSCode(workspace);
+		const frame = await openQueueEditor(vscode.workbench);
+
+		// Splitter affordance is present between the two panes.
+		const splitter = frame.locator('.editor-splitter');
+		await expect(splitter).toBeVisible();
+
+		// Drag it wider; the list pane grows from the 340px default toward the
+		// 640px clamp and the detail pane gives up the width.
+		const widthBefore = await frame
+			.locator('.editor-list')
+			.evaluate((el) => (el as HTMLElement).getBoundingClientRect().width);
+		const widthAfter = await dragEditorSplitter(vscode.workbench, frame, 200);
+		expect(widthAfter).toBeGreaterThan(widthBefore);
+
+		await expect(vscode.workbench).toHaveScreenshot('lanes-editor-resized.png', { fullPage: true });
 	});
 
 	test('tray view renders the compact triage index', async () => {

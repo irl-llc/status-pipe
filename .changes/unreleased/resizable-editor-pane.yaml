@@ -1,0 +1,2 @@
+kind: Added
+body: 'The editor view''s status-card list pane is now resizable: drag the divider between the list and the detail pane to widen or narrow it. The chosen width is remembered across reloads.'
