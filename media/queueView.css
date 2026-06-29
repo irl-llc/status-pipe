@@ -511,6 +511,15 @@ body {
 	padding: 12px 16px;
 }
 
+/* Shown when the pane falls back to the top item with no explicit selection —
+   it must read as a hint, never as an authoritative chosen ticket. */
+.selection-note {
+	color: var(--vscode-descriptionForeground);
+	font-size: 0.85em;
+	font-style: italic;
+	margin-bottom: 8px;
+}
+
 .detail-section {
 	margin-bottom: 14px;
 }

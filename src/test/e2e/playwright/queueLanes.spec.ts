@@ -61,6 +61,14 @@ test.describe('queue lanes', () => {
 		// ack'd visual without hunting for it inside the full-lane shot above.
 		await expect(ackedCard).toHaveScreenshot('acked-card.png');
 
+		// Dedicated baseline of the "nothing selected" affordance (issue #26):
+		// with no explicit selection the detail pane falls back to the top
+		// NEEDS-YOU item under an italic "most urgent — nothing selected" note,
+		// so it can never read as authoritative for a ticket open elsewhere.
+		// Isolated like acked-card above so the banner is visible at a glance.
+		await expect(frame.locator('.selection-note', { hasText: 'most urgent — nothing selected' })).toBeVisible();
+		await expect(frame.locator('.editor-detail')).toHaveScreenshot('selection-note.png');
+
 		await expect(vscode.workbench).toHaveScreenshot('lanes-editor.png', { fullPage: true });
 	});
 

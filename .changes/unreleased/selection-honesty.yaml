@@ -1,0 +1,2 @@
+kind: Fixed
+body: 'The editor right pane no longer silently shows a different ticket than the one you selected. When the queue updates underneath a selection whose card has left the visible set, the selection is cleared rather than silently re-pointed to the top card. And when nothing is explicitly selected, the pane shows the top NEEDS-YOU item under a "most urgent — nothing selected" note, so it can never read as authoritative for a ticket you have open elsewhere.'
