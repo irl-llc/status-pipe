@@ -23,6 +23,8 @@ interface Harness {
 	spawner: FakeSpawner;
 	runner: WorkerRunner;
 	logs: string[];
+	fileLines: string[];
+	fileClosed: number;
 	doneCount: number;
 }
 
@@ -30,12 +32,19 @@ function makeRunner(timeoutMinutes = 45): Harness {
 	const clock = new ManualClock();
 	const spawner = new FakeSpawner();
 	const logs: string[] = [];
-	const h = { clock, spawner, logs, doneCount: 0 } as Harness;
+	const fileLines: string[] = [];
+	const h = { clock, spawner, logs, fileLines, fileClosed: 0, doneCount: 0 } as Harness;
 	const deps: WorkerRunnerDeps = {
 		spawn: spawner.spawn,
 		now: () => clock.now,
 		schedule: clock.schedule,
 		log: (line) => logs.push(line),
+		logFile: {
+			write: (line) => fileLines.push(line),
+			close: () => {
+				h.fileClosed += 1;
+			},
+		},
 		onDone: () => {
 			h.doneCount += 1;
 		},
@@ -114,5 +123,26 @@ describe('supervisor/workerRunner', () => {
 		h.runner.stop(); // one kill from stop…
 		await h.clock.advance(10 * 60_000); // …and the armed timeout must not add another
 		assert.equal(h.spawner.kills, 1);
+	});
+
+	it('tees banners and output to the persistent disk log, closed once on exit', () => {
+		const h = makeRunner();
+		h.runner.start();
+		h.spawner.outputLast('{"type":"assistant"}');
+		h.spawner.exitLast(0);
+		// Same lines as the live channel, plus the file is closed exactly once.
+		assert.deepEqual(h.fileLines, h.logs);
+		assert.ok(h.fileLines[0].includes('worker 19 started'));
+		assert.ok(h.fileLines.includes('{"type":"assistant"}'));
+		assert.ok(h.fileLines.some((l) => l.includes('worker 19 ended')));
+		assert.equal(h.fileClosed, 1);
+	});
+
+	it('closes the disk log even when the spawn fails', () => {
+		const h = makeRunner();
+		h.spawner.failNext = new Error('ENOENT');
+		h.runner.start();
+		assert.ok(h.fileLines.some((l) => l.includes('spawn failed')));
+		assert.equal(h.fileClosed, 1);
 	});
 });

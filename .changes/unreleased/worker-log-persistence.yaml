@@ -1,0 +1,2 @@
+kind: Added
+body: 'Failed-worker telemetry is now recoverable. Each worker run''s output is persisted to .status-pipe/logs/worker-<key>.log (last three attempts kept, rotated per start), so a failed worker''s output survives the extension reload the live OutputChannel doesn''t. A crashed-worker card gains an "Open log" button that opens this persisted file. Closes #58.'

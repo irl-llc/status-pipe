@@ -11,12 +11,16 @@
 import { ClaudeActivityReducer } from '../output/claudeStream';
 import { WorkerProcessState } from '../queue/queueInputs';
 import { ProcessHandle, SpawnRequest, Spawner } from './supervisedRunner';
+import { WorkerLogSink } from './workerLog';
 
 export interface WorkerRunnerDeps {
 	spawn: Spawner;
 	now(): number;
 	schedule(fn: () => void, ms: number): () => void;
 	log(line: string): void;
+	/** Persistent per-worker disk log (design/09); absent in headless/test
+	 *  contexts. Receives the same lines as `log`, closed once on exit. */
+	logFile?: WorkerLogSink;
 	/** Called once when the process exits or is killed — the pool removes it. */
 	onDone(): void;
 }
@@ -50,18 +54,24 @@ export class WorkerRunner {
 	/** Spawn the process and arm its wall-clock timeout. Call exactly once. */
 	start(): void {
 		this.runningSince = this.deps.now();
-		this.deps.log(`\n══════ worker ${this.key} started ${new Date(this.runningSince).toISOString()} ══════\n`);
+		this.emit(`\n══════ worker ${this.key} started ${new Date(this.runningSince).toISOString()} ══════\n`);
 		try {
 			this.handle = this.deps.spawn(this.request, {
 				onOutput: (chunk) => this.onOutput(chunk),
 				onExit: (code) => this.onExit(code),
 			});
 		} catch (err) {
-			this.deps.log(`[supervisor] worker ${this.key} spawn failed: ${errMessage(err)}\n`);
+			this.emit(`[supervisor] worker ${this.key} spawn failed: ${errMessage(err)}\n`);
 			this.onExit(127);
 			return;
 		}
 		this.armTimeout();
+	}
+
+	/** Tee one line to the live OutputChannel and the persistent disk log. */
+	private emit(line: string): void {
+		this.deps.log(line);
+		this.deps.logFile?.write(line);
 	}
 
 	get alive(): boolean {
@@ -82,7 +92,7 @@ export class WorkerRunner {
 
 	private armTimeout(): void {
 		this.cancelTimeout = this.deps.schedule(() => {
-			this.deps.log(`[supervisor] worker ${this.key} exceeded ${this.timeoutMinutes}m — killed\n`);
+			this.emit(`[supervisor] worker ${this.key} exceeded ${this.timeoutMinutes}m — killed\n`);
 			this.handle?.kill();
 		}, this.timeoutMinutes * 60_000);
 	}
@@ -90,7 +100,7 @@ export class WorkerRunner {
 	private onOutput(chunk: string): void {
 		this.lastOutputAt = this.deps.now();
 		this.reducer.pushChunk(chunk);
-		this.deps.log(chunk);
+		this.emit(chunk);
 	}
 
 	private onExit(code: number | null): void {
@@ -100,9 +110,8 @@ export class WorkerRunner {
 		this.cancelTimeout = null;
 		this.handle = null;
 		const uptimeMs = this.runningSince !== null ? this.deps.now() - this.runningSince : 0;
-		this.deps.log(
-			`══════ worker ${this.key} ended (exit ${code ?? 'signal'}, ${Math.round(uptimeMs / 1000)}s) ══════\n`,
-		);
+		this.emit(`══════ worker ${this.key} ended (exit ${code ?? 'signal'}, ${Math.round(uptimeMs / 1000)}s) ══════\n`);
+		this.deps.logFile?.close();
 		this.deps.onDone();
 	}
 }

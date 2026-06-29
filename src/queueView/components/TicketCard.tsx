@@ -173,13 +173,19 @@ function SimpleAction({ card, kind }: { card: CardDisplay; kind: 'reveal' | 'res
 			</button>
 		);
 	}
+	const ticket = card.ticket ?? '';
 	return (
-		<button
-			className="text-button primary"
-			onClick={() => post({ type: 'restartWorker', repoRoot: card.repoRoot, ticket: card.ticket ?? '' })}
-		>
-			Restart worker
-		</button>
+		<>
+			<button className="text-button" onClick={() => post({ type: 'openWorkerLog', repoRoot: card.repoRoot, ticket })}>
+				Open log
+			</button>
+			<button
+				className="text-button primary"
+				onClick={() => post({ type: 'restartWorker', repoRoot: card.repoRoot, ticket })}
+			>
+				Restart worker
+			</button>
+		</>
 	);
 }
 

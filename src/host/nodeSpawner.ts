@@ -11,8 +11,21 @@ import { ProcessEvents, Spawner } from '../supervisor/supervisedRunner';
 import { resolveLaunchTemplates } from '../supervisor/launchTemplate';
 
 /**
- * Node may emit both 'error' and 'exit' for one process; the runner
- * contract is one onExit per spawn.
+ * Grace window after 'exit' before we force completion when 'close' is wedged.
+ * A child's stdio pipes drain in microseconds once it exits; this only matters
+ * for the pathological case where a surviving grandchild inherited the fd and
+ * holds it open, which would otherwise strand the runner forever.
+ */
+const DRAIN_GRACE_MS = 2_000;
+
+/**
+ * Deliver exactly one onExit per spawn, and only once the child's stdout/stderr
+ * have drained. Node fires 'exit' when the process ends but BEFORE its stdio
+ * pipes flush their final buffered 'data' — so completing on 'exit' would drop a
+ * crashed worker's last output, the very telemetry the persisted worker log
+ * exists to capture (#58). We therefore complete on 'close' (emitted after stdio
+ * drains), fall back to a graced 'exit' so a wedged pipe can't strand the
+ * runner, and to 'error' (code 127) for a process that never spawned.
  */
 function wireExitOnce(child: ChildProcess, events: ProcessEvents): void {
 	let exited = false;
@@ -22,7 +35,8 @@ function wireExitOnce(child: ChildProcess, events: ProcessEvents): void {
 		events.onExit(code);
 	};
 	child.on('error', () => exitOnce(127));
-	child.on('exit', (code) => exitOnce(code));
+	child.on('close', (code) => exitOnce(code));
+	child.on('exit', (code) => setTimeout(() => exitOnce(code), DRAIN_GRACE_MS).unref?.());
 }
 
 export const nodeSpawner: Spawner = (request, events) => {

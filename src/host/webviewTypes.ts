@@ -25,6 +25,7 @@ export type WebviewMessage =
 	| { type: 'ready' }
 	| { type: 'openExternal'; url: string }
 	| { type: 'revealTicketFile'; repoRoot: string; ticket: string }
+	| { type: 'openWorkerLog'; repoRoot: string; ticket: string }
 	| { type: 'openEpicFile'; repoRoot: string; slug: string }
 	| { type: 'ack'; repoRoot: string; ticket: string; note: string | null }
 	| { type: 'withdrawAck'; repoRoot: string; ticket: string; ackId: string }

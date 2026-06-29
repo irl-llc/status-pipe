@@ -311,11 +311,15 @@ describe('queueView/components', () => {
 			assert.deepEqual(messages, [{ type: 'revealTicketFile', repoRoot: '/repo', ticket: 'T-1' }]);
 		});
 
-		it('worker-crashed cards offer Restart worker', () => {
+		it('worker-crashed cards offer Open log (persisted) and Restart worker', () => {
 			const card = makeCard({ reason: 'worker-crashed' });
 			const { result, messages } = renderCard(card);
+			fireEvent.click(result.getByText('Open log'));
 			fireEvent.click(result.getByText('Restart worker'));
-			assert.deepEqual(messages, [{ type: 'restartWorker', repoRoot: '/repo', ticket: 'T-1' }]);
+			assert.deepEqual(messages, [
+				{ type: 'openWorkerLog', repoRoot: '/repo', ticket: 'T-1' },
+				{ type: 'restartWorker', repoRoot: '/repo', ticket: 'T-1' },
+			]);
 		});
 
 		it('an owner question with a ref offers Open question', () => {
